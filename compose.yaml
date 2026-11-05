@@ -1,0 +1,42 @@
+x-osm: &osm
+  image: overv/openstreetmap-tile-server:2.3.0
+  environment:
+    THREADS: ${THREADS:-2}
+  shm_size: 1gb
+
+services:
+  import:
+    <<: *osm
+    profiles: [tools]
+    command: import
+    volumes:
+      - type: bind
+        source: ./data/region.osm.pbf
+        target: /data/region.osm.pbf
+        read_only: true
+        bind:
+          create_host_path: false
+      - osm-data:/data/database
+  tiles:
+    <<: *osm
+    command: run
+    ports:
+      - "127.0.0.1:${TILE_PORT:-8081}:80"
+    restart: unless-stopped
+    volumes:
+      - osm-data:/data/database
+      - osm-tiles:/data/tiles
+  web:
+    image: map-service-web:local
+    build:
+      context: .
+      args:
+        TILE_SERVER_URL: http://tiles:80
+    restart: unless-stopped
+    depends_on: [tiles]
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8080}:3000"
+
+volumes:
+  osm-data:
+  osm-tiles:
