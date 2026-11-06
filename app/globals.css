@@ -17,3 +17,4 @@ main { flex: 1; min-height: 240px; position: relative; display: flex; }
 .compare-toggle:disabled { color: #777; }
 .comparison-grid .map-options { top: 56px; max-width: calc(100% - 48px); }
 @media (max-width: 700px) { .comparison-grid { grid-template-columns: 1fr; grid-template-rows: repeat(3, minmax(300px, 1fr)); } }
+.map-options .coverage-warning { color: #8a4100; font-weight: 600; }

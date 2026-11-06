@@ -84,3 +84,17 @@ test('missing map blocks start; failed npm install does not start services or ma
 test('process failures keep the original nonzero exit status visible', async () => {
   await assert.rejects(runCommand(process.execPath, ['-e', 'process.exit(7)'], { capture: true }), /exit 7/);
 });
+
+test('partial imagery is explicit and reuses the downloaded acquisition', async () => workspace(async root => {
+  await mkdir(join(root, 'data/imagery/taean/sentinel2/source'), { recursive: true });
+  await writeFile(join(root, 'data/imagery/taean/sentinel2/source/acquisition.json'), '{}');
+  const calls = [];
+  const manager = createManager({ root, run: async (command, args) => { calls.push(args); return ''; }, log() {} });
+  await manager.execute('partial-imagery');
+  assert.ok(calls.some(call => call.includes('imagery-build') && call.includes('--allow-partial')));
+  assert.ok(!calls.some(call => call.includes('run') && call.includes('imagery-download')));
+  calls.length = 0;
+  await manager.execute('rebuild-imagery');
+  assert.ok(calls.some(call => call.includes('imagery-build')));
+  assert.ok(!calls.some(call => call.includes('--allow-partial')));
+}));

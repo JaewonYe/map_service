@@ -12,10 +12,11 @@ import numpy as np
 from PIL import Image
 import rasterio
 from rasterio.enums import Resampling
+from rasterio.features import geometry_mask
 from rasterio.merge import merge
 from rasterio.transform import from_bounds
 from rasterio.vrt import WarpedVRT
-from rasterio.warp import transform_bounds
+from rasterio.warp import transform_bounds, transform_geom
 from download import checksum
 
 EXTENT = 20037508.342789244
@@ -84,7 +85,32 @@ def write_tiles(path, rgba, transform, bbox, minzoom, maxzoom, attribution):
     return count
 
 
-def build(root,minzoom=6,maxzoom=14):
+def assess_coverage(valid, transform, root, allow_partial=False):
+    bbox_coverage = float(valid.mean())
+    boundary_path = root/'source/region.boundary.geojson'
+    target = np.ones(valid.shape, dtype=bool)
+    scope = 'bounding_box'
+    boundary_record = None
+    if boundary_path.is_file():
+        boundary = json.loads(boundary_path.read_text())
+        shapes = [transform_geom('EPSG:4326', 'EPSG:3857', feature['geometry'])
+                  for feature in boundary['features'] if feature.get('geometry')]
+        if not shapes: raise RuntimeError('Empty county boundary; coverage cannot be evaluated.')
+        target = geometry_mask(shapes, out_shape=valid.shape, transform=transform, invert=True)
+        if not target.any(): raise RuntimeError('County boundary does not intersect imagery grid.')
+        scope = 'county_boundary'
+        boundary_record = {'file':'source/region.boundary.geojson','sha256':checksum(boundary_path)}
+    coverage = float(valid[target].mean())
+    partial = coverage < 0.98
+    if not valid[target].any(): raise RuntimeError('No valid imagery in target area. Existing tiles preserved.')
+    if partial and not allow_partial:
+        raise RuntimeError(f'Only {coverage:.1%} pixel coverage in {scope} (bbox {bbox_coverage:.1%}). '
+                           'Existing tiles preserved. Use --allow-partial only if transparent missing areas are acceptable; no extra download is needed.')
+    return {'coverage':coverage,'bbox_coverage':bbox_coverage,'coverage_scope':scope,
+            'partial':partial,'boundary_record':boundary_record}
+
+
+def build(root,minzoom=6,maxzoom=14,allow_partial=False):
     if not 0<=minzoom<=maxzoom<=14: raise ValueError('Supported imagery zoom range: 0..14')
     acquisition=json.loads((root/'source/acquisition.json').read_text())
     processed=root/'processed';processed.mkdir(parents=True,exist_ok=True)
@@ -106,11 +132,11 @@ def build(root,minzoom=6,maxzoom=14):
                 calibration=current
                 dataset=stack.enter_context(rasterio.open(path))
                 if dataset.count!=1: raise RuntimeError('Expected individual reflectance bands, not display RGB.')
-                sources.append(stack.enter_context(WarpedVRT(dataset,crs='EPSG:3857',resampling=Resampling.bilinear,nodata=0)))
+                sources.append(stack.enter_context(WarpedVRT(dataset,crs='EPSG:3857',resampling=Resampling.bilinear,src_nodata=0,nodata=0)))
             mosaic,transform=merge(sources,indexes=[1],bounds=bounds,res=resolution,nodata=0,method='first',masked=True)
             bands[band]=mosaic[0].astype('float32').filled(np.nan)*calibration[0]+calibration[1]
-        coverage=float(np.logical_and.reduce([np.isfinite(value) for value in bands.values()]).mean())
-        if coverage<0.98: raise RuntimeError(f'Only {coverage:.1%} pixel coverage; missing scenes. Existing tiles preserved.')
+        quality = assess_coverage(np.logical_and.reduce([np.isfinite(value) for value in bands.values()]), transform, root, allow_partial)
+        print(f"Coverage: {quality['coverage']:.1%} ({quality['coverage_scope']}), bbox {quality['bbox_coverage']:.1%}; partial={quality['partial']}", flush=True)
         dates=sorted({scene['datetime'][:10] for scene in acquisition['scenes']})
         attribution=f'Contains modified Copernicus Sentinel data ({", ".join(sorted({date[:4] for date in dates}))})'
         variants={}
@@ -121,7 +147,7 @@ def build(root,minzoom=6,maxzoom=14):
             variants[identity]={'mbtiles':f'processed/{filename}','sha256':digest,'tiles':count}
             target.replace(processed/filename)
         manifest={**acquisition,'ready':True,'minzoom':minzoom,'maxzoom':maxzoom,'dates':dates,
-                  'attribution':attribution,'coverage':coverage,'variants':variants,'nominal_resolution_m':10,
+                  'attribution':attribution,**quality,'variants':variants,'nominal_resolution_m':10,
                   'acquisition_sha256':checksum(root/'source/acquisition.json'),
                   'display':{'stretch_reflectance':[0,0.3],'gamma':2.2,'infrared_bands':['nir','red','green'],
                              'ndvi_formula':'(nir-red)/(nir+red)','ndvi_range':[-1,1]},
@@ -136,4 +162,5 @@ if __name__=='__main__':
     parser.add_argument('--root',type=Path,default=Path('/data/taean/sentinel2'))
     parser.add_argument('--minzoom',type=int,default=6)
     parser.add_argument('--maxzoom',type=int,default=14)
-    args=parser.parse_args();build(args.root,args.minzoom,args.maxzoom)
+    parser.add_argument('--allow-partial',action='store_true',help='Explicitly allow incomplete coverage; missing pixels remain transparent and the UI shows a warning.')
+    args=parser.parse_args();build(args.root,args.minzoom,args.maxzoom,args.allow_partial)

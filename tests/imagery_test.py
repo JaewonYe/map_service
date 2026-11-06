@@ -72,6 +72,21 @@ class ImageryTest(unittest.TestCase):
                         np.testing.assert_allclose(opaque[0,:3],[85,155,60],atol=1)
             finally: httpd.shutdown();httpd.server_close();thread.join()
             before=(folder/'manifest.json').read_bytes()
+            # Introduce a real nodata strip; strict mode must preserve the old version.
+            for asset in assets.values():
+                path=folder/asset['file']
+                with rasterio.open(path,'r+') as raster:
+                    pixels=raster.read();pixels[:,:,:4]=0;raster.write(pixels)
+                asset['sha256']=checksum(path)
+            (folder/'source/acquisition.json').write_text(json.dumps(acquisition))
+            with self.assertRaisesRegex(RuntimeError,'--allow-partial'):
+                build(folder,13,14)
+            self.assertEqual((folder/'manifest.json').read_bytes(),before)
+            build(folder,13,14,allow_partial=True)
+            partial=json.loads((folder/'manifest.json').read_text())
+            self.assertTrue(partial['partial']);self.assertLess(partial['coverage'],0.98)
+            verify(folder)
+            before=(folder/'manifest.json').read_bytes()
             (folder/'source/red.tif').write_bytes(b'corrupted')
             with self.assertRaises(RuntimeError):verify(folder)
             with self.assertRaises(RuntimeError):build(folder,13,14)
@@ -81,3 +96,32 @@ class ImageryTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             serve.ROOT=Path(folder)
             self.assertTrue(all(not entry['ready'] for entry in serve.metadata()['datasets']))
+
+class CoverageTest(unittest.TestCase):
+    def test_boundary_excludes_missing_pixels_outside_county(self):
+        from build import assess_coverage
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);(root/'source').mkdir()
+            boundary={'type':'FeatureCollection','features':[{'type':'Feature','properties':{},'geometry':{
+                'type':'Polygon','coordinates':[[[0,0],[0.5,0],[0.5,1],[0,1],[0,0]]]}}]}
+            (root/'source/region.boundary.geojson').write_text(json.dumps(boundary))
+            from rasterio.warp import transform_bounds
+            transform=from_bounds(*transform_bounds('EPSG:4326','EPSG:3857',0,0,1,1),10,10)
+            valid=np.zeros((10,10),dtype=bool);valid[:,:5]=True
+            result=assess_coverage(valid,transform,root)
+            self.assertEqual(result['coverage'],1)
+            self.assertEqual(result['bbox_coverage'],0.5)
+            self.assertFalse(result['partial'])
+
+    def test_partial_requires_explicit_opt_in_and_does_not_fill_gaps(self):
+        from build import assess_coverage
+        with tempfile.TemporaryDirectory() as folder:
+            valid=np.ones((10,10),dtype=bool);valid[0,:]=False
+            transform=from_bounds(0,0,100,100,10,10)
+            with self.assertRaisesRegex(RuntimeError,'--allow-partial'):
+                assess_coverage(valid,transform,Path(folder))
+            result=assess_coverage(valid,transform,Path(folder),True)
+            self.assertTrue(result['partial']);self.assertEqual(result['coverage'],0.9)
+            self.assertEqual(valid.sum(),90)
+            with self.assertRaisesRegex(RuntimeError,'No valid imagery'):
+                assess_coverage(np.zeros((10,10),dtype=bool),transform,Path(folder),True)

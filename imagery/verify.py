@@ -11,6 +11,8 @@ def verify(root):
     for scene in manifest['scenes']:
         records.extend((asset['file'],asset['sha256']) for asset in scene['bands'].values())
         if 'metadata_file' in scene: records.append((scene['metadata_file'],scene['metadata_sha256']))
+    if manifest.get('boundary_record'):
+        boundary=manifest['boundary_record'];records.append((boundary['file'],boundary['sha256']))
     records.append(('source/acquisition.json',manifest['acquisition_sha256']))
     records.extend((variant['mbtiles'],variant['sha256']) for variant in manifest['variants'].values())
     for relative,expected in records:

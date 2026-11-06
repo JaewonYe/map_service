@@ -38,7 +38,7 @@ def metadata():
         entry = {'id': identity, **preset, 'ready': False}
         if current:
             manifest, _ = current
-            keys = ('ready', 'bbox', 'minzoom', 'maxzoom', 'dates', 'attribution', 'nominal_resolution_m', 'note')
+            keys = ('ready', 'bbox', 'minzoom', 'maxzoom', 'dates', 'attribution', 'nominal_resolution_m', 'note', 'partial', 'coverage', 'coverage_scope', 'bbox_coverage')
             entry.update({key: manifest[key] for key in keys if key in manifest})
         result.append(entry)
     return {'datasets': result}

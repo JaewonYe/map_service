@@ -53,7 +53,7 @@ test('local satellite imagery is selectable and overlays can be toggled', async 
   await page.route('**/imagery/metadata.json', route => route.fulfill({ json: { datasets:
     [['rgb','자연색 RGB'],['infrared','근적외선 강조'],['ndvi','식생지수 NDVI']].map(([id,label]) => ({
       id,label,ready:true,bbox:[125.45,36.35,126.55,37.08],minzoom:6,maxzoom:14,
-      dates:['2025-10-15'],attribution:'Synthetic imagery test',nominal_resolution_m:10
+      dates:['2025-10-15'],attribution:'Synthetic imagery test',nominal_resolution_m:10,partial:true,coverage:0.9,coverage_scope:'bounding_box'
     }))
   } }));
   await page.route(/\/imagery\/(?:rgb|infrared|ndvi)\/\d+\/\d+\/\d+\.png$/, route => route.fulfill({
@@ -63,6 +63,7 @@ test('local satellite imagery is selectable and overlays can be toggled', async 
   await expect(page.getByLabel('지도 종류')).toHaveValue('rgb');
   await expect.poll(() => imageryRequests.length).toBeGreaterThan(0);
   await expect(page.getByText('자연색 RGB 약 10m · 2025-10-15')).toBeVisible();
+  await expect(page.locator('.coverage-warning')).toContainText('90.0%');
   await page.getByLabel('도로·건물 표시').uncheck();
   await expect(page.getByLabel('도로·건물 표시')).not.toBeChecked();
   await page.getByLabel('지도 종류').selectOption('osm');

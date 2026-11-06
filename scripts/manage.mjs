@@ -97,7 +97,7 @@ export function createManager({ root = projectRoot, run = runCommand, platform =
     await requireVector();
     log('Map data prepared. Select service start next.');
   }
-  async function prepareImagery(force = false) {
+  async function prepareImagery(force = false, allowPartial = false) {
     const folder = path('data/imagery/taean/sentinel2');
     if (force && !await exists(join(folder, 'source/acquisition.json'))) throw new Error('Retained imagery bands are missing. Prepare satellite data first.');
     await docker('--profile', 'imagery-tools', 'build', 'imagery-download');
@@ -110,7 +110,7 @@ export function createManager({ root = projectRoot, run = runCommand, platform =
       await docker('--profile', 'imagery-tools', 'run', '--rm', 'imagery-download');
     }
     await docker('stop', 'imagery');
-    await docker('--profile', 'imagery-tools', 'run', '--rm', 'imagery-build');
+    await docker('--profile', 'imagery-tools', 'run', '--rm', 'imagery-build', ...(allowPartial ? ['--allow-partial'] : []));
     await docker('--profile', 'imagery-tools', 'run', '--rm', 'imagery-verify');
     await docker('up', '-d', 'imagery');
     log('RGB / infrared / NDVI prepared. Start services or refresh the page.');
@@ -145,13 +145,14 @@ export function createManager({ root = projectRoot, run = runCommand, platform =
   }
   return {
     async execute(action) {
-      if (!['map', 'imagery', 'start', 'dev', 'stop', 'status', 'rebuild-map', 'rebuild-imagery'].includes(action)) throw new Error(`Unknown action: ${action}`);
+      if (!['map', 'imagery', 'start', 'dev', 'stop', 'status', 'rebuild-map', 'rebuild-imagery', 'partial-imagery'].includes(action)) throw new Error(`Unknown action: ${action}`);
       await initialize();
       switch (action) {
         case 'map': return prepareMap();
         case 'rebuild-map': return prepareMap(true);
         case 'imagery': return prepareImagery();
         case 'rebuild-imagery': return prepareImagery(true);
+        case 'partial-imagery': return prepareImagery(true, true);
         case 'start': return start();
         case 'dev':
           await requireVector();
@@ -184,7 +185,8 @@ async function main() {
     '5': ['Docker 서비스 종료 (데이터 유지)', 'stop'],
     '6': ['서비스 상태와 오류 로그 확인', 'status'],
     '7': ['보관한 PBF로 지도 타일 재생성', 'rebuild-map'],
-    '8': ['보관한 밴드로 위성영상 재가공', 'rebuild-imagery']
+    '8': ['보관한 밴드로 위성영상 재가공', 'rebuild-imagery'],
+    '9': ['누락 영역을 투명 표시하고 위성영상 재가공 (불완전 영상 허용)', 'partial-imagery']
   };
   const reader = createInterface({ input: process.stdin, output: process.stdout });
   try {
@@ -194,7 +196,7 @@ async function main() {
       console.log(' 0. 메뉴 닫기 (실행 중인 Docker 서비스는 유지)');
       const selected = (await reader.question('번호 선택: ')).trim();
       if (selected === '0') break;
-      if (!choices[selected]) { console.log('0부터 8까지의 번호를 선택하세요.'); continue; }
+      if (!choices[selected]) { console.log('0부터 9까지의 번호를 선택하세요.'); continue; }
       try { await manager.execute(choices[selected][1]); }
       catch (error) { console.error(`\nFAILED: ${error.message}\nNo later setup steps were executed. Fix the error and retry.`); }
       await reader.question('\nEnter를 누르면 메뉴로 돌아갑니다...');

@@ -8,7 +8,7 @@ import { mapStyle } from '../lib/map-style';
 type Imagery = {
   id: string; label: string; ready: boolean; nominal_resolution_m?: number;
   bbox?: [number, number, number, number]; minzoom?: number; maxzoom?: number;
-  attribution?: string; dates?: string[];
+  attribution?: string; dates?: string[]; partial?: boolean; coverage?: number; coverage_scope?: string;
 };
 
 type Camera = { center: [number, number]; zoom: number; bearing: number; pitch: number };
@@ -97,6 +97,7 @@ function MapPanel({ fixedMode, initialCamera, onReady, onDispose, onMetadata }: 
       {mode !== 'osm' && <>
         <label><input type="checkbox" checked={overlay} onChange={event => setOverlay(event.target.checked)} /> 도로·건물 표시</label>
         <small>{selected?.label}{selected?.nominal_resolution_m ? ` 약 ${selected.nominal_resolution_m}m` : ''} · {selected?.dates?.join(', ')}</small>
+        {selected?.partial && <small className="coverage-warning">일부 영상 누락 · 유효 픽셀 {((selected.coverage || 0)*100).toFixed(1)}% ({selected.coverage_scope === 'county_boundary' ? '군 경계' : '사각형 범위'}) · 누락 영역은 투명 표시</small>}
         {mode === 'ndvi' && <small>NDVI: −1 (물·낮은 값) → +1 (높은 식생 반응)</small>}
       </>}
     </div>
