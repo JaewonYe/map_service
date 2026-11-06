@@ -17,7 +17,7 @@ if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 
 ```powershell
 New-Item -ItemType Directory -Force -Path .\data | Out-Null
-curl.exe --fail --location --retry 3 --output .\data\region.osm.pbf https://download.geofabrik.de/europe/monaco-latest.osm.pbf
+Invoke-WebRequest -Uri "https://download.geofabrik.de/europe/monaco-latest.osm.pbf" -OutFile ".\data\region.osm.pbf" -ErrorAction Stop
 # 다운로드 성공 후 실행합니다.
 docker compose --profile tools run --rm import
 ```
@@ -78,15 +78,14 @@ if ($LASTEXITCODE -ne 0) { throw "의존성 설치 실패" }
 # 기존 .env는 유지합니다. 필요한 새 항목은 .env.example을 보고 직접 반영하세요.
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 New-Item -ItemType Directory -Force -Path .\data | Out-Null
-curl.exe --fail --location --retry 3 --output .\data\region.osm.pbf https://download.geofabrik.de/europe/monaco-latest.osm.pbf
-if ($LASTEXITCODE -ne 0) { throw "지도 데이터 다운로드 실패" }
+Invoke-WebRequest -Uri "https://download.geofabrik.de/europe/monaco-latest.osm.pbf" -OutFile ".\data\region.osm.pbf" -ErrorAction Stop
 
 # 새 데이터 볼륨에서 한 번 실행합니다. 성공한 후에만 서버를 시작하세요.
 docker compose --profile tools run --rm import
 if ($LASTEXITCODE -ne 0) { throw "지도 데이터 가져오기 실패: 로그를 확인하세요" }
 ```
 
-`curl.exe`는 Windows PowerShell의 `curl` 별칭과 구분하기 위한 표기입니다. `curl.exe`가 없다면 다운로드 명령 대신 `Invoke-WebRequest -Uri "https://download.geofabrik.de/europe/monaco-latest.osm.pbf" -OutFile .\data\region.osm.pbf`를 사용하세요. 다운로드 도중 종료되었거나 실패한 파일은 가져오지 말고 다시 다운로드하세요.
+다운로드에는 PowerShell의 `Invoke-WebRequest`를 사용합니다. `-ErrorAction Stop`은 다운로드 실패 시 명령 실행을 중단합니다. 다운로드 도중 종료되었거나 실패한 파일은 가져오지 말고 다시 다운로드하세요.
 
 가져오기에는 `download.geofabrik.de`, `osmdata.openstreetmap.de`, `naturalearth.s3.amazonaws.com`에 HTTPS 접근이 필요합니다. 이미지 다운로드에는 Docker Hub, npm 설치에는 npm 레지스트리 접근도 필요합니다. 회사 프록시를 사용한다면 컨테이너에도 프록시와 신뢰할 CA를 전달하세요. 인증서 검증을 끄지 마세요.
 
