@@ -18,3 +18,4 @@ public/maplibre/
 !data/imagery/
 data/imagery/*
 !data/imagery/README.md
+.cache/

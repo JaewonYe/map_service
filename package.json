@@ -11,7 +11,9 @@
     "smoke": "node scripts/smoke.mjs",
     "test:tiles": "node scripts/check-vector.mjs",
     "predev": "node scripts/prepare-maplibre.mjs",
-    "prebuild": "node scripts/prepare-maplibre.mjs"
+    "prebuild": "node scripts/prepare-maplibre.mjs",
+    "manage": "node scripts/manage.mjs",
+    "test:launcher": "node --test --test-isolation=none tests/manage.test.mjs"
   },
   "dependencies": {
     "next": "16.4.5",
