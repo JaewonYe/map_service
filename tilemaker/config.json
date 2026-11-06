@@ -9,7 +9,7 @@
     "maxzoom": 14,
     "basezoom": 14,
     "include_ids": false,
-    "name": "Minimal OSM",
+    "name": "Taean OSM",
     "version": "1.0",
     "description": "OSM-only roads, buildings and inland water; no external datasets",
     "compress": "gzip"

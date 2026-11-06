@@ -9,7 +9,7 @@ test('MapLibre renders vector tiles locally and supports zoom', async ({ page })
   page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => requests.push(request.url()));
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: '자체 호스팅 지도' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '태안군 지도' })).toBeVisible();
   await expect(page.locator('.maplibregl-canvas')).toBeVisible();
   await expect.poll(() => requests.some(url => url.includes('/tile/'))).toBe(true);
   await expect(page.locator('.maplibregl-ctrl-attrib')).toContainText('OpenStreetMap');
@@ -21,7 +21,7 @@ test('MapLibre renders vector tiles locally and supports zoom', async ({ page })
 });
 
 test('Next.js proxies usable road/building geometry and upstream errors', async ({ request }) => {
-  const tile = await request.get('/tile/14/8529/5974.pbf');
+  const tile = await request.get('/tile/14/13940/6391.pbf');
   expect(tile.status()).toBe(200);
   expect(await tile.body()).toEqual(await readFile(new URL('./fixtures/tile.pbf', import.meta.url)));
   const decoded = new VectorTile(new PbfReader(await tile.body()));

@@ -1,4 +1,4 @@
-# Next.js + MapLibre 최소 OSM 지도
+# 태안군 OSM 지도 — Next.js + MapLibre
 
 ## Quick Guide (Windows PowerShell)
 
@@ -13,14 +13,19 @@ npm.cmd ci
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-**2. 지역 데이터 준비** — 기존 `data/region.osm.pbf`가 있다면 다운로드를 생략합니다. 외부 해안선 ZIP 5개는 필요 없습니다.
+**2. 대한민국 원본에서 태안군 PBF 생성** — 이미 태안군 PBF가 있다면 `data/taean.osm.pbf`로 복사하고 다음 단계로 넘어갑니다. 모나코 PBF의 파일명만 바꿔 사용하면 안 됩니다.
 
 ```powershell
 New-Item -ItemType Directory -Force -Path .\data\vector | Out-Null
-Invoke-WebRequest -Uri "https://download.geofabrik.de/europe/monaco-latest.osm.pbf" -OutFile ".\data\region.osm.pbf" -ErrorAction Stop
+Invoke-WebRequest -Uri "https://download.geofabrik.de/asia/south-korea-latest.osm.pbf" -OutFile ".\data\south-korea.osm.pbf" -ErrorAction Stop
+docker compose build extract
+# 다운로드와 빌드가 성공한 후 실행합니다.
+docker compose --profile tools run --rm extract
 ```
 
-**3. 벡터 타일 생성** — PBF에서 `data/vector/region.mbtiles`를 생성합니다. 최초 1회 또는 데이터 변경 시에만 실행하세요. 타일 생성 중에는 서버를 중지합니다.
+추출기는 대한민국 PBF의 OSM 태안군 행정경계(`admin_level=6`)를 찾아 `data/taean.osm.pbf`를 생성합니다. 외부 해안선 ZIP은 필요 없습니다.
+
+**3. 벡터 타일 생성** — 태안군 PBF에서 `data/vector/region.mbtiles`를 생성합니다. 최초 1회 또는 데이터 갱신 시 실행합니다.
 
 ```powershell
 docker compose stop tiles
@@ -47,37 +52,35 @@ npm.cmd run dev
 ## 구성
 
 ```text
-지역 .osm.pbf → tilemaker (자체 JSON/Lua 설정) → region.mbtiles
+대한민국 .osm.pbf → osmium 행정경계 추출 → 태안군 .osm.pbf → tilemaker (자체 JSON/Lua 설정) → region.mbtiles
 브라우저 → Next.js + MapLibre → /tile/z/x/y.pbf → Python 읽기 전용 타일 서버
 ```
 
 | 위치 | 역할 |
 | --- | --- |
-| `data/region.osm.pbf` | 지역 OSM 원본 |
+| `data/south-korea.osm.pbf` | 다운로드한 대한민국 OSM 원본 |
+| `data/taean.osm.pbf` | 행정경계로 추출한 태안군 OSM 원본 |
+| `data/taean.boundary.geojson` | 추출에 사용한 행정경계 |
+| `data/taean.manifest.json` | 원본·결과 SHA256 및 객체 수 |
+| `extract/extract.py` | 태안군 경계 선택 및 PBF 추출 |
 | `data/vector/region.mbtiles` | 생성된 벡터 타일 (Git 제외) |
 | `tilemaker/config.json`, `tilemaker/process.lua` | 외부 자료 없는 최소 레이어 생성 |
 | `tile-server/server.py` | MBTiles(TMS)를 XYZ HTTP 타일로 제공; gzip 처리 |
 | `lib/map-style.ts` | MapLibre의 로컬 스타일 |
-| `lib/map-config.ts` | 중심 좌표·확대 수준 (기본 모나코) |
+| `lib/map-config.ts` | 중심 좌표·확대 수준 (기본 태안군 전체 보기) |
 | `components/MapCanvas.tsx` | 클라이언트 전용 지도와 확대·이동 제어 |
 | `next.config.mjs` | 동일 출처 타일 프록시 |
 
-다른 지역을 쓰려면 PBF와 `lib/map-config.ts`의 중심 좌표를 함께 바꾸세요. MapLibre 사용 중 좌표는 컴포넌트에서 `[경도, 위도]`로 변환됩니다. 브라우저에 WebGL 지원이 필요합니다.
+다른 지역을 쓰려면 `extract/extract.py`의 경계 선택 조건, Compose 입력 파일과 `lib/map-config.ts`의 중심 좌표를 함께 바꾸세요. MapLibre 사용 중 좌표는 컴포넌트에서 `[경도, 위도]`로 변환됩니다. 브라우저에 WebGL 지원이 필요합니다.
 
-## 기존 래스터 구성에서 전환
+## 추출 범위와 기존 데이터 전환
 
-기존 PostgreSQL 데이터와 ZIP은 이번 구성에서 사용하지 않습니다. PBF가 남아 있다면 그대로 사용하세요. 기존 서버를 종료하고 아래와 같이 진행합니다.
-
-```powershell
-docker compose down
-npm.cmd ci
-New-Item -ItemType Directory -Force -Path .\data\vector | Out-Null
-docker compose --profile tools run --rm import
-docker compose up -d tiles
-npm.cmd run dev
-```
-
-기존 Docker DB 볼륨은 자동 삭제하지 않습니다. `down -v`, `docker volume prune`은 실행하지 마세요. 이전의 `compose.local-data.yaml` 및 `resume-external` 절차는 이번 구성에서 제거했습니다.
+- 태안군 전체는 사각형이 아닌 **OSM 행정경계 폴리곤**으로 선택합니다. 경계에 포함된 도서도 대한민국 원본에 존재하면 포함됩니다. OSM 경계의 완전성·정확성에 의존하며 공식 지적 경계 데이터를 대신하지 않습니다.
+- 경계를 통과하는 도로·건물은 잘라내지 않고 온전한 way로 보존(`complete_ways`)하므로 일부 도형은 군 밖까지 이어집니다. 경계 부근 relation은 불완전할 수 있습니다.
+- 태안군 경계가 없거나 여러 개라면 추출을 실패 처리합니다. 사각형 범위로 자동 대체하지 않습니다. 추출은 네트워크 차단 상태에서 수행되며 원본 파일을 수정하지 않습니다.
+- 대한민국 원본 처리는 태안군 타일 호스팅보다 RAM·디스크를 더 사용합니다. 추출용으로 RAM 8~16GB와 충분한 SSD 여유를 우선 준비하고 실제 사용량을 확인하세요. 생성 후 호스팅에는 `region.mbtiles`만 필요합니다.
+- 기존 모나코·래스터 데이터를 사용 중이라면 `docker compose down`으로 중지하고 `npm.cmd ci` 후 위 Quick Guide 2~4단계를 수행하세요. 기존 `data/region.osm.pbf`는 보존하지만 새 구성에서는 사용하지 않습니다.
+- 기존 DB 볼륨과 ZIP은 삭제하지 않습니다. `down -v`, `docker volume prune`은 실행하지 마세요. 태안군 추출이 성공한 뒤에만 타일을 재생성하세요.
 
 ## Docker로 전체 실행
 
@@ -99,6 +102,19 @@ docker build --secret "id=proxy_ca,src=$proxyCaPath" -t map-service-web:local .
 
 ## 검증·문제 확인
 
+### Windows에서 MapLibre worker 파일이 없다는 오류가 나는 경우
+
+`predev`에서 `maplibre-gl-worker.mjs`를 찾지 못하면, 이전 버전의 `node_modules`가 남았거나 의존성 설치가 완료되지 않았을 수 있습니다. 다운로드한 최신 저장소 폴더에서 다음을 실행하세요.
+
+```powershell
+npm.cmd ci
+if ($LASTEXITCODE -ne 0) { throw "의존성 설치 실패: 위 설치 로그를 확인하세요" }
+npm.cmd run dev
+```
+
+`npm.cmd ci`는 잠금 파일에 맞춰 의존성을 다시 설치합니다. 기존 지도 PBF와 MBTiles는 삭제하지 않습니다. 설치가 실패하면 개발 서버 실행 전에 설치 오류를 해결해야 합니다. `package-lock.json`은 삭제하지 마세요. 계속 실패하면 `npm.cmd ls maplibre-gl` 결과와 설치 오류를 확인하세요.
+
+
 ```powershell
 npx.cmd playwright install chromium
 npm.cmd test
@@ -119,4 +135,8 @@ npm.cmd run test:tiles
 
 OSM 저작자 표시를 유지하며, 데이터 재배포·파생 DB에는 [ODbL 조건](https://www.openstreetmap.org/copyright)을 확인하세요. 향후 위성 영상을 배경 레이어로 추가하고 현재 벡터 도로·건물을 겹칠 수 있습니다.
 
-검증: 공식 tilemaker의 모나코 테스트 PBF로 네트워크 차단 상태에서 생성, 실제 MBTiles 타일 도형 디코딩, Docker 전체 실행·브라우저 렌더링, Chromium 테스트 3개, Python 서버 테스트 3개, TypeScript 검사를 통과했습니다. Windows에서 직접 실행한 검증은 아직 하지 않았습니다.
+태안군 실제 데이터 생성 상태: 현재 클라우드에서는 `download.geofabrik.de` 접근이 HTTP 403으로 차단되어 실제 대한민국 원본 및 태안군 PBF·타일을 아직 생성하지 못했습니다. 합성 데이터 검증과 실제 지역 데이터 검증을 구분해야 합니다. Windows에서 직접 실행한 검증도 아직 하지 않았습니다.
+
+원본 다운로드가 차단되면 접속 가능한 다른 네트워크에서 [대한민국 PBF](https://download.geofabrik.de/asia/south-korea-latest.osm.pbf)를 받고 `data/south-korea.osm.pbf`에 복사한 뒤 추출 명령부터 실행하세요.
+
+검증: 합성 행정경계의 내부 도로·건물 포함 및 외부 도로 제외, 실패 시 기존 PBF 보존, 추출 PBF의 벡터 타일 변환을 확인했습니다. 경계 추출 테스트 3개, 브라우저 테스트 3개와 TypeScript 검사도 통과했습니다. 이는 실제 태안군 데이터 검증 결과가 아닙니다.

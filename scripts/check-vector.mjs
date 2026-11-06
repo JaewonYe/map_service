@@ -3,7 +3,7 @@ import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
 
 const base = process.env.MAP_URL || 'http://127.0.0.1:8081';
-const tile = process.env.SMOKE_TILE || '14/8529/5974';
+const tile = process.env.SMOKE_TILE || '14/13940/6391';
 assert.match(tile, /^\d+\/\d+\/\d+$/);
 const response = await fetch(new URL(`/tile/${tile}.pbf`, base), { signal: AbortSignal.timeout(30000) });
 assert.equal(response.status, 200, 'Vector tile HTTP status');

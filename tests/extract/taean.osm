@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic fixture, not real Taean OSM data. -->
+<osm version="0.6" generator="map-service-test">
+  <node id="1" lat="36.73" lon="126.28" version="1"/>
+  <node id="2" lat="36.73" lon="126.32" version="1"/>
+  <node id="3" lat="36.76" lon="126.32" version="1"/>
+  <node id="4" lat="36.76" lon="126.28" version="1"/>
+  <node id="11" lat="36.74" lon="126.29" version="1"/>
+  <node id="12" lat="36.75" lon="126.31" version="1"/>
+  <node id="21" lat="36.745" lon="126.298" version="1"/>
+  <node id="22" lat="36.745" lon="126.300" version="1"/>
+  <node id="23" lat="36.747" lon="126.300" version="1"/>
+  <node id="24" lat="36.747" lon="126.298" version="1"/>
+  <node id="31" lat="37.0" lon="127.0" version="1"/>
+  <node id="32" lat="37.1" lon="127.1" version="1"/>
+  <way id="100" version="1"><nd ref="1"/><nd ref="2"/><nd ref="3"/><nd ref="4"/><nd ref="1"/></way>
+  <way id="200" version="1"><nd ref="11"/><nd ref="12"/><tag k="highway" v="residential"/></way>
+  <way id="201" version="1"><nd ref="21"/><nd ref="22"/><nd ref="23"/><nd ref="24"/><nd ref="21"/><tag k="building" v="yes"/></way>
+  <way id="300" version="1"><nd ref="31"/><nd ref="32"/><tag k="highway" v="primary"/></way>
+  <relation id="500" version="1"><member type="way" ref="100" role="outer"/><tag k="type" v="multipolygon"/><tag k="boundary" v="administrative"/><tag k="admin_level" v="6"/><tag k="name" v="태안군"/></relation>
+</osm>

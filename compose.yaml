@@ -1,4 +1,13 @@
 services:
+  extract:
+    image: map-service-extract:local
+    build:
+      context: .
+      dockerfile: extract/Dockerfile
+    profiles: [tools]
+    network_mode: none
+    volumes:
+      - ./data:/data
   import:
     # Official image pinned to an immutable multi-platform digest.
     image: ghcr.io/systemed/tilemaker@sha256:9cd8728a37a31c8a5205e091cedd3ff2c2c450c57e1ce3e5b58916185540ebba
@@ -7,7 +16,7 @@ services:
     entrypoint: [/bin/sh, /config/import.sh]
     volumes:
       - type: bind
-        source: ./data/region.osm.pbf
+        source: ./data/taean.osm.pbf
         target: /input/region.osm.pbf
         read_only: true
         bind:
