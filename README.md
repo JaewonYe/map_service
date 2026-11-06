@@ -1,5 +1,40 @@
 # Next.js 기반 자체 호스팅 OSM 지도
 
+## Quick Guide (Windows PowerShell)
+
+**준비:** Git, Node.js 22 이상, Docker Desktop(WSL 2·Linux containers)을 설치하고 Docker Desktop을 실행하세요. 아래 명령은 순서대로 실행하며, 실패하면 다음 단계로 넘어가지 마세요.
+
+**1. 최초 설정** — 저장소를 복제하고 의존성과 환경설정을 준비합니다. 이미 복제했다면 기존 폴더에서 `npm.cmd ci`부터 실행하세요.
+
+```powershell
+git clone https://github.com/JaewonYe/map_service.git
+Set-Location .\map_service
+npm.cmd ci
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+```
+
+**2. 지도 데이터 준비 (최초 1회)** — 작은 모나코 데이터를 다운로드하고 DB에 가져옵니다. 완료까지 시간이 걸립니다. 기존 DB에는 import를 다시 실행하지 마세요.
+
+```powershell
+New-Item -ItemType Directory -Force -Path .\data | Out-Null
+curl.exe --fail --location --retry 3 --output .\data\region.osm.pbf https://download.geofabrik.de/europe/monaco-latest.osm.pbf
+# 다운로드 성공 후 실행합니다.
+docker compose --profile tools run --rm import
+```
+
+**3. 개발 서버 실행** — 데이터 가져오기가 성공한 후 실행하고, 브라우저에서 `http://127.0.0.1:3000`을 엽니다. 이후에는 이 단계만 반복하면 됩니다.
+
+```powershell
+docker compose up -d tiles
+npm.cmd run dev
+```
+
+**종료:** `Ctrl+C`로 Next.js를 종료한 뒤 `docker compose down`으로 타일 서버를 중지합니다. 지도 데이터는 유지됩니다.
+
+설치·배포·테스트의 상세 설명은 아래 항목을 참고하세요.
+
+---
+
 Next.js App Router + React + TypeScript 프런트엔드입니다. Leaflet을 클라이언트 컴포넌트에서 `dynamic(..., { ssr: false })`로 로드합니다. 지도 라이브러리와 스타일은 Next.js 번들로 제공하며 외부 CDN이나 OSM 공용 타일 서버를 사용하지 않습니다.
 
 지도 백엔드는 별도 Docker 서비스입니다. OpenStreetMap 추출본을 PostgreSQL/PostGIS에 가져오고 Mapnik/renderd가 PNG 타일을 생성합니다. Next.js `rewrites`가 `/tile/{z}/{x}/{y}.png` 요청을 타일 서버로 전달하므로 브라우저의 별도 CORS 설정이 필요 없습니다. 기존 Nginx 정적 웹 서버는 제거했습니다.
