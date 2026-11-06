@@ -10,7 +10,8 @@ data/*
 next-env.d.ts
 test-results/
 playwright-report/
-!data/external/
-data/external/*
-!data/external/README.md
 __pycache__/
+!data/vector/
+data/vector/*
+!data/vector/README.md
+public/maplibre/

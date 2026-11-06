@@ -1,31 +1,28 @@
-x-osm: &osm
-  image: overv/openstreetmap-tile-server:2.3.0
-  environment:
-    THREADS: ${THREADS:-2}
-  shm_size: 1gb
-
 services:
   import:
-    <<: *osm
+    # Official image pinned to an immutable multi-platform digest.
+    image: ghcr.io/systemed/tilemaker@sha256:9cd8728a37a31c8a5205e091cedd3ff2c2c450c57e1ce3e5b58916185540ebba
     profiles: [tools]
-    command: import
+    network_mode: none
+    entrypoint: [/bin/sh, /config/import.sh]
     volumes:
       - type: bind
         source: ./data/region.osm.pbf
-        target: /data/region.osm.pbf
+        target: /input/region.osm.pbf
         read_only: true
         bind:
           create_host_path: false
-      - osm-data:/data/database
+      - ./data/vector:/output
+      - ./tilemaker:/config:ro
   tiles:
-    <<: *osm
-    command: run
+    image: python:3.12-slim-bookworm
+    command: [python, /app/server.py]
+    restart: unless-stopped
     ports:
       - "127.0.0.1:${TILE_PORT:-8081}:80"
-    restart: unless-stopped
     volumes:
-      - osm-data:/data/database
-      - osm-tiles:/data/tiles
+      - ./data/vector:/data:ro
+      - ./tile-server:/app:ro
   web:
     image: map-service-web:local
     build:
@@ -36,7 +33,3 @@ services:
     depends_on: [tiles]
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8080}:3000"
-
-volumes:
-  osm-data:
-  osm-tiles:

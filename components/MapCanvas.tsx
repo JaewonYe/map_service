@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import L from 'leaflet';
+import { Map, NavigationControl, setWorkerUrl } from 'maplibre-gl';
 import { mapConfig } from '../lib/map-config';
+import { mapStyle } from '../lib/map-style';
 
 export default function MapCanvas() {
   const container = useRef<HTMLDivElement>(null);
@@ -10,29 +11,36 @@ export default function MapCanvas() {
 
   useEffect(() => {
     if (!container.current) return;
-    const map = L.map(container.current, {
-      minZoom: mapConfig.minZoom,
-      maxZoom: mapConfig.maxZoom
-    }).setView(mapConfig.center, mapConfig.zoom);
-    const osm = L.tileLayer('/tile/{z}/{x}/{y}.png', {
-      maxZoom: mapConfig.maxZoom,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    setWorkerUrl('/maplibre/maplibre-gl-worker.mjs');
+    let map: Map;
+    try {
+      map = new Map({
+        container: container.current,
+        style: mapStyle,
+        center: [mapConfig.center[1], mapConfig.center[0]],
+        zoom: mapConfig.zoom,
+        minZoom: mapConfig.minZoom,
+        maxZoom: mapConfig.maxZoom
+      });
+    } catch {
+      setTileError(true);
+      return;
+    }
+    map.addControl(new NavigationControl(), 'top-right');
+    map.on('error', event => {
+      console.error('Map rendering failed:', event.error);
+      setTileError(true);
     });
-    let failed = false;
-    osm.on('loading', () => { failed = false; });
-    osm.on('tileerror', () => { failed = true; setTileError(true); });
-    osm.on('load', () => { if (!failed) setTileError(false); });
-    osm.addTo(map);
-    // Add future imagery providers as independent base layers here.
-    L.control.layers({ OpenStreetMap: osm }).addTo(map);
-    // Required for navigation, hot reload, and React Strict Mode remounts.
+    map.on('sourcedata', event => {
+      if (event.sourceId === 'osm' && event.sourceDataType === 'content') setTileError(false);
+    });
     return () => { map.remove(); };
   }, []);
 
   return <>
     <div ref={container} id="map" aria-label="OpenStreetMap 지도" />
     {tileError && <p className="map-status" role="status">
-      지도 타일을 불러오지 못했습니다. 데이터 가져오기 및 타일 서버 상태를 확인하세요.
+      지도를 불러오지 못했습니다. 벡터 타일 생성·서버 상태와 WebGL 지원을 확인하세요.
     </p>}
   </>;
 }

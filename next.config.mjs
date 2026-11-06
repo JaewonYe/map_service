@@ -8,8 +8,8 @@ const nextConfig = {
       throw new Error('TILE_SERVER_URL must be an HTTP(S) origin without credentials or a path.');
     }
     return [{
-      source: '/tile/:z(\\d+)/:x(\\d+)/:y(\\d+).png',
-      destination: `${upstream.origin}/tile/:z/:x/:y.png`
+      source: '/tile/:z(\\d+)/:x(\\d+)/:y(\\d+).pbf',
+      destination: `${upstream.origin}/tile/:z/:x/:y.pbf`
     }];
   }
 };

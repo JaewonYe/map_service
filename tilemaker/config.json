@@ -1,0 +1,17 @@
+{
+  "layers": {
+    "roads": { "minzoom": 6, "maxzoom": 14 },
+    "buildings": { "minzoom": 12, "maxzoom": 14 },
+    "water": { "minzoom": 6, "maxzoom": 14 }
+  },
+  "settings": {
+    "minzoom": 6,
+    "maxzoom": 14,
+    "basezoom": 14,
+    "include_ids": false,
+    "name": "Minimal OSM",
+    "version": "1.0",
+    "description": "OSM-only roads, buildings and inland water; no external datasets",
+    "compress": "gzip"
+  }
+}
