@@ -7,3 +7,6 @@ OSM data: © OpenStreetMap contributors, ODbL — https://www.openstreetmap.org/
 
 The fixture has real road/building geometry. The HTTP test double returns it for
 multiple coordinates to test the frontend independently of a running MBTiles server.
+
+`satellite.png` is a solid-color synthetic test image, not satellite imagery.
+It is never copied into the real `data/imagery/` folder.

@@ -15,3 +15,6 @@ __pycache__/
 data/vector/*
 !data/vector/README.md
 public/maplibre/
+!data/imagery/
+data/imagery/*
+!data/imagery/README.md

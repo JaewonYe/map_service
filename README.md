@@ -35,7 +35,7 @@ docker compose --profile tools run --rm import
 **4. 개발 실행** — 생성이 성공한 뒤 실행하고 `http://127.0.0.1:3000`을 엽니다.
 
 ```powershell
-docker compose up -d tiles
+docker compose up -d tiles imagery
 npm.cmd run dev
 ```
 
@@ -44,10 +44,75 @@ npm.cmd run dev
 ## 무엇이 표시되나요?
 
 - 도로와 건물, PBF의 닫힌 수면 도형을 표시합니다.
-- **바다/해안선, 지형, 글자 라벨, POI, 위성 영상은 제공하지 않습니다.** 바다 영역도 기본 배경색으로 보일 수 있습니다. 지역 경계에서 잘린 수면 및 복잡한 관계 도형은 완전하지 않을 수 있습니다.
+- **일반 지도에는 바다/해안선, 지형, 글자 라벨, POI가 없습니다.** 위성영상은 아래 별도 준비 절차를 완료하면 사용할 수 있습니다. 바다 영역도 기본 배경색으로 보일 수 있습니다. 지역 경계에서 잘린 수면 및 복잡한 관계 도형은 완전하지 않을 수 있습니다.
 - 폰트·스프라이트·외부 스타일·외부 ZIP을 요청하지 않습니다. `osmdata.openstreetmap.de`, Natural Earth, PostgreSQL/PostGIS가 필요 없습니다.
 - 타일은 z6~14에서 생성하며, 더 확대하면 z14 타일을 확대 표시합니다. 데이터 지역 밖에는 기본 배경만 보일 수 있습니다.
 - 최초 Docker 이미지와 npm 패키지 설치에는 인터넷이 필요합니다. 이미 준비된 이미지·의존성과 로컬 PBF가 있으면 타일 생성 및 지도 제공에는 외부 데이터 다운로드가 필요 없습니다.
+
+## 위성영상 3종 다운로드·비교·이동
+
+같은 Sentinel-2 자료(약 10m)의 **자연색 RGB / 근적외선 강조 / 식생지수 NDVI**를 제공합니다. 열화상이나 건물 식별용 항공사진은 아닙니다. 원본 Red·Green·Blue·NIR 밴드는 한 번만 다운로드하며 세 영상이 같은 장면을 공유합니다.
+
+**1. 도구 빌드·다운로드** — 아래 두 도메인의 HTTPS 접근이 필요합니다.
+
+- `earth-search.aws.element84.com` (카탈로그)
+- `sentinel-cogs.s3.us-west-2.amazonaws.com` (원본 밴드)
+
+```powershell
+docker compose --profile imagery-tools build imagery-download
+docker compose --profile imagery-tools run --rm imagery-download
+```
+
+기본 검색 기간은 **2025년 10월**, 장면 전체 구름 비율 15% 이하입니다. 다른 기간은 다운로드 명령 뒤에 `--dates "2025-09-01T00:00:00Z/2025-09-30T23:59:59Z" --max-cloud 20`을 붙이세요. 격자별로 구름이 적은 장면을 선택하므로 하나의 모자이크에 여러 촬영일이 포함될 수 있고 태안군에 구름이 남을 수 있습니다. 경계 파일이 있으면 도서를 포함하는 행정경계의 사각형 범위를 사용하며, 없으면 서쪽 도서까지 포함하는 기본 범위를 사용합니다. 주변 지역·바다도 영상에 포함될 수 있습니다.
+
+장면 전체 원본 밴드를 보관하므로 여러 장면이면 수 GB 이상의 디스크가 필요할 수 있습니다. 처리용 RAM 8~16GB와 충분한 SSD를 준비하고 실제 사용량을 확인하세요.
+
+**2. 오프라인 가공·적용** — 다운로드가 성공한 후 순서대로 실행합니다. 가공과 검증 컨테이너는 네트워크가 차단됩니다.
+
+```powershell
+docker compose stop imagery
+docker compose --profile imagery-tools run --rm imagery-build
+docker compose --profile imagery-tools run --rm imagery-verify
+docker compose up -d imagery
+```
+
+개발 서버를 실행하고 페이지를 새로고침하면 자연색 영상이 기본으로 표시됩니다. **지도 종류**에서 세 영상을 전환하거나 **세 영상 나란히 비교**를 누르세요. 세 지도의 위치·확대·회전이 함께 움직입니다. 도로·건물을 겹쳐 볼 수도 있습니다. Docker 웹은 새 프록시 설정을 위해 `docker compose up -d --build web`으로 다시 빌드합니다. 데이터가 없으면 영상 옵션과 비교 버튼은 비활성화되고 일반 지도는 유지됩니다.
+
+- 자연색: Red·Green·Blue, 반사도 0~0.3 및 감마 2.2 표시 보정
+- 근적외선 강조: NIR·Red·Green을 RGB로 배치한 가색상 영상 (열화상 아님)
+- NDVI: STAC의 scale/offset을 적용한 반사도로 `(NIR-Red)/(NIR+Red)` 계산; −1~1을 색상으로 표시
+
+명시적인 반사도 보정 정보가 없거나 장면별 보정값이 다르면 임의 추정하지 않고 중단합니다. 가시광·NIR 정렬 후 NDVI를 계산하므로 재표본화 영향이 있으며, 구름·그림자·대기 영향이 남을 수 있습니다. **NDVI 타일은 비교용 색상 시각화이며 검증된 농작물 진단이나 정량 지수 파일이 아닙니다.** 원본 밴드와 보정 정보를 보관해 추후 다시 처리할 수 있습니다.
+
+영역의 유효 픽셀 비율이 98% 미만이면 생성을 실패 처리합니다. 이것은 구름이 없다는 검증이 아닙니다. 새 파일 3종 생성이 완료된 뒤에만 manifest를 교체하므로 실패 시 기존 완료 버전이 유지됩니다.
+
+**3. 백업·이동** — 아래 **`data/imagery/taean/sentinel2/` 폴더 전체**를 복사하세요. 실제 영상은 Git에 업로드하지 않습니다.
+
+```text
+data/imagery/taean/sentinel2/
+├── source/
+│   ├── <장면ID>-red.tif / -green.tif / -blue.tif / -nir.tif
+│   ├── *.stac.json              # 촬영일·출처·공간정보·밴드 보정값
+│   ├── *.sha256                 # 원본 체크섬
+│   └── acquisition.json         # 선택 장면·상대경로·체크섬
+├── processed/
+│   ├── rgb-<체크섬>.mbtiles
+│   ├── infrared-<체크섬>.mbtiles
+│   └── ndvi-<체크섬>.mbtiles
+└── manifest.json                # 날짜·이용 조건·표시 방식·현재 파일 참조·체크섬
+```
+
+복사 전 `docker compose stop imagery`로 중지합니다. 다른 PC의 동일한 경로에 붙여넣고 아래 명령을 실행하면 **재다운로드·재가공 없이** 사용할 수 있습니다. 새 PC는 위 1단계의 **빌드만** 수행하거나 이미지도 미리 옮겨야 합니다.
+
+```powershell
+docker compose --profile imagery-tools run --rm imagery-verify
+docker compose up -d tiles imagery
+npm.cmd run dev
+```
+
+원본·촬영 메타데이터·가공 타일을 SHA256으로 검사합니다. `source/`와 Copernicus 출처·이용 조건 링크도 함께 보관하세요. 이전 가공 버전은 자동 삭제하지 않습니다. 영상 서버 포트는 기본 8082이며 `IMAGERY_PORT`, `IMAGERY_SERVER_URL`을 함께 조절합니다.
+
+**현재 실제 다운로드 상태:** 클라우드 정책의 HTTP 403으로 실제 태안군 위성자료는 아직 다운로드하지 못했습니다. 폴더가 존재하는 것만으로 다운로드 완료를 판단하지 마세요. 합성 시험 자료는 실제 데이터 폴더에 넣지 않습니다.
 
 ## 구성
 
@@ -102,6 +167,18 @@ docker build --secret "id=proxy_ca,src=$proxyCaPath" -t map-service-web:local .
 
 ## 검증·문제 확인
 
+### import에서 `set: Illegal option` 오류가 나는 경우
+
+Windows의 CRLF 줄바꿈이 Linux 셸에 전달되면 발생할 수 있습니다. 최신 Compose 구성은 임시 복사본을 LF로 변환해서 실행하며, `.gitattributes`도 셸 스크립트의 LF 체크아웃을 지정합니다. 이전 구성을 사용 중이라면 PowerShell에서 아래 명령으로 현재 파일을 LF·UTF-8(BOM 없음)으로 저장한 뒤 다시 생성하세요. 관리자 권한이나 `chmod`는 필요 없습니다.
+
+```powershell
+$path = Join-Path (Get-Location) "tilemaker\import.sh"
+$text = [System.IO.File]::ReadAllText($path).Replace("`r`n", "`n")
+[System.IO.File]::WriteAllText($path, $text, [System.Text.UTF8Encoding]::new($false))
+docker compose --profile tools run --rm import
+```
+
+
 ### Windows에서 MapLibre worker 파일이 없다는 오류가 나는 경우
 
 `predev`에서 `maplibre-gl-worker.mjs`를 찾지 못하면, 이전 버전의 `node_modules`가 남았거나 의존성 설치가 완료되지 않았을 수 있습니다. 다운로드한 최신 저장소 폴더에서 다음을 실행하세요.
@@ -140,3 +217,5 @@ OSM 저작자 표시를 유지하며, 데이터 재배포·파생 DB에는 [ODbL
 원본 다운로드가 차단되면 접속 가능한 다른 네트워크에서 [대한민국 PBF](https://download.geofabrik.de/asia/south-korea-latest.osm.pbf)를 받고 `data/south-korea.osm.pbf`에 복사한 뒤 추출 명령부터 실행하세요.
 
 검증: 합성 행정경계의 내부 도로·건물 포함 및 외부 도로 제외, 실패 시 기존 PBF 보존, 추출 PBF의 벡터 타일 변환을 확인했습니다. 경계 추출 테스트 3개, 브라우저 테스트 3개와 TypeScript 검사도 통과했습니다. 이는 실제 태안군 데이터 검증 결과가 아닙니다.
+
+위성 기능 검증: 합성 반사도 밴드로 RGB/NIR/NDVI 생성·계산식·음수 offset 적용·세 타일 제공·폴더 복사·체크섬 검사 4개, Chromium 테스트 5개, 타입 검사를 통과했습니다. 실제 위성자료 다운로드·화질·촬영 범위 검증은 HTTP 403 해소 후 별도로 필요합니다.

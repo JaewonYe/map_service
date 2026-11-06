@@ -1,4 +1,36 @@
 services:
+  imagery-download:
+    image: map-service-imagery:local
+    build:
+      context: .
+      dockerfile: imagery/Dockerfile
+    profiles: [imagery-tools]
+    volumes:
+      - ./data/imagery:/data
+      - ./data:/region:ro
+  imagery-build:
+    image: map-service-imagery:local
+    profiles: [imagery-tools]
+    network_mode: none
+    entrypoint: [python, /app/build.py]
+    volumes:
+      - ./data/imagery:/data
+  imagery-verify:
+    image: map-service-imagery:local
+    profiles: [imagery-tools]
+    network_mode: none
+    entrypoint: [python, /app/verify.py]
+    volumes:
+      - ./data/imagery:/data:ro
+  imagery:
+    image: python:3.12-slim-bookworm
+    command: [python, /app/serve.py]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${IMAGERY_PORT:-8082}:80"
+    volumes:
+      - ./data/imagery:/data:ro
+      - ./imagery:/app:ro
   extract:
     image: map-service-extract:local
     build:
@@ -13,7 +45,13 @@ services:
     image: ghcr.io/systemed/tilemaker@sha256:9cd8728a37a31c8a5205e091cedd3ff2c2c450c57e1ce3e5b58916185540ebba
     profiles: [tools]
     network_mode: none
-    entrypoint: [/bin/sh, /config/import.sh]
+    # Normalize Windows CRLF in a temporary copy; keep mounted source read-only.
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        tr -d '\r' < /config/import.sh > /tmp/import.sh
+        exec /bin/sh /tmp/import.sh
     volumes:
       - type: bind
         source: ./data/taean.osm.pbf
@@ -38,7 +76,8 @@ services:
       context: .
       args:
         TILE_SERVER_URL: http://tiles:80
+        IMAGERY_SERVER_URL: http://imagery:80
     restart: unless-stopped
-    depends_on: [tiles]
+    depends_on: [tiles, imagery]
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8080}:3000"
