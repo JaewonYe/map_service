@@ -1,0 +1,24 @@
+# Opt-in: docker compose -f compose.yaml -f compose.local-data.yaml ...
+services:
+  external-data:
+    image: overv/openstreetmap-tile-server:2.3.0
+    profiles: [tools]
+    entrypoint: [python3, -m, http.server, '8000', --bind, '0.0.0.0', --directory, /external-data]
+    volumes:
+      - ./data/external:/external-data:ro
+    healthcheck:
+      test: [CMD, python3, -c, "import http.client; c=http.client.HTTPConnection('127.0.0.1',8000,timeout=3); c.request('HEAD','/'); assert c.getresponse().status == 200"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+  import:
+    depends_on:
+      external-data:
+        condition: service_healthy
+    entrypoint: [python3, /opt/import-local.py]
+    environment:
+      NO_PROXY: external-data,localhost,127.0.0.1
+      no_proxy: external-data,localhost,127.0.0.1
+    volumes:
+      - ./data/external:/external-data:ro
+      - ./scripts/import-local.py:/opt/import-local.py:ro

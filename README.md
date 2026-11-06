@@ -22,6 +22,8 @@ Invoke-WebRequest -Uri "https://download.geofabrik.de/europe/monaco-latest.osm.p
 docker compose --profile tools run --rm import
 ```
 
+외부 데이터 서버에 연결되지 않으면 [외부 ZIP 직접 다운로드](#외부-zip을-직접-다운로드해-가져오기) 안내에 따라 `data/external/`에 파일을 복사한 뒤 가져오세요.
+
 **3. 개발 서버 실행** — 데이터 가져오기가 성공한 후 실행하고, 브라우저에서 `http://127.0.0.1:3000`을 엽니다. 이후에는 이 단계만 반복하면 됩니다.
 
 ```powershell
@@ -88,6 +90,45 @@ if ($LASTEXITCODE -ne 0) { throw "지도 데이터 가져오기 실패: 로그�
 다운로드에는 PowerShell의 `Invoke-WebRequest`를 사용합니다. `-ErrorAction Stop`은 다운로드 실패 시 명령 실행을 중단합니다. 다운로드 도중 종료되었거나 실패한 파일은 가져오지 말고 다시 다운로드하세요.
 
 가져오기에는 `download.geofabrik.de`, `osmdata.openstreetmap.de`, `naturalearth.s3.amazonaws.com`에 HTTPS 접근이 필요합니다. 이미지 다운로드에는 Docker Hub, npm 설치에는 npm 레지스트리 접근도 필요합니다. 회사 프록시를 사용한다면 컨테이너에도 프록시와 신뢰할 CA를 전달하세요. 인증서 검증을 끄지 마세요.
+
+### 외부 ZIP을 직접 다운로드해 가져오기
+
+접속 가능한 다른 네트워크/PC의 브라우저에서 아래 파일을 다운로드한 뒤, 저장소의 **`data/external/` 폴더에 압축을 풀지 않고** 복사하세요. 파일명은 아래와 정확히 같아야 합니다. 일부 파일은 용량이 큽니다.
+
+| 파일 (클릭하면 다운로드) | 복사 위치 |
+| --- | --- |
+| [간소화 해안선](https://osmdata.openstreetmap.de/download/simplified-water-polygons-split-3857.zip) | `data/external/simplified-water-polygons-split-3857.zip` |
+| [상세 해안선](https://osmdata.openstreetmap.de/download/water-polygons-split-3857.zip) | `data/external/water-polygons-split-3857.zip` |
+| [남극 빙상 면적](https://osmdata.openstreetmap.de/download/antarctica-icesheet-polygons-3857.zip) | `data/external/antarctica-icesheet-polygons-3857.zip` |
+| [남극 빙상 경계](https://osmdata.openstreetmap.de/download/antarctica-icesheet-outlines-3857.zip) | `data/external/antarctica-icesheet-outlines-3857.zip` |
+| [국가 경계](https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_boundary_lines_land.zip) | `data/external/ne_110m_admin_0_boundary_lines_land.zip` |
+
+예를 들어 저장소가 `C:\Users\사용자\source\map_service`라면 `C:\Users\사용자\source\map_service\data\external`에 ZIP 5개를 붙여넣습니다. OSM 원본은 별도로 `data/region.osm.pbf`에 준비합니다.
+
+**새 DB에 처음 가져오는 경우:** 기본 import 대신 아래 명령을 사용합니다.
+
+```powershell
+docker compose -f compose.yaml -f compose.local-data.yaml --profile tools run --rm import
+```
+
+**OSM 가져오기는 성공하고 외부 데이터 다운로드에서 실패한 경우:** 기존 DB를 유지한 채 외부 데이터 단계만 재개합니다. 실행 중인 타일 서버를 먼저 중지하세요.
+
+```powershell
+docker compose stop tiles
+docker compose -f compose.yaml -f compose.local-data.yaml --profile tools run --rm import resume-external
+```
+
+실패하면 다음 명령으로 넘어가지 말고 오류를 확인하세요. 두 방식 모두 ZIP 존재·내부 파일·CRC를 검사한 후, 내부 HTTP 서버를 통해 기존 가져오기 도구에 전달합니다. 외부 데이터 ZIP을 인터넷에서 다시 받지 않습니다. Docker 이미지와 npm 의존성은 별도로 준비되어 있어야 합니다.
+
+**가져오기 성공 후:** 임시 파일 서버를 중지하고 평소처럼 실행합니다.
+
+```powershell
+docker compose -f compose.yaml -f compose.local-data.yaml --profile tools stop external-data
+docker compose up -d tiles
+npm.cmd run dev
+```
+
+이미 만들어진 DB/볼륨을 삭제하거나 기본 import 전체를 재실행할 필요는 없습니다. ZIP은 Git에 업로드되지 않습니다. 자동 증분 갱신은 이 구성에서도 설정하지 않습니다. 로컬 ZIP 검사·주소 변환과 Compose 구성은 검증했지만, 실제 ZIP 5개를 이용한 전체 가져오기·복구 검증은 아직 수행하지 못했습니다.
 
 ### 로컬 개발: Next.js 빠른 새로고침
 

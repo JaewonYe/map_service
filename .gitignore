@@ -10,3 +10,7 @@ data/*
 next-env.d.ts
 test-results/
 playwright-report/
+!data/external/
+data/external/*
+!data/external/README.md
+__pycache__/
