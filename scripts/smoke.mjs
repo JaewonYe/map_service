@@ -1,20 +1,15 @@
 import assert from 'node:assert/strict';
-const base = process.env.MAP_URL || 'http://127.0.0.1:8080';
-const tile = process.env.SMOKE_TILE || '14/13940/6391';
-assert.match(tile, /^\d+\/\d+\/\d+$/);
-const page = await fetch(new URL('/', base), { signal: AbortSignal.timeout(10000) });
-assert.equal(page.status, 200, 'Next.js page HTTP status');
-const html = await page.text();
-assert.ok(html.includes('태안군 지도'), 'Page heading');
-const assets = [...new Set([...html.matchAll(/(?:src|href)="([^"\s]+\.(?:js|css)(?:\?[^"\s]*)?)"/g)].map(match => match[1]))];
-assert.ok(assets.length > 0, 'Next.js JS/CSS bundles');
-for (const path of assets) {
-  const url = new URL(path, base);
-  assert.equal(url.origin, new URL(base).origin, 'Assets must be self-hosted');
-  const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
-  assert.equal(response.status, 200, path);
-  assert.ok((await response.arrayBuffer()).byteLength > 0, path);
-}
-process.env.MAP_URL = base;
-await import('./check-vector.mjs');
-console.log('Next.js page, bundles, and vector geometry passed.');
+const base=process.env.MAP_URL || 'http://127.0.0.1:8085';
+assert.equal((await fetch(base)).status,200);
+const response=await fetch(`${base}/imagery/metadata.json`);
+assert.equal(response.status,200);
+const rgb=(await response.json()).datasets.find(entry=>entry.id==='rgb'&&entry.ready);
+assert.ok(rgb,'Prepare Esri RGB first');
+const z=rgb.maxzoom;
+const lon=(rgb.bbox[0]+rgb.bbox[2])/2,lat=(rgb.bbox[1]+rgb.bbox[3])/2;
+const x=Math.floor((lon+180)/360*2**z),y=Math.floor((1-Math.asinh(Math.tan(lat*Math.PI/180))/Math.PI)/2*2**z);
+const tile=await fetch(`${base}/imagery/rgb/${z}/${x}/${y}.jpg`);
+assert.equal(tile.status,200);
+assert.match(tile.headers.get('content-type')||'',/image\/jpeg/);
+assert.equal(Buffer.from(await tile.arrayBuffer()).subarray(0,2).toString('hex'),'ffd8');
+console.log('Esri RGB page, metadata and JPEG tile passed.');

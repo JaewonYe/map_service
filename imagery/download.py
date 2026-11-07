@@ -1,134 +1,103 @@
-"""Download and retain calibrated public Sentinel-2 spectral COG bands; no tiled basemap scraping."""
+"""Archive a bounded Esri RGB tile set locally. Credentials are never archived."""
 import argparse
-from datetime import datetime, timezone
 import hashlib
+import html
+import io
 import json
+import math
+import os
+import time
 from pathlib import Path
-from urllib.parse import urlencode, urlparse
-from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import urlopen
+from PIL import Image
 
-CATALOG = 'https://earth-search.aws.element84.com/v1'
-BBOX = [125.45, 36.35, 126.55, 37.08]  # Includes western offshore islands; rectangular fallback
+SERVICE = 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer'
+BBOX = [125.45, 36.35, 126.55, 37.08]
 
 
 def checksum(path):
-    result = hashlib.sha256()
+    digest=hashlib.sha256()
     with path.open('rb') as source:
-        for block in iter(lambda: source.read(1024 * 1024), b''):
-            result.update(block)
-    return result.hexdigest()
+        for block in iter(lambda:source.read(1024*1024),b''):digest.update(block)
+    return digest.hexdigest()
 
 
-def get_json(url):
-    with urlopen(Request(url, headers={'User-Agent': 'map-service-imagery/1.0'}), timeout=60) as response:
-        return json.load(response)
+def atomic_json(path, value):
+    partial = path.with_suffix('.next.json')
+    partial.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding='utf-8')
+    partial.replace(path)
 
 
-def choose_scenes(items, max_cloud):
-    best = {}
-    for item in items:
-        properties = item['properties']
-        if properties.get('eo:cloud_cover', 100) > max_cloud:
-            continue
-        grid = properties.get('grid:code')
-        if not grid:
-            grid = '-'.join(str(properties[k]) for k in ('mgrs:utm_zone', 'mgrs:latitude_band', 'mgrs:grid_square'))
-        previous = best.get(grid)
-        if previous is None or properties['eo:cloud_cover'] < previous['properties']['eo:cloud_cover']:
-            best[grid] = item
-    if not best or len(best) > 6:
-        raise RuntimeError('No suitable scenes or more than 6 grids. Adjust date/cloud limits and inspect catalog.')
-    return sorted(best.values(), key=lambda item: item['properties']['eo:cloud_cover'])
+def request(path, token):
+    params = {'f':'json'} if not path.startswith('/tile/') else {}
+    if token: params['token'] = token
+    url = SERVICE + path + (('?' + urlencode(params)) if params else '')
+    time.sleep(0.2)  # At most five sequential service requests per second.
+    try:
+        with urlopen(url, timeout=90) as response: return response.read()
+    except HTTPError as error:
+        raise RuntimeError(f'Esri HTTP {error.code}; check account permissions, token, limits and network. Existing files retained.') from None
+    except URLError:
+        raise RuntimeError('Esri connection failed. Check network/proxy access. Existing files retained.') from None
 
 
-def download(root, date_range, max_cloud):
-    source = root / 'source'
-    source.mkdir(parents=True, exist_ok=True)
-    bbox = BBOX
-    boundary_path = Path('/region/taean.boundary.geojson')
-    if boundary_path.is_file():
-        boundary = json.loads(boundary_path.read_text())
-        points = []
-        def coordinates(value):
-            if len(value) >= 2 and isinstance(value[0], (int, float)):
-                points.append(value[:2])
-            else:
-                for child in value:
-                    coordinates(child)
-        for feature in boundary['features']:
-            coordinates(feature['geometry']['coordinates'])
-        if not points:
-            raise RuntimeError('Empty Taean boundary')
-        bbox = [min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points)]
-        (source/'region.boundary.geojson').write_text(json.dumps(boundary))
-    params = {'collections': 'sentinel-2-l2a', 'bbox': ','.join(map(str, bbox)),
-              'datetime': date_range, 'limit': 100}
-    url = CATALOG + '/search?' + urlencode(params)
-    items = []
-    for _ in range(10):
-        page = get_json(url)
-        items.extend(page.get('features', []))
-        links = [link for link in page.get('links', []) if link.get('rel') == 'next']
-        if not links:
-            break
-        url = links[0]['href']
-        if not url.startswith(CATALOG + '/') or links[0].get('method', 'GET') != 'GET':
-            raise RuntimeError('Unsupported catalog pagination; narrow the date range.')
-    else:
-        raise RuntimeError('Too many catalog pages; narrow the date range.')
-    selected = choose_scenes(items, max_cloud)
-    records = []
-    for item in selected:
-        identity = item['id']
-        if not identity.replace('_', '').replace('-', '').isalnum():
-            raise RuntimeError('Unexpected scene identifier')
-        metadata_file = source / f'{identity}.stac.json'
-        bands = {}
-        for band in ('red', 'green', 'blue', 'nir'):
-            asset = item['assets'][band]
-            calibration = asset.get('raster:bands', [{}])[0]
-            if 'scale' not in calibration or 'offset' not in calibration:
-                raise RuntimeError(f'{identity}/{band}: missing explicit reflectance scale/offset in STAC; refusing to guess NDVI calibration.')
-            href = asset['href']
-            parsed = urlparse(href)
-            if parsed.scheme != 'https' or parsed.hostname != 'sentinel-cogs.s3.us-west-2.amazonaws.com' or parsed.query or parsed.username:
-                raise RuntimeError('Unexpected imagery host or signed URL; inspect catalog before downloading.')
-            target = source / f'{identity}-{band}.tif'
-            receipt = target.with_suffix('.sha256')
-            if not (target.is_file() and receipt.is_file() and checksum(target) == receipt.read_text().strip()):
-                partial = target.with_suffix('.part')
-                try:
-                    print(f'Downloading {identity}/{band}', flush=True)
-                    with urlopen(href, timeout=120) as response, partial.open('wb') as output:
-                        while block := response.read(1024 * 1024):
-                            output.write(block)
-                    if partial.stat().st_size == 0:
-                        raise RuntimeError('Empty image')
-                    partial.replace(target)
-                    receipt.write_text(checksum(target) + '\n')
-                finally:
-                    partial.unlink(missing_ok=True)
-            bands[band] = {'file': target.relative_to(root).as_posix(), 'sha256': checksum(target), 'url': href,
-                           'scale': calibration['scale'], 'offset': calibration['offset']}
-        metadata_file.write_text(json.dumps(item, indent=2))
-        records.append({'id': identity, 'bands': bands,
-                        'metadata_file': metadata_file.relative_to(root).as_posix(), 'metadata_sha256': checksum(metadata_file),
-                        'datetime': item['properties']['datetime'], 'cloud_cover': item['properties']['eo:cloud_cover']})
-    acquisition = {'provider': 'Copernicus Sentinel-2 / Element 84 Earth Search',
-                   'license': 'Copernicus Sentinel data terms',
-                   'license_url': 'https://dataspace.copernicus.eu/terms-and-conditions',
-                   'catalog': CATALOG, 'bbox': bbox, 'date_range': date_range,
-                   'downloaded_at': datetime.now(timezone.utc).isoformat(), 'scenes': records}
-    temporary = source / 'acquisition.next.json'
-    temporary.write_text(json.dumps(acquisition, indent=2))
-    temporary.replace(source / 'acquisition.json')
-    print(f'Retained {len(records)} scene(s); run imagery-build next. Cloud cover is scene-wide, not a guarantee for Taean.')
+def tiles(bbox, minzoom, maxzoom):
+    west,south,east,north = bbox
+    if not (-180 <= west < east <= 180 and -85 <= south < north <= 85): raise ValueError('Invalid bbox')
+    for z in range(minzoom,maxzoom+1):
+        def position(lon,lat):
+            return ((lon+180)/360*2**z,(1-math.asinh(math.tan(math.radians(lat)))/math.pi)/2*2**z)
+        left,bottom=position(west,south);right,top=position(east,north)
+        for x in range(math.floor(left),math.ceil(right)):
+            for y in range(math.floor(top),math.ceil(bottom)): yield z,x,y
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--root', type=Path, default=Path('/data/taean/sentinel2'))
-    parser.add_argument('--dates', default='2025-10-01T00:00:00Z/2025-10-31T23:59:59Z')
-    parser.add_argument('--max-cloud', type=float, default=15)
-    args = parser.parse_args()
-    download(args.root, args.dates, args.max_cloud)
+def download(root,bbox=BBOX,minzoom=6,maxzoom=15,max_tiles=15000):
+    if not 0 <= minzoom <= maxzoom <= 19: raise ValueError('Invalid zoom range (0..19)')
+    wanted=list(tiles(bbox,minzoom,maxzoom))
+    if len(wanted)>max_tiles: raise RuntimeError(f'{len(wanted)} tiles exceed limit {max_tiles}; reduce area/zoom or explicitly increase --max-tiles.')
+    token=os.environ.get('ESRI_API_KEY','').strip()
+    metadata=json.loads(request('',token))
+    if 'error' in metadata: raise RuntimeError(f"Esri service error {metadata['error'].get('code')}; account authentication may be required.")
+    info=metadata.get('tileInfo',{})
+    if info.get('spatialReference',{}).get('wkid') not in (3857,102100,102113) or info.get('rows')!=256 or info.get('cols')!=256:
+        raise RuntimeError('Expected 256px Web Mercator tiles.')
+    origin=info.get('origin',{})
+    if abs(origin.get('x',0)+20037508.342789244)>1 or abs(origin.get('y',0)-20037508.342789244)>1:
+        raise RuntimeError('Unexpected Esri tile origin.')
+    levels={lod['level'] for lod in info['lods']}
+    if any(z not in levels for z in range(minzoom,maxzoom+1)): raise RuntimeError('Requested zoom level is not supported by service.')
+    source=root/'source';source.mkdir(parents=True,exist_ok=True)
+    atomic_json(source/'service.json',metadata)
+    records=[]
+    for i,(z,x,y) in enumerate(wanted):
+        target=source/'tiles'/str(z)/str(x)/f'{y}.tile'
+        receipt=target.with_suffix('.sha256')
+        target.parent.mkdir(parents=True,exist_ok=True)
+        if not (target.is_file() and receipt.is_file() and checksum(target)==receipt.read_text().strip()):
+            body=request(f'/tile/{z}/{y}/{x}',token)  # Esri uses z / row / column.
+            with Image.open(io.BytesIO(body)) as image:
+                if image.size!=(256,256) or image.format not in ('JPEG','PNG'): raise RuntimeError('Unexpected RGB tile response.')
+                image.verify()
+            temporary=target.with_suffix('.part');temporary.write_bytes(body);temporary.replace(target)
+            receipt.write_text(checksum(target)+'\n')
+        records.append({'z':z,'x':x,'y':y,'file':target.relative_to(root).as_posix(),'sha256':checksum(target)})
+        if i%100==0: print(f'{i+1}/{len(wanted)} tiles archived',flush=True)
+    acquisition={'source':'Esri World Imagery','service':SERVICE,'bbox':bbox,'minzoom':minzoom,'maxzoom':maxzoom,
+                 'attribution':html.escape(metadata.get('copyrightText') or 'Esri and its data providers'),
+                 'service_metadata_sha256':checksum(source/'service.json'),'tiles':records,
+                 'note':'RGB tiles, not spectral bands. Native resolution and imagery dates vary by location. Use under your applicable service permissions.'}
+    atomic_json(source/'acquisition.json',acquisition)
+    print('RGB archive complete. Run imagery-build; keep source/ for future reuse.')
+
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--root',type=Path,default=Path('/data/taean/esri'))
+    parser.add_argument('--bbox',type=float,nargs=4,default=BBOX)
+    parser.add_argument('--minzoom',type=int,default=6)
+    parser.add_argument('--maxzoom',type=int,default=15)
+    parser.add_argument('--max-tiles',type=int,default=15000)
+    args=parser.parse_args();download(args.root,args.bbox,args.minzoom,args.maxzoom,args.max_tiles)

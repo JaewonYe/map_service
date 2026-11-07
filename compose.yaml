@@ -5,9 +5,10 @@ services:
       context: .
       dockerfile: imagery/Dockerfile
     profiles: [imagery-tools]
+    environment:
+      ESRI_API_KEY: ${ESRI_API_KEY:-}
     volumes:
       - ./data/imagery:/data
-      - ./data:/region:ro
   imagery-build:
     image: map-service-imagery:local
     profiles: [imagery-tools]
@@ -31,53 +32,13 @@ services:
     volumes:
       - ./data/imagery:/data:ro
       - ./imagery:/app:ro
-  extract:
-    image: map-service-extract:local
-    build:
-      context: .
-      dockerfile: extract/Dockerfile
-    profiles: [tools]
-    network_mode: none
-    volumes:
-      - ./data:/data
-  import:
-    # Official image pinned to an immutable multi-platform digest.
-    image: ghcr.io/systemed/tilemaker@sha256:9cd8728a37a31c8a5205e091cedd3ff2c2c450c57e1ce3e5b58916185540ebba
-    profiles: [tools]
-    network_mode: none
-    # Normalize Windows CRLF in a temporary copy; keep mounted source read-only.
-    entrypoint:
-      - /bin/sh
-      - -ec
-      - |
-        tr -d '\r' < /config/import.sh > /tmp/import.sh
-        exec /bin/sh /tmp/import.sh
-    volumes:
-      - type: bind
-        source: ./data/taean.osm.pbf
-        target: /input/region.osm.pbf
-        read_only: true
-        bind:
-          create_host_path: false
-      - ./data/vector:/output
-      - ./tilemaker:/config:ro
-  tiles:
-    image: python:3.12-slim-bookworm
-    command: [python, /app/server.py]
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:${TILE_PORT:-8081}:80"
-    volumes:
-      - ./data/vector:/data:ro
-      - ./tile-server:/app:ro
   web:
     image: map-service-web:local
     build:
       context: .
       args:
-        TILE_SERVER_URL: http://tiles:80
         IMAGERY_SERVER_URL: http://imagery:80
     restart: unless-stopped
-    depends_on: [tiles, imagery]
+    depends_on: [imagery]
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8080}:3000"

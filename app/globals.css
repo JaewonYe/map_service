@@ -6,15 +6,4 @@ header p { margin: 0; color: #555; }
 main { flex: 1; min-height: 240px; position: relative; display: flex; }
 .map-canvas { position: absolute; inset: 0; }
 .map-status { position: absolute; bottom: 28px; left: 12px; right: 12px; z-index: 1000; margin: 0; padding: 12px; background: #fff4db; color: #542e00; border: 1px solid #c18b38; }
-.map-options { position: absolute; top: 12px; left: 12px; z-index: 2; display: flex; flex-direction: column; gap: 8px; background: white; padding: 12px; border-radius: 4px; box-shadow: 0 1px 4px #0003; font-size: 14px; }
-.map-options small { max-width: 260px; color: #555; }
-
-.map-workspace { position: relative; display: flex; flex: 1; min-width: 0; }
-.single-map, .comparison-grid { display: grid; flex: 1; min-width: 0; }
-.comparison-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; }
-.map-panel { position: relative; min-height: 300px; min-width: 0; }
-.compare-toggle { position: absolute; top: 12px; right: 60px; z-index: 4; padding: 8px; background: white; border: 1px solid #ccc; border-radius: 4px; }
-.compare-toggle:disabled { color: #777; }
-.comparison-grid .map-options { top: 56px; max-width: calc(100% - 48px); }
-@media (max-width: 700px) { .comparison-grid { grid-template-columns: 1fr; grid-template-rows: repeat(3, minmax(300px, 1fr)); } }
-.map-options .coverage-warning { color: #8a4100; font-weight: 600; }
+.map-panel { position: relative; flex: 1; min-height: 300px; }
