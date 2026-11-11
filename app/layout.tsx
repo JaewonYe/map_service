@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import 'leaflet/dist/leaflet.css';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: '태안군 지도',
-  description: '태안군 Esri RGB 지도'
+  description: 'TPK 기반 오프라인 위성지도'
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

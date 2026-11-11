@@ -1,28 +1,45 @@
 import {test,expect} from '@playwright/test';
-import {readFile} from 'node:fs/promises';
+import {coordinate} from './fixtures/tpk-fixture';
 
-test('only local Esri RGB renders, with attribution and no other datasets',async({page})=>{
-  const errors:string[]=[],requests:string[]=[];
-  page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));
-  await page.goto('/');
-  await expect(page.getByRole('heading',{name:'태안군 지도'})).toBeVisible();
-  await expect.poll(()=>requests.some(url=>/\/imagery\/rgb\/.*\.jpg/.test(url))).toBe(true);
-  await expect(page.locator('.maplibregl-ctrl-attrib')).toContainText('Esri');
-  await expect(page.getByRole('status')).toHaveCount(0);
-  await expect(page.getByRole('combobox')).toHaveCount(0);
-  expect(requests.every(url=>url.startsWith('http://127.0.0.1:3100/')||url.startsWith('blob:'))).toBe(true);
-  expect(requests.some(url=>/\.pbf|ndvi|infrared|sentinel/i.test(url))).toBe(false);
+test('offline Leaflet map, coordinates, zoom, scale and boundary work locally',async({page})=>{
+  const requests:string[]=[],errors:string[]=[];page.on('request',r=>requests.push(r.url()));page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/');await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible();
+  await expect(page.locator('.leaflet-control-scale')).toBeVisible();
+  await expect(page.locator('.leaflet-overlay-pane path').first()).toBeVisible();
+  await expect(page.getByTestId('zoom')).toHaveText('16');
+  await page.locator('.leaflet-control-zoom-in').click();await expect(page.getByTestId('zoom')).toHaveText('17');
+  await page.locator('.leaflet-container').click({position:{x:250,y:250}});await expect(page.getByTestId('clicked')).not.toContainText('지도를 클릭하세요');
+  expect(requests.every(url=>url.startsWith('http://127.0.0.1:3100/'))).toBe(true);
   expect(errors).toEqual([]);
 });
-test('RGB bytes proxy correctly; old dataset routes are absent',async({request})=>{
-  const image=await request.get('/imagery/rgb/10/871/399.jpg');
-  expect(image.status()).toBe(200);
-  expect(await image.body()).toEqual(await readFile(new URL('./fixtures/satellite.jpg',import.meta.url)));
-  expect((await request.get('/imagery/ndvi/10/871/399.jpg')).status()).toBe(404);
-  expect((await request.get('/tile/10/871/399.pbf')).status()).toBe(404);
+test('metadata comes from package, JPEG/PNG and conditional caching work; missing tile is 404',async({request})=>{
+  const info=await request.get('/api/map-info');expect(info.status()).toBe(200);const metadata=await info.json();
+  expect(metadata.zoomLevels).toEqual([15,16,17]);expect(metadata.osm.mode).toBe('unavailable');expect(metadata.packageVersion).toBe('1.0-synthetic');
+  const {x,y}=coordinate(16);const tile=await request.get(`/api/tiles/16/${x}/${y}`);expect(tile.status()).toBe(200);expect(tile.headers()['content-type']).toBe('image/jpeg');
+  expect((await request.get(`/api/tiles/16/${x+1}/${y+1}`)).headers()['content-type']).toBe('image/png');
+  expect((await request.get(`/api/tiles/16/${x}/${y}`,{headers:{'If-None-Match':tile.headers().etag}})).status()).toBe(304);
+  expect((await request.get('/api/tiles/16/0/0')).status()).toBe(404);
+  expect((await request.get('/api/tiles/1/2/0')).status()).toBe(400);
+  expect((await request.get('/api/osm/16/0/0')).status()).toBe(404);
 });
-test('no archive shows preparation instructions without an online fallback',async({page})=>{
-  await page.route('**/imagery/metadata.json',r=>r.fulfill({json:{datasets:[{id:'rgb',ready:false}]}}));
-  await page.goto('/');
-  await expect(page.getByRole('status')).toContainText('Esri RGB 데이터가 없습니다');
+test('offline network denial does not break satellite rendering',async({page})=>{
+  await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
+  await page.goto('/');await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible();
+  await expect(page.getByText('오프라인 OSM 타일이 없어 위성영상만 제공합니다.')).toBeVisible();
+});
+
+test('licensed local OSM layer switches without any public tile request',async({page})=>{
+  const {png}=await import('./fixtures/tpk-fixture');const requests:string[]=[];
+  page.on('request',request=>requests.push(request.url()));
+  await page.route('**/api/map-info',async route=>{
+    const response=await route.fetch(),body=await response.json();
+    await route.fulfill({json:{...body,osm:{mode:'local',url:'/fixture-osm/{z}/{x}/{y}',attribution:'Synthetic local OSM fixture'}}});
+  });
+  await page.route('**/fixture-osm/**',route=>route.fulfill({contentType:'image/png',body:png()}));
+  await page.goto('/');await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible();
+  await page.getByRole('radio',{name:'OSM',exact:true}).check();
+  await expect.poll(()=>requests.some(url=>url.includes('/fixture-osm/'))).toBe(true);
+  await page.getByRole('radio',{name:'위성영상',exact:true}).check();
+  await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible();
+  expect(requests.every(url=>url.startsWith('http://127.0.0.1:3100/'))).toBe(true);
 });

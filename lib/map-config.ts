@@ -1,7 +1,5 @@
-// Initial Esri RGB view: Taean county, South Korea.
+// Preferred initial camera. Actual bounds/levels from TPK take precedence.
 export const mapConfig = {
-  center: [36.70, 126.30] as [number, number],
-  zoom: 10,
-  minZoom: 6,
-  maxZoom: 19
+  center: [36.597889, 126.240136] as [number, number],
+  zoom: 16
 };

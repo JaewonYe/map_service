@@ -1,44 +1,29 @@
 services:
-  imagery-download:
-    image: map-service-imagery:local
-    build:
-      context: .
-      dockerfile: imagery/Dockerfile
-    profiles: [imagery-tools]
-    environment:
-      ESRI_API_KEY: ${ESRI_API_KEY:-}
-    volumes:
-      - ./data/imagery:/data
-  imagery-build:
-    image: map-service-imagery:local
-    profiles: [imagery-tools]
-    network_mode: none
-    entrypoint: [python, /app/build.py]
-    volumes:
-      - ./data/imagery:/data
-  imagery-verify:
-    image: map-service-imagery:local
-    profiles: [imagery-tools]
-    network_mode: none
-    entrypoint: [python, /app/verify.py]
-    volumes:
-      - ./data/imagery:/data:ro
-  imagery:
-    image: python:3.12-slim-bookworm
-    command: [python, /app/serve.py]
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:${IMAGERY_PORT:-8082}:80"
-    volumes:
-      - ./data/imagery:/data:ro
-      - ./imagery:/app:ro
   web:
     image: map-service-web:local
     build:
       context: .
-      args:
-        IMAGERY_SERVER_URL: http://imagery:80
-    restart: unless-stopped
-    depends_on: [imagery]
+    environment:
+      TPK_PATH: /data/tpk/${TPK_FILE:-map.tpk}
+      TPK_CACHE_DIR: /cache
+      TPK_USAGE_CONFIRMED: ${TPK_USAGE_CONFIRMED:-false}
+      MAP_MODE: ${MAP_MODE:-offline}
+      OSM_TILE_DIR: /data/osm
+      OSM_USAGE_CONFIRMED: ${OSM_USAGE_CONFIRMED:-false}
+    volumes:
+      - type: bind
+        source: ${TPK_HOST_DIR:-./data/tpk}
+        target: /data/tpk
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${OSM_HOST_DIR:-./data/osm}
+        target: /data/osm
+        read_only: true
+      - tpk-cache:/cache
     ports:
-      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8080}:3000"
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-3001}:3001"
+    restart: unless-stopped
+volumes:
+  tpk-cache:

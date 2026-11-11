@@ -19,3 +19,6 @@ public/maplibre/
 data/imagery/*
 !data/imagery/README.md
 .cache/
+!data/tpk/
+data/tpk/*
+!data/tpk/README.md
