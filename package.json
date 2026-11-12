@@ -11,6 +11,7 @@
     "smoke": "node scripts/smoke.mjs",
     "manage": "node scripts/manage.mjs",
     "test:launcher": "node --test --test-isolation=none tests/manage.test.mjs",
+    "test:measure": "tsx --test tests/measure.test.ts",
     "inspect:tpk": "tsx scripts/inspect-tpk.ts",
     "test:tiles": "tsx --test tests/tpk.test.ts tests/catalog.test.ts"
   },

@@ -1,10 +1,12 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import L from 'leaflet';
+import MapMeasurements from './MapMeasurements';
 import type {CatalogInfo} from '../lib/tiles/catalog';
 type Info=CatalogInfo&{osm:{mode:string;url:string|null;attribution:string}};
 export default function MapCanvas(){
   const container=useRef<HTMLDivElement>(null);
+  const [mapInstance,setMapInstance]=useState<L.Map|null>(null);
   const [info,setInfo]=useState<Info|null>(null),[message,setMessage]=useState('TPK 메타데이터 확인 중…');
   const [center,setCenter]=useState<[number,number]|null>(null),[zoom,setZoom]=useState<number|null>(null),[clicked,setClicked]=useState<[number,number]|null>(null);
   useEffect(()=>{
@@ -41,6 +43,7 @@ export default function MapCanvas(){
         let point:L.CircleMarker|undefined;
         map.on('moveend zoomend',()=>{const c=map!.getCenter();setCenter([c.lat,c.lng]);setZoom(map!.getZoom());});
         map.on('click',(event:L.LeafletMouseEvent)=>{setClicked([event.latlng.lat,event.latlng.lng]);point?.remove();point=L.circleMarker(event.latlng,{radius:5,color:'#ff574e',fillOpacity:1}).addTo(map!);});
+        setMapInstance(map);
       }catch(error){if(!abort.signal.aborted)setMessage(error instanceof Error?error.message:'지도 초기화 실패');}
     })();return()=>{abort.abort();map?.remove();};
   },[]);
@@ -57,6 +60,9 @@ export default function MapCanvas(){
       </details>}
       {info?.osm.mode==='unavailable'&&<small>오프라인 OSM 타일이 없어 위성영상만 제공합니다.</small>}
     </aside>
-    {message&&<p role="status" className="map-status">{message}</p>}
+    <div className="map-bottom-tools">
+      {message&&<p role="status" className="map-status">{message}</p>}
+      {mapInstance&&<MapMeasurements map={mapInstance}/>}
+    </div>
   </section>;
 }

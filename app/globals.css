@@ -5,7 +5,19 @@ h1 { margin: 0; font-size: 20px; }
 header p { margin: 0; color: #555; }
 main { flex: 1; min-height: 240px; position: relative; display: flex; }
 .map-canvas { position: absolute; inset: 0; }
-.map-status { position: absolute; bottom: 28px; left: 12px; right: 12px; z-index: 1000; margin: 0; padding: 12px; background: #fff4db; color: #542e00; border: 1px solid #c18b38; }
+.map-bottom-tools {position:absolute;bottom:28px;left:12px;right:12px;z-index:1000;display:flex;flex-direction:column;align-items:flex-start;gap:8px;pointer-events:none;}
+.map-status {align-self:stretch;pointer-events:auto;margin:0;padding:12px;background:#fff4db;color:#542e00;border:1px solid #c18b38;}
+.map-measurements {pointer-events:auto;box-sizing:border-box;width:350px;max-width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;background:#fffef5;box-shadow:0 1px 5px #0002;font-size:13px;}
+.measurement-buttons {display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;}
+.measurement-buttons button {padding:6px 9px;min-height:32px;border:1px solid #a9b8bf;border-radius:4px;background:#fff;color:#1e293b;font:inherit;cursor:pointer;}
+.measurement-buttons button[aria-pressed="true"] {background:#087f8c;color:#fff;border-color:#087f8c;}
+.measurement-buttons button:focus-visible {outline:3px solid #38bdf8;outline-offset:2px;}
+.measurement-buttons button:disabled {opacity:0.45;cursor:default;}
+.measurement-help {margin:7px 0;line-height:1.4;color:#475569;}
+.map-measurements output {display:block;margin-top:5px;font-weight:700;font-size:15px;}
+.measurement-error {margin:5px 0;color:#b91c1c;}
+.leaflet-grab.measurement-drawing {cursor:crosshair;}
+.measurement-label {padding:1px 4px;font-size:10px;}
 .map-panel { position: relative; flex: 1; min-height: 300px; }
 .map-info { position:absolute; top:12px; left:60px; z-index:500; background:#fffE; padding:10px; border-radius:4px; font-size:13px; max-width:calc(100% - 140px); }
 .map-info small {display:block;color:#555;margin-top:4px;}
