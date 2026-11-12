@@ -18,6 +18,9 @@ main { flex: 1; min-height: 240px; position: relative; display: flex; }
 .measurement-error {margin:5px 0;color:#b91c1c;}
 .leaflet-grab.measurement-drawing {cursor:crosshair;}
 .measurement-label {padding:1px 4px;font-size:10px;}
+.map-context-menu {position:fixed;z-index:1200;pointer-events:auto;box-sizing:border-box;width:220px;padding:4px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;box-shadow:0 3px 14px #0003;}
+.map-context-menu button {display:block;width:100%;min-height:40px;padding:9px 12px;border:0;border-radius:3px;background:#fff;text-align:left;color:#1e293b;font:13px system-ui,sans-serif;cursor:pointer;}
+.map-context-menu button:hover,.map-context-menu button:focus-visible {background:#e0f2f1;outline:2px solid #087f8c;outline-offset:-2px;}
 .map-panel { position: relative; flex: 1; min-height: 300px; }
 .map-info { position:absolute; top:12px; left:60px; z-index:500; background:#fffE; padding:10px; border-radius:4px; font-size:13px; max-width:calc(100% - 140px); }
 .map-info small {display:block;color:#555;margin-top:4px;}

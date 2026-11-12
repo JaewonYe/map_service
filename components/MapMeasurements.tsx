@@ -1,14 +1,17 @@
 'use client';
 
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent} from 'react';
 import L from 'leaflet';
 import {areaSquareMeters, distanceMeters, formatArea, formatDistance, isSelfIntersecting, segmentMeters, type Coordinate} from '../lib/map-measure';
 
 type Kind = 'distance' | 'area';
+type ContextMenu = {point: Coordinate; x: number; y: number};
 export default function MapMeasurements({map}: {map: L.Map}) {
   const [kind, setKind] = useState<Kind | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [points, setPoints] = useState<Coordinate[]>([]);
+  const [menu, setMenu] = useState<ContextMenu | null>(null);
+  const menuElement = useRef<HTMLDivElement>(null);
   const layer = useRef<L.LayerGroup | null>(null);
   const invalid = useMemo(() => kind === 'area' && isSelfIntersecting(points), [kind, points]);
   const distance = useMemo(() => distanceMeters(points), [points]);
@@ -20,6 +23,49 @@ export default function MapMeasurements({map}: {map: L.Map}) {
     const group = L.layerGroup().addTo(map); layer.current = group;
     return () => {group.remove(); layer.current = null;};
   }, [map]);
+
+  useEffect(() => {
+    const open = (event: L.LeafletMouseEvent) => {
+      event.originalEvent.preventDefault();
+      const rect = map.getContainer().getBoundingClientRect();
+      setMenu({point: [event.latlng.lat, event.latlng.lng],
+        x: rect.left + event.containerPoint.x, y: rect.top + event.containerPoint.y});
+    };
+    const close = () => setMenu(null);
+    map.on('contextmenu', open); map.on('movestart zoomstart resize', close);
+    return () => {map.off('contextmenu', open); map.off('movestart zoomstart resize', close);};
+  }, [map]);
+
+  useLayoutEffect(() => {
+    if (!menu || !menuElement.current) return;
+    const rect = map.getContainer().getBoundingClientRect(), size = menuElement.current.getBoundingClientRect();
+    const left = Math.max(8, rect.left + 8), top = Math.max(8, rect.top + 8);
+    const x = Math.max(left, Math.min(menu.x, Math.min(rect.right, window.innerWidth) - size.width - 8));
+    const y = Math.max(top, Math.min(menu.y, Math.min(rect.bottom, window.innerHeight) - size.height - 8));
+    if (x !== menu.x || y !== menu.y) setMenu({...menu, x, y});
+    menuElement.current.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({preventScroll: true});
+  }, [map, menu]);
+
+  useEffect(() => {
+    if (!menu) return;
+    const outside = (event: PointerEvent) => {
+      if (!menuElement.current?.contains(event.target as Node)) setMenu(null);
+    };
+    const escape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault(); setMenu(null); map.getContainer().focus({preventScroll: true});
+      }
+    };
+    const close = () => setMenu(null);
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('keydown', escape);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      document.removeEventListener('pointerdown', outside, true);
+      document.removeEventListener('keydown', escape);
+      window.removeEventListener('scroll', close, true);
+    };
+  }, [map, menu]);
 
   useEffect(() => {
     if (!drawing) return;
@@ -51,19 +97,31 @@ export default function MapMeasurements({map}: {map: L.Map}) {
     });
   }, [map, points, kind, invalid]);
 
-  function start(next: Kind) {setKind(next); setPoints([]); setDrawing(true);}
-  function stop() {setDrawing(false);}
-  function undo() {setPoints(previous => previous.slice(0, -1)); if (kind) setDrawing(true);}
-  function clear() {setDrawing(false); setKind(null); setPoints([]);}
+  function start(next: Kind, first?: Coordinate) {setMenu(null); setKind(next); setPoints(first ? [first] : []); setDrawing(true);}
+  function stop() {setMenu(null); setDrawing(false);}
+  function undo() {setMenu(null); setPoints(previous => previous.slice(0, -1)); if (kind) setDrawing(true);}
+  function clear() {setMenu(null); setDrawing(false); setKind(null); setPoints([]);}
+  function navigateMenu(event: KeyboardEvent<HTMLDivElement>) {
+    const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault();
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 :
+        (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
+      buttons[next]?.focus();
+    } else if (event.key === 'Tab') {
+      event.preventDefault(); setMenu(null); map.getContainer().focus({preventScroll: true});
+    }
+  }
 
-  return <aside className="map-measurements" aria-label="거리와 면적 측정">
+  return <><aside className="map-measurements" aria-label="거리와 면적 측정">
     <strong>거리·면적 측정</strong>
     <div className="measurement-buttons" role="group" aria-label="측정 도구">
       <button type="button" aria-pressed={!drawing} onClick={stop}>이동</button>
       <button type="button" aria-pressed={drawing && kind === 'distance'} onClick={() => start('distance')}>거리</button>
       <button type="button" aria-pressed={drawing && kind === 'area'} onClick={() => start('area')}>면적</button>
     </div>
-    <p className="measurement-help">{drawing ? (kind === 'distance' ? '지도를 차례로 클릭해 경로를 선택하세요.' : '경계를 따라 점을 선택하세요. 마지막 변은 자동 연결됩니다.') : kind ? '측정 결과가 유지됩니다. 지도를 이동하거나 새 측정을 시작하세요.' : '거리 또는 면적을 선택한 뒤 지도를 클릭하세요.'}</p>
+    <p className="measurement-help">{drawing ? (kind === 'distance' ? '지도를 차례로 클릭해 경로를 선택하세요.' : '경계를 따라 점을 선택하세요. 마지막 변은 자동 연결됩니다.') : kind ? '측정 결과가 유지됩니다. 지도를 이동하거나 새 측정을 시작하세요.' : '지도 우클릭 또는 측정 버튼으로 거리·면적 측정을 시작하세요.'}</p>
     <div data-testid="measurement-points">선택한 점: {points.length}개</div>
     <output data-testid="measurement-result" aria-live="polite">
       {kind === 'distance' ? `거리: ${formatDistance(distance)}` : kind === 'area' ? `면적: ${points.length >= 3 && !invalid ? formatArea(area) : '—'}` : '측정값: —'}
@@ -75,5 +133,12 @@ export default function MapMeasurements({map}: {map: L.Map}) {
       <button type="button" onClick={undo} disabled={!points.length}>마지막 점 취소</button>
       <button type="button" onClick={clear} disabled={!kind}>초기화</button>
     </div>
-  </aside>;
+  </aside>
+    {menu && <div ref={menuElement} role="menu" aria-label="지도 측정 메뉴" className="map-context-menu"
+      style={{left: menu.x, top: menu.y, maxWidth: Math.max(0, map.getSize().x - 16)}}
+      onKeyDown={navigateMenu} onContextMenu={event => event.preventDefault()}>
+      <button type="button" role="menuitem" onClick={() => start('distance', menu.point)}>거리 측정 시작</button>
+      <button type="button" role="menuitem" onClick={() => start('area', menu.point)}>면적 측정 시작</button>
+    </div>}
+  </>;
 }

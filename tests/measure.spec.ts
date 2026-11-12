@@ -71,3 +71,77 @@ test('measurement toolbar works on a narrow screen with external hosts blocked',
   expect(requests.every(url => url.startsWith('http://127.0.0.1:3101/'))).toBe(true);
   await page.screenshot({path: testInfo.outputPath('measurement-mobile.png')});
 });
+
+test('right-click starts distance at the clicked point without adding a menu-click vertex', async ({page}) => {
+  await open(page);
+  const map = page.locator('.leaflet-container'), bounds = (await map.boundingBox())!;
+  await map.click({button: 'right', position: position.a});
+  const menu = page.getByRole('menu', {name: '지도 측정 메뉴'});
+  await expect(menu).toBeVisible();
+  await expect(page.getByTestId('measurement-points')).toHaveText('선택한 점: 0개');
+  await menu.getByRole('menuitem', {name: '거리 측정 시작'}).click();
+  await expect(menu).toHaveCount(0);
+  await expect(page.getByRole('button', {name: '거리', exact: true})).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('measurement-points')).toHaveText('선택한 점: 1개');
+  const marker = (await page.locator('path.measurement-vertex').boundingBox())!;
+  expect(Math.abs(marker.x + marker.width / 2 - (bounds.x + position.a.x))).toBeLessThan(2);
+  expect(Math.abs(marker.y + marker.height / 2 - (bounds.y + position.a.y))).toBeLessThan(2);
+  await map.click({position: position.b});
+  await expect(page.getByTestId('measurement-points')).toHaveText('선택한 점: 2개');
+  await expect(page.getByTestId('measurement-result')).not.toHaveText('거리: 0 m');
+  await page.getByRole('button', {name: '측정 완료'}).click();
+});
+
+test('right-click menu supports keyboard selection of area measurement', async ({page}) => {
+  await open(page);
+  const map = page.locator('.leaflet-container');
+  await map.click({button: 'right', position: position.a});
+  const menu = page.getByRole('menu', {name: '지도 측정 메뉴'});
+  await expect(menu.getByRole('menuitem', {name: '거리 측정 시작'})).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', {name: '면적 측정 시작'})).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(menu).toHaveCount(0);
+  await expect(page.getByTestId('measurement-points')).toHaveText('선택한 점: 1개');
+  await expect(page.getByRole('button', {name: '면적', exact: true})).toHaveAttribute('aria-pressed', 'true');
+  await map.click({position: position.b}); await map.click({position: position.c});
+  await expect(page.getByTestId('measurement-points')).toHaveText('선택한 점: 3개');
+  await expect(page.locator('path.measurement-polygon')).toBeVisible();
+  await expect(page.getByTestId('measurement-result')).toContainText('m²');
+  await page.getByRole('button', {name: '측정 완료'}).click();
+});
+
+test('opening or dismissing a right-click menu preserves the current measurement', async ({page}) => {
+  await open(page); await page.getByRole('button', {name: '거리', exact: true}).click();
+  const map = page.locator('.leaflet-container');
+  await map.click({position: position.a}); await map.click({position: position.b});
+  const result = await page.getByTestId('measurement-result').textContent();
+  await map.click({button: 'right', position: position.c});
+  const menu = page.getByRole('menu', {name: '지도 측정 메뉴'});
+  await expect(menu).toBeVisible(); await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(page.getByTestId('measurement-points')).toHaveText('선택한 점: 2개');
+  await expect(page.getByTestId('measurement-result')).toHaveText(result!);
+  await map.click({button: 'right', position: position.c});
+  await menu.getByRole('menuitem', {name: '면적 측정 시작'}).click();
+  await expect(page.getByTestId('measurement-points')).toHaveText('선택한 점: 1개');
+  await expect(page.locator('path.measurement-line')).toHaveCount(0);
+});
+
+test('right-click menu stays inside the map on a narrow screen and dismisses on click or zoom', async ({page}) => {
+  await page.setViewportSize({width: 390, height: 844}); await open(page);
+  const map = page.locator('.leaflet-container'), bounds = (await map.boundingBox())!;
+  await map.click({button: 'right', position: {x: bounds.width - 9, y: bounds.height - 70}});
+  const menu = page.getByRole('menu', {name: '지도 측정 메뉴'});
+  await expect(menu).toBeVisible();
+  const menuBounds = (await menu.boundingBox())!;
+  expect(menuBounds.x).toBeGreaterThanOrEqual(bounds.x);
+  expect(menuBounds.y).toBeGreaterThanOrEqual(bounds.y);
+  expect(menuBounds.x + menuBounds.width).toBeLessThanOrEqual(bounds.x + bounds.width);
+  expect(menuBounds.y + menuBounds.height).toBeLessThanOrEqual(bounds.y + bounds.height);
+  await map.click({position: {x: 90, y: 240}}); await expect(menu).toHaveCount(0);
+  await expect(page.getByTestId('measurement-points')).toHaveText('선택한 점: 0개');
+  await map.click({button: 'right', position: {x: 90, y: 240}}); await expect(menu).toBeVisible();
+  await page.locator('.leaflet-control-zoom-in').click(); await expect(menu).toHaveCount(0);
+  await expect(page.getByTestId('zoom')).toHaveText('17');
+});
