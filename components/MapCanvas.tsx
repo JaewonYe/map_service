@@ -22,6 +22,7 @@ export default function MapCanvas(){
           return L.rectangle([[b.south,b.west],[b.north,b.east]],{color:source.role==='base'?'#6ca5e5':'#f5b33b',weight:2,fill:false,interactive:false});
         })).addTo(map);
         const satellite=L.tileLayer(`/api/tiles/{z}/{x}/{y}?v=${metadata.revision}`,{tileSize:metadata.tileSize,bounds,noWrap:true,
+          minZoom:metadata.minZoom,maxZoom:metadata.maxZoom,
           minNativeZoom:metadata.minZoom,maxNativeZoom:metadata.maxZoom,
           attribution:metadata.attribution.replace(/[<>&"']/g,'')});
         const layers:Record<string,L.Layer>={};

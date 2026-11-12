@@ -33,3 +33,27 @@ test('API selects native detail by priority and enlarges a base tile for uncover
   expect((await request.get(url, {headers: {'If-None-Match': fallback.headers().etag}})).status()).toBe(304);
   expect((await request.get('/api/tiles/13/0/0')).status()).toBe(404);
 });
+
+test('zoom 19 keeps requesting tiles and displays native detail pixels', async ({page}) => {
+  const requested: string[] = [];
+  page.on('request', request => requested.push(request.url()));
+  await page.goto('/');
+  await expect(page.getByTestId('zoom')).toHaveText('16');
+  await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible();
+  for (const zoom of [17, 18, 19]) {
+    await page.locator('.leaflet-control-zoom-in').click();
+    await expect(page.getByTestId('zoom')).toHaveText(String(zoom));
+  }
+  await expect.poll(() => requested.some(url => url.includes('/api/tiles/19/'))).toBe(true);
+  const center = coordinate(19);
+  const tile = page.locator(`img.leaflet-tile[src*="/api/tiles/19/${center.x}/${center.y}?"]`);
+  await expect(tile).toHaveClass(/leaflet-tile-loaded/);
+  await expect(tile).toBeVisible();
+  const pixel = await tile.evaluate(element => {
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 256;
+    const context = canvas.getContext('2d')!;
+    context.drawImage(element as HTMLImageElement, 0, 0);
+    return [...context.getImageData(128, 128, 1, 1).data];
+  });
+  expect(pixel).toEqual([30, 70, 200, 255]);
+});

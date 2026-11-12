@@ -9,3 +9,5 @@ playwright-report
 *.tsbuildinfo
 .cache/
 public/maplibre/
+# Legacy file can remain when a new release ZIP is extracted over an old folder.
+lib/map-style.ts
