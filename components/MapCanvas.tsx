@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from 'react';
 import L from 'leaflet';
 import MapMeasurements from './MapMeasurements';
+import DetailLocations from './DetailLocations';
 import type {CatalogInfo} from '../lib/tiles/catalog';
 type Info=CatalogInfo&{osm:{mode:string;url:string|null;attribution:string}};
 export default function MapCanvas(){
@@ -53,6 +54,7 @@ export default function MapCanvas(){
       <div>Zoom: <span data-testid="zoom">{zoom??'—'}</span></div>
       <div data-testid="clicked">클릭: {clicked?`${clicked[0].toFixed(6)}, ${clicked[1].toFixed(6)}`:'지도를 클릭하세요'}</div>
       <small>EPSG:3857 · {info?.osm.mode==='online'?'온라인 OSM 허용':'오프라인'} · 파랑: 기본 지도 · 노랑: 상세 지역</small>
+      {info?.mode==='multi'&&mapInstance&&<DetailLocations map={mapInstance} sources={info.sources}/>}
       {info?.mode==='multi'&&<details data-testid="map-sources"><summary>지도 데이터 {info.sources.length}개 · 자동 해상도 선택</summary>
         <ul>{info.sources.map(source=><li key={source.id}>{source.name} · {source.role==='base'?'기본':'상세'} · Zoom {source.minZoom}–{source.maxZoom} · 우선순위 {source.priority} · {source.status==='ready'?(source.usageConfirmed?'사용 중':'메타데이터만'):source.status==='disabled'?'비활성':'사용 불가'}</li>)}</ul>
         <small>상세 타일이 없으면 가능한 낮은 줌 타일을 확대 표시합니다.</small>

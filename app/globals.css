@@ -27,4 +27,12 @@ main { flex: 1; min-height: 240px; position: relative; display: flex; }
 .map-info details {margin-top:6px;max-height:35vh;overflow:auto;max-width:340px;}
 .map-info summary {cursor:pointer;}
 .map-info ul {padding-left:18px;margin:6px 0;}
+.map-info .detail-location-list {display:grid;gap:4px;list-style:none;padding:0;margin:6px 0 0;max-height:120px;overflow-y:auto;}
+.detail-location-list button {display:block;box-sizing:border-box;width:100%;min-height:32px;padding:4px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;text-align:left;color:#1e293b;font:inherit;cursor:pointer;}
+.detail-location-list button:hover,.detail-location-list button[aria-current="location"] {background:#e0f2f1;border-color:#087f8c;}
+.detail-location-list button:focus-visible {outline:2px solid #087f8c;outline-offset:-2px;}
+.detail-location-list button:disabled {opacity:0.55;cursor:default;}
+.detail-location-name {display:block;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.detail-location-meta {display:block;font-size:10px;line-height:12px;color:#52616b;}
+.detail-locations-empty {margin:6px 0;font-size:11px;color:#52616b;}
 @media(max-width:600px){header{padding:8px;gap:8px;}h1{font-size:16px;}.map-info{left:48px;font-size:11px;padding:6px;}.map-status{font-size:12px;}}
