@@ -13,6 +13,7 @@ type Entry = yauzl.Entry;
 export type Bounds={south:number;west:number;north:number;east:number};
 export type MapInfo={revision:string;center:[number,number];bounds:Bounds;minZoom:number;maxZoom:number;zoom:number;zoomLevels:number[];projection:'EPSG:3857';tileSize:number;source:string;attribution:string;format:string;storage:string;packageVersion:string;licenseNotice:string;usageConfirmed:boolean;archive:{entries:number;bundles:number;zipMethods:number[];packetSize:number;indexOrder:string};};
 export class TileError extends Error { constructor(message:string,public status=422){super(message);} }
+export type TpkOptions={usageConfirmed?:boolean;memoryLimitBytes?:number};
 const WORLD=20037508.342789244, RESOLUTION=156543.03392804097;
 function find(value:any,key:string):any {
   if(!value||typeof value!=='object')return undefined;
@@ -51,11 +52,11 @@ export class Tpk {
   private indexes=new Map<string,Buffer>();private indexPending=new Map<string,Promise<Buffer>>();
   private running=0;private waiters:Array<()=>void>=[];
   private tilesPending=new Map<string,Promise<{bytes:Buffer;mime:string;etag:string}|null>>();
-  private constructor(private path:string,private zip:yauzl.ZipFile,private cache:string){}
-  static async load(path:string,cache=resolve('.cache/tpk')){
+  private constructor(private path:string,private zip:yauzl.ZipFile,private cache:string,private options:TpkOptions){}
+  static async load(path:string,cache=resolve('.cache/tpk'),options:TpkOptions={}){
     const file=await stat(path);if(!file.isFile())throw new TileError('TPK path is not a file');
     const zip=await new Promise<yauzl.ZipFile>((ok,fail)=>yauzl.open(path,{lazyEntries:true,autoClose:false},(e,z)=>e?fail(e):ok(z!)));
-    const reader=new Tpk(path,zip,cache);
+    const reader=new Tpk(path,zip,cache,options);
     try{
       await new Promise<void>((ok,fail)=>{
         zip.on('error',fail);zip.on('end',ok);zip.on('entry',(entry:Entry)=>{
@@ -69,7 +70,7 @@ export class Tpk {
     }catch(e){zip.close();throw e;}
   }
   close(){this.zip.close();}
-  info(){return {...this.metadata,usageConfirmed:process.env.TPK_USAGE_CONFIRMED==='true'};}
+  info(){return {...this.metadata,usageConfirmed:this.options.usageConfirmed??process.env.TPK_USAGE_CONFIRMED==='true'};}
   private entry(name:string){return this.entries.get(name.toLowerCase());}
   private async stream(entry:Entry){return new Promise<NodeJS.ReadableStream>((ok,fail)=>this.zip.openReadStream(entry,(e,s)=>e?fail(e):ok(s!)));}
   private async text(entry:Entry){
@@ -150,7 +151,7 @@ export class Tpk {
     return readAt(await this.materialize(entry),offset,length);
   }
   async tile(z:number,x:number,y:number){
-    if(process.env.TPK_USAGE_CONFIRMED!=='true')throw new TileError('Confirm permitted local TPK web use with TPK_USAGE_CONFIRMED=true before serving imagery',403);
+    if(!this.info().usageConfirmed)throw new TileError('Confirm permitted local TPK web use before serving imagery (TPK_USAGE_CONFIRMED=true for single TPK, usageConfirmed=true per catalog source)',403);
     const key=`${z}/${x}/${y}`,cached=this.memory.get(key);if(cached){this.memory.delete(key);this.memory.set(key,cached);return cached;}
     const existing=this.tilesPending.get(key);if(existing)return existing;
     if(this.tilesPending.size>=512)throw new TileError('Tile queue busy; retry shortly',429);
@@ -159,7 +160,8 @@ export class Tpk {
       else this.running++;
       try{return await this.readTile(z,x,y);}finally{const next=this.waiters.shift();if(next)next();else this.running--;}
     })().then(tile=>{
-      if(tile&&tile.bytes.length<=8*1024*1024){while(this.memoryBytes+tile.bytes.length>32*1024*1024||this.memory.size>=256){const first=this.memory.keys().next().value;if(first===undefined)break;this.memoryBytes-=this.memory.get(first)!.bytes.length;this.memory.delete(first);}this.memory.set(key,tile);this.memoryBytes+=tile.bytes.length;}
+      const memoryLimit=this.options.memoryLimitBytes??32*1024*1024;
+      if(tile&&tile.bytes.length<=Math.min(8*1024*1024,memoryLimit)){while(this.memoryBytes+tile.bytes.length>memoryLimit||this.memory.size>=256){const first=this.memory.keys().next().value;if(first===undefined)break;this.memoryBytes-=this.memory.get(first)!.bytes.length;this.memory.delete(first);}this.memory.set(key,tile);this.memoryBytes+=tile.bytes.length;}
       return tile;
     });this.tilesPending.set(key,task);try{return await task;}finally{this.tilesPending.delete(key);}
   }

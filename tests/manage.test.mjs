@@ -10,7 +10,7 @@ async function fixture(t){
   t.after(()=>rm(projectRoot,{recursive:true,force:true}));
   await writeFile(join(projectRoot,'.env.example'),'PORT=3001\n');
   async function install(){
-    for(const file of ['tsx/dist/cli.mjs','fast-xml-parser/package.json','yauzl/index.js','next/dist/bin/next','react/package.json','leaflet/dist/leaflet.js']){
+    for(const file of ['tsx/dist/cli.mjs','fast-xml-parser/package.json','yauzl/index.js','sharp/package.json','next/dist/bin/next','react/package.json','leaflet/dist/leaflet.js']){
       const path=join(projectRoot,'node_modules',file);await mkdir(dirname(path),{recursive:true});await writeFile(path,'');
     }
   }

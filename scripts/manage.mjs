@@ -28,7 +28,7 @@ export async function runCommand(command,args,{cwd=root,capture=false}={}){
   });
 }
 async function dependenciesReady(projectRoot,action){
-  const files=['tsx/dist/cli.mjs','fast-xml-parser/package.json','yauzl/index.js'];
+  const files=['tsx/dist/cli.mjs','fast-xml-parser/package.json','yauzl/index.js','sharp/package.json'];
   if(action==='dev')files.push('next/dist/bin/next','react/package.json','leaflet/dist/leaflet.js');
   try{await Promise.all(files.map(file=>access(join(projectRoot,'node_modules',file))));return true;}
   catch(error){if(['ENOENT','ENOTDIR'].includes(error.code))return false;throw error;}

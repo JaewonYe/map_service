@@ -22,3 +22,4 @@ data/imagery/*
 !data/tpk/
 data/tpk/*
 !data/tpk/README.md
+!data/tpk/maps.example.json

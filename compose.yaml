@@ -5,6 +5,7 @@ services:
       context: .
     environment:
       TPK_PATH: /data/tpk/${TPK_FILE:-map.tpk}
+      MAP_CONFIG_FILE: ${MAP_CONFIG_FILE:-maps.json}
       TPK_CACHE_DIR: /cache
       TPK_USAGE_CONFIRMED: ${TPK_USAGE_CONFIRMED:-false}
       MAP_MODE: ${MAP_MODE:-offline}

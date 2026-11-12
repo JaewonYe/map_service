@@ -9,4 +9,7 @@ main { flex: 1; min-height: 240px; position: relative; display: flex; }
 .map-panel { position: relative; flex: 1; min-height: 300px; }
 .map-info { position:absolute; top:12px; left:60px; z-index:500; background:#fffE; padding:10px; border-radius:4px; font-size:13px; max-width:calc(100% - 140px); }
 .map-info small {display:block;color:#555;margin-top:4px;}
+.map-info details {margin-top:6px;max-height:35vh;overflow:auto;max-width:340px;}
+.map-info summary {cursor:pointer;}
+.map-info ul {padding-left:18px;margin:6px 0;}
 @media(max-width:600px){header{padding:8px;gap:8px;}h1{font-size:16px;}.map-info{left:48px;font-size:11px;padding:6px;}.map-status{font-size:12px;}}
