@@ -1,0 +1,33 @@
+import type {Bounds} from '../tiles/tpk';
+export type LayerId = 'satellite' | 'street' | 'elevation';
+export type LayerInfo = {
+  available: boolean;
+  reason?: string;
+  url?: string;
+  revision?: string;
+  bounds?: Bounds;
+  minNativeZoom?: number;
+  maxNativeZoom?: number;
+  attribution?: string;
+  online?: boolean;
+  minElevation?: number;
+  maxElevation?: number;
+  verticalDatum?: string;
+};
+export type ElevationMetadata = {
+  version: 1;
+  projection: 'EPSG:3857';
+  tileSize: 256;
+  encoding: 'terrarium';
+  units: 'm';
+  bounds: Bounds;
+  minZoom: number;
+  maxZoom: number;
+  minElevation: number;
+  maxElevation: number;
+  source: string;
+  attribution: string;
+  verticalDatum: string;
+  usageConfirmed: boolean;
+  tiles: string;
+};

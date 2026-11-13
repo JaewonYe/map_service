@@ -57,3 +57,5 @@ main { flex: 1; min-height: 240px; position: relative; display: flex; }
 .building-dates {font-size:11px;color:#52616b;}
 .building-load-error {position:absolute;right:12px;top:110px;z-index:1000;box-sizing:border-box;max-width:calc(100% - 24px);padding:10px;background:#fff4db;border:1px solid #c18b38;font-size:12px;}
 @media(max-width:600px){header{padding:8px;gap:8px;}h1{font-size:16px;}.map-info{left:48px;font-size:11px;padding:6px;}.map-status{font-size:12px;}}
+.map-data-help {position:absolute;right:10px;top:145px;z-index:600;padding:7px;border:1px solid #aab7c4;border-radius:4px;background:white;color:#1e293b;font:12px system-ui;cursor:pointer;}
+.elevation-legend span {display:inline-block;width:65px;height:10px;background:linear-gradient(to right,#418f6c,#dac17b,#805432,#faf6eb);}

@@ -1,4 +1,4 @@
-# 다중 해상도 TPK 오프라인 위성지도
+# 오프라인 지도 — 위성영상·일반 지도·고도 지도
 
 기존 **Next.js 16.4.5 App Router + TypeScript + Docker**를 유지합니다. Leaflet을 클라이언트에서만 로드하며, **Next.js Route Handler가 로컬 TPK를 직접 읽습니다.** 별도의 Python/FastAPI/타일 서버는 실행하지 않습니다.
 
@@ -9,7 +9,8 @@
 1. 단일 TPK는 **`data/tpk/map.tpk`**에 복사합니다. 다중 해상도는 **`data/tpk/maps.example.json` → `maps.json`**으로 복사한 뒤 TPK 파일들을 등록합니다. [여러 TPK 등록 방법](#여러-tpk-등록-방법)을 참고하세요.
 2. `.env.example`을 `.env`로 복사합니다. 기존 `.env`가 있으면 필요한 항목만 반영하세요.
 3. 아래 명령 또는 실행 메뉴 1로 메타데이터·이용 조건을 확인합니다. 허용된 TPK에 한해 단일 모드는 `.env`의 **`TPK_USAGE_CONFIRMED=true`**, 다중 모드는 각 `maps.json` 항목의 **`usageConfirmed: true`**를 설정합니다.
-4. 실행합니다.
+4. 일반 지도·고도 지도가 필요하면 아래 [데이터 추가](#일반-지도고도-지도-추가) 절차를 진행합니다. 기존 위성 TPK는 그대로 사용합니다.
+5. 실행합니다.
 
 ```sh
 docker compose up -d --build
@@ -18,6 +19,75 @@ docker compose up -d --build
 브라우저: **http://localhost:3001**. 기존 `.env`를 사용한다면 `PORT=3001`로 변경하세요. Windows에서는 `실행.cmd` 메뉴 2로도 시작할 수 있습니다. 종료는 `docker compose down` 또는 메뉴 4입니다. TPK·로컬 OSM·캐시 데이터는 유지됩니다.
 
 현재 저장소에는 **실제 사용자 TPK가 없습니다.** 실제 파일을 첨부하거나 위 위치에 준비해야 실제 형식·화질·영역 검증을 완료할 수 있습니다. 합성 테스트 패키지를 실제 Esri 영상으로 제공하지 않습니다.
+
+## 일반 지도·고도 지도 추가
+
+현재 보유한 **World Imagery TPK(대한민국 0–13, 태안 14–19)는 위성영상**입니다. 이 영상의 줌을 늘려도 도로·건물명 지도나 실제 고도값이 생성되지는 않습니다. 아래 데이터를 별도로 준비해야 합니다. **데이터가 없는 레이어는 선택기에 표시되지 않으며, 오른쪽 `지도 데이터 준비`에서 상태와 필요한 파일을 확인할 수 있습니다.**
+
+| 기능 | 필요한 데이터 | 복사할 위치 |
+| --- | --- | --- |
+| 일반 지도 | 도로·지명이 렌더링된 래스터 **TPK** (EPSG:3857, 256px, Compact V1/V2) | `data/street/map.tpk` |
+| 고도 지도 | 미터 단위 높이를 가진 **단일 밴드 DEM GeoTIFF** (`.tif`) | `data/elevation/source/dem.tif` |
+
+### 일반 지도
+
+1. 허용된 **일반 지도 TPK**를 위 위치에 복사하고 `.env`에 `STREET_USAGE_CONFIRMED=true`를 설정합니다. 위성용 `TPK_USAGE_CONFIRMED`와 별개입니다.
+2. 여러 일반 지도 TPK가 있다면 `data/street/maps.example.json`을 `maps.json`으로 복사하고, 위성 카탈로그와 동일한 형식으로 기본/상세 TPK와 각각의 `usageConfirmed`를 등록합니다. `file` 경로는 **data/street 기준**입니다. 단일 파일은 모든 원본 줌을 사용하고, 다중 파일은 `minZoom`/`maxZoom`을 실제 데이터에 맞추세요.
+3. 서비스를 재시작하고 새로고침한 뒤 오른쪽 **일반 지도**를 선택합니다. 초기 선택은 위성영상 → 일반 지도 → 고도 지도 순으로 준비된 첫 레이어입니다.
+
+일반 지도에는 별도의 TPK 카탈로그가 적용됩니다. 겹침·우선순위·빈 상세 타일의 낮은 줌 대체 규칙은 기존 위성 지도와 같습니다. 위성 TPK와 파일을 혼합하지 마세요. `.pbf`와 벡터 MBTiles는 이 래스터 API에 바로 넣을 수 없습니다. 저장소에 남아 있는 예전 `data/vector/region.mbtiles`는 **모나코 영역의 벡터 데이터**로 태안 일반 지도 대신 사용할 수 없습니다.
+
+기존 `data/osm/z/x/y.png` 또는 `.jpg` 로컬 OSM도 사용할 수 있습니다. TPK 일반 지도가 준비되면 우선 사용하고, 없으면 허용된 로컬 OSM, 마지막으로 **명시적으로 MAP_MODE=online인 경우만** 공용 OSM을 사용합니다. 인터넷 연결을 켠다고 자동으로 온라인 모드로 바뀌지 않습니다. 로컬 XYZ에는 필요한 줌을 모두 준비해야 하며, TPK의 부모 타일 대체 기능은 적용되지 않습니다.
+
+### 고도 지도
+
+**DEM은 위성 RGB 사진과 다른 수치 데이터**입니다. 태안부터 시작한다면 해당 영역을 포함하는 Copernicus DEM GLO-30 또는 SRTM 등 약 30m DEM GeoTIFF를 준비할 수 있습니다. 사용 조건과 고도 기준(해발/타원체고)을 함께 확인하고 `DEM_SOURCE`, `DEM_ATTRIBUTION`, `DEM_VERTICAL_DATUM`에 기록하세요. 측정 정확도는 원본 DEM에 따르며 확대해도 정밀도가 높아지지 않습니다.
+
+1. 원본 DEM을 `data/elevation/source/dem.tif`에 복사합니다. 입력 좌표계는 GDAL로 EPSG:3857에 재투영합니다. RGB GeoTIFF·위성 TPK·단위가 feet인 DEM은 직접 사용할 수 없습니다.
+2. 허가된 데이터의 변환·자체 웹 사용을 확인하고 `.env`에 `ELEVATION_USAGE_CONFIRMED=true`를 설정합니다. 기본 변환은 `DEM_MIN_ZOOM=8`, `DEM_MAX_ZOOM=13`입니다. 줌 19에서도 원본 최대 줌을 확대 표시하므로 해상도가 낮다는 이유로 줌 19 타일을 모두 생성할 필요는 없습니다.
+3. Windows `실행.cmd`의 **6. 고도 지도 준비**를 선택하거나 두 OS에서 아래 명령을 실행합니다.
+
+```sh
+docker compose --profile tools run --rm --build prepare-elevation
+docker compose up -d --build
+```
+
+이미 최신 웹 이미지가 실행 중이면 두 번째 명령 대신 `docker compose restart web`이면 됩니다. 최초 도구 이미지 빌드에는 인터넷이 필요할 수 있습니다. 변환은 로컬 파일만 읽고 **네트워크 없는 작업 컨테이너**에서 수행합니다. 추가 Python 서버는 실행하지 않습니다.
+
+권한 확인 전 메타데이터만 검사하려면 다음 명령을 사용하세요. 변환 결과는 만들지 않습니다.
+
+```sh
+docker compose --profile tools run --rm --build prepare-elevation --inspect
+```
+
+**고도 지도**는 고도별 색상과 북서 방향 광원의 음영을 표시합니다. 범례는 해당 DEM의 최저~최고 고도이며, 어느 레이어에서든 지도를 클릭하면 **고도(m)**를 조회합니다. 고도 기준이 미확인이면 그대로 표시합니다. 경계 밖·NoData·누락 데이터는 `데이터 없음`이며, **0m와 음수 고도는 정상 값**입니다. NoData 영역은 투명하며 임의의 고도를 생성하지 않습니다. 거리·면적 측정은 기존처럼 수평 구면 기준이며 지형 경사를 반영하지 않습니다.
+
+```text
+data/
+├── tpk/                       # 기존 위성 TPK + maps.json 유지
+├── street/                    # 일반 지도 TPK + 선택적 maps.json
+└── elevation/
+    ├── source/dem.tif          # 원본 DEM, 수정하지 않음
+    ├── metadata.json          # 경계·줌·고도 범위·단위·고도 기준·원본 SHA256
+    └── sets/<id>/
+        ├── color/z/x/y.png     # 고도 색상 + 음영, 로컬 제공
+        └── height/z/x/y.png    # Terrarium RGBA 수치 고도; 투명 픽셀은 NoData
+```
+
+변환은 **각 줌에서 수치 DEM을 먼저 재투영·보간한 뒤** 높이를 PNG로 인코딩합니다. 이미 인코딩된 RGB를 축소하여 높이값을 손상시키지 않습니다. 타일 바깥 1픽셀을 함께 읽어 음영 경계가 이어지도록 합니다. 경계·줌·표시 범위는 `metadata.json`과 TPK 원본에서 읽으며 프론트엔드 수정은 필요하지 않습니다. 변환 대상이 기본 제한 20,000 타일을 넘으면 줌을 낮추거나 DEM을 잘라서 시작하세요. 스케일/오프셋이 있는 DEM은 먼저 GDAL의 `gdal_translate -unscale -ot Float32`로 실제 미터 값으로 정규화해야 합니다.
+
+완료한 데이터는 **data/street 및 data/elevation 전체**를 복사해 이전하세요. 원본·메타데이터·color/height를 함께 보관하며 Docker 이미지에는 넣지 않습니다. 변환 성공 시에만 메타데이터가 새 세트를 가리키도록 바꾸고, 실패 시 기존 결과를 유지합니다. 이전 `sets/`는 보관하므로 필요 없을 때 서비스를 중지한 뒤 현재 metadata.json이 참조하지 않는 세트만 정리하세요.
+
+처음 이 기능을 받으면 `docker compose up -d --build`로 웹 이미지를 갱신합니다. 이후 **지도 파일·설정 변경은 재시작과 새로고침**만 필요합니다. 고도 데이터는 새 DEM을 사용할 때만 다시 변환하세요. 일반/고도 데이터가 없거나 손상돼도 기존 위성 레이어는 계속 사용할 수 있고, 위성 TPK 없이 일반/고도 데이터만 준비한 환경도 실행할 수 있습니다.
+
+추가 환경변수: `STREET_HOST_DIR`/`STREET_TPK_DIR`, `ELEVATION_HOST_DIR`/`ELEVATION_DIR`은 각각 Docker 호스트/개발 서버 경로입니다. 컨테이너 내부는 `/data/street`, `/data/elevation`으로 고정합니다. `.env.example`의 새 항목을 기존 `.env`에 병합하세요.
+
+추가 API:
+
+- `GET /api/map-info`: `layers.satellite`, `layers.street`, `layers.elevation`에 제공 상태·경계·원본 줌·로컬 URL·고도 범위를 제공합니다.
+- `GET /api/street/{z}/{x}/{y}`: 일반 지도 TPK XYZ 타일, 권한 검사·ETag·상위 줌 대체.
+- `GET /api/elevation/tiles/{z}/{x}/{y}`: 변환된 고도 색상/음영 PNG. 원본 줌만 반환하며 브라우저가 확대합니다.
+- `GET /api/elevation?lat=36.597889&lon=126.240136`: 미터 단위 고도·고도 기준·원본 줌. 데이터가 없으면 `elevationMeters: null`; 잘못된 좌표 400, 미확인 권한 403, 없는 타일 404.
 
 ## 메타데이터 먼저 검사
 
@@ -213,7 +283,7 @@ Compact V1은 별도 `.bundlx`의 5바이트 offset과 **column-major** 인덱�
 
 기본 `MAP_MODE=offline`에서는 외부 지도 요청이 없습니다. 필수 JS/CSS와 Leaflet은 Next.js가 로컬 제공하며 외부 CDN·폰트·위성 API를 요청하지 않습니다.
 
-오프라인 OSM을 함께 쓰려면 사용이 허가된 XYZ 타일을 **`data/osm/z/x/y.png` 또는 `.jpg`**에 두고 `OSM_USAGE_CONFIRMED=true`를 설정하세요. 그러면 레이어 선택기에 OSM이 나타납니다. 파일이 없거나 권한이 확인되지 않으면 OSM을 표시하지 않습니다.
+오프라인 OSM을 함께 쓰려면 사용이 허가된 XYZ 타일을 **`data/osm/z/x/y.png` 또는 `.jpg`**에 두고 `OSM_USAGE_CONFIRMED=true`를 설정하세요. 그러면 별도 일반 TPK가 없을 때 레이어 선택기에 **일반 지도**가 나타납니다. 파일이 없거나 권한이 확인되지 않으면 OSM을 표시하지 않습니다.
 
 온라인 OSM이 필요할 때만 `MAP_MODE=online`으로 바꾸고 컨테이너를 재생성합니다. 이때 브라우저가 공용 OSM 타일을 요청하며 [OSM 타일 이용 정책](https://operations.osmfoundation.org/policies/tiles/)을 따라야 합니다. 이 프로젝트는 공용 OSM 타일의 일괄 다운로드 기능을 제공하지 않습니다.
 
@@ -262,7 +332,7 @@ docker compose build
 docker save -o map-service-image.tar map-service-web:local
 ```
 
-`map-service-image.tar`, 저장소의 `compose.yaml`/`.env`, **`maps.json`과 하위 폴더를 포함한 `data/tpk/` 전체**, **`data/buildings/`**, 필요 시 `data/osm/`을 대상 PC에 복사합니다. JSON은 상대 경로를 유지하므로 Windows/Ubuntu 사이에서도 동일하게 사용합니다. 대상 PC에서:
+`map-service-image.tar`, 저장소의 `compose.yaml`/`.env`, **`maps.json`과 하위 폴더를 포함한 `data/tpk/` 전체**, **`data/buildings/`**, **`data/street/`와 `data/elevation/` 전체**, 필요 시 `data/osm/`을 대상 PC에 복사합니다. 새 폴더에는 최소한 저장소의 README 파일을 포함해 폴더가 존재하도록 합니다. JSON은 상대 경로를 유지하므로 Windows/Ubuntu 사이에서도 동일하게 사용합니다. 대상 PC에서:
 
 ```sh
 docker load -i map-service-image.tar
@@ -278,6 +348,7 @@ npm run test:tiles
 npm run test:launcher
 npm run test:measure
 npm run test:buildings
+npm run test:layers
 npx playwright install chromium
 npm test
 npm run typecheck
@@ -287,6 +358,12 @@ npm run typecheck
 
 **검증 범위:** 현재 Linux 클라우드의 합성 패키지 테스트이며, 실제 사용자 TPK 검증과 Windows 11/Ubuntu 24.04 실기 검증은 아직 완료되지 않았습니다. 실제 파일의 라이선스·내보내기 정보와 패키지 구조를 확인한 뒤 실제 위성영상 검증을 진행해야 합니다.
 
-현재 검증 결과: 타일·형식・다중 등록 테스트 **22개**, 실행 메뉴 **12개**, 거리·면적 계산 **9개**, 건물 저장소 **7개**, 단일/다중/측정/지역 이동/건물 브라우저 **24개**를 통과했습니다. 다중 등록에서는 z0–13 기본 지도, z14–19 상세/누락 줌, 겹침·동일 우선순위, 부모 타일 위치별 crop, 투명 PNG 합성, 권한 격리, 손상/누락 상세 파일, 설정 변경 감지와 기존 단일 TPK 호환성을 검사합니다. Docker Compose의 외부 통신 차단 네트워크에서도 **3개 TPK의 선택·확대 대체·압축 bundle 캐시·404·비루트 실행·원본 읽기 전용 마운트**를 확인했습니다. 실행 메뉴에서는 의존성 설치·오프라인 재사용·설치 실패 처리·Windows npm 명령 구성도 검사합니다. 모두 합성/공개 형식 샘플 기준이며 실제 사용자 패키지의 완료 증거는 아닙니다.
+현재 검증 결과: 타일·형식・다중 등록 테스트 **22개**, 실행 메뉴 **12개**, 거리·면적 계산 **9개**, 건물 저장소 **7개**, 단일/다중/측정/지역 이동/건물/추가 레이어 브라우저 **27개**를 통과했습니다. 다중 등록에서는 z0–13 기본 지도, z14–19 상세/누락 줌, 겹침·동일 우선순위, 부모 타일 위치별 crop, 투명 PNG 합성, 권한 격리, 손상/누락 상세 파일, 설정 변경 감지와 기존 단일 TPK 호환성을 검사합니다. Docker Compose의 외부 통신 차단 네트워크에서도 **3개 TPK의 선택·확대 대체·압축 bundle 캐시·404·비루트 실행·원본 읽기 전용 마운트**를 확인했습니다. 실행 메뉴에서는 의존성 설치·오프라인 재사용·설치 실패 처리·Windows npm 명령 구성도 검사합니다. 모두 합성/공개 형식 샘플 기준이며 실제 사용자 패키지의 완료 증거는 아닙니다.
 
 건물 기능은 등록·새로고침 후 유지·수정·삭제·저장 실패 시 입력 보존·지연 응답·문자열 표시·버전 충돌·모바일을 검증했습니다. 외부 통신이 차단된 Docker Compose에서도 비루트 사용자로 건물을 등록·수정한 뒤 컨테이너를 강제로 재생성해 내용과 버전의 보존, 기존 z19 타일 제공, 삭제를 확인했습니다. 실제 사용자 건물 데이터는 테스트에 사용하지 않았습니다.
+
+고도 변환 검증은 GDAL·NumPy가 설치된 환경에서 `python3 -m unittest discover -s tests -p '*_test.py'`로 실행합니다. Node 단위 테스트는 수치 인코딩·0m/음수/NoData·경로 격리·권한 분리를 확인하며, 브라우저 테스트는 세 레이어 전환·원본 줌 확대·고도 API·오프라인 요청을 검사합니다. 테스트 데이터는 CC0 합성 데이터이며 실제 태안 지형을 나타내지 않습니다.
+
+오프라인 PC에서 **새 DEM 변환도** 하려면 인터넷이 있는 PC에서 `docker compose --profile tools build prepare-elevation` 후 `docker save -o elevation-tools-image.tar map-service-elevation-tools:local`로 도구 이미지도 복사하고, 대상 PC에서 `docker load -i elevation-tools-image.tar` 후 **`--build` 없이** `docker compose --profile tools run --rm --pull never prepare-elevation`을 사용하세요. 이미 변환된 데이터의 지도 표시에는 도구 이미지가 필요 없습니다.
+
+일반/고도 확장 검증: Node 단위 테스트 **6개**, GDAL 변환 테스트 **3개**, 추가 브라우저 테스트 **3개**를 통과했습니다. 네트워크가 차단된 Docker Compose에서 합성 GeoTIFF의 실제 변환, 세 레이어의 로컬 타일, 클릭 고도 123.5m, PNG/404, 비루트 실행, 읽기 전용 마운트를 확인했습니다. Windows/Ubuntu 실기와 실제 사용자 태안 데이터는 검증하지 않았습니다.

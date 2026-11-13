@@ -25,7 +25,7 @@ test('metadata comes from package, JPEG/PNG and conditional caching work; missin
 test('offline network denial does not break satellite rendering',async({page})=>{
   await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
   await page.goto('/');await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible();
-  await expect(page.getByText('오프라인 OSM 타일이 없어 위성영상만 제공합니다.')).toBeVisible();
+  await expect(page.getByText('일반 지도 데이터가 준비되지 않았습니다.')).toBeVisible();
 });
 
 test('licensed local OSM layer switches without any public tile request',async({page})=>{
@@ -37,7 +37,7 @@ test('licensed local OSM layer switches without any public tile request',async({
   });
   await page.route('**/fixture-osm/**',route=>route.fulfill({contentType:'image/png',body:png()}));
   await page.goto('/');await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible();
-  await page.getByRole('radio',{name:'OSM',exact:true}).check();
+  await page.getByRole('radio',{name:'일반 지도',exact:true}).check();
   await expect.poll(()=>requests.some(url=>url.includes('/fixture-osm/'))).toBe(true);
   await page.getByRole('radio',{name:'위성영상',exact:true}).check();
   await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible();

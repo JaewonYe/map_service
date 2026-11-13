@@ -6,9 +6,13 @@ import DetailLocations from './DetailLocations';
 import MapBuildings from './MapBuildings';
 import type {Coordinate} from '../lib/map-measure';
 import type {CatalogInfo} from '../lib/tiles/catalog';
-type Info=CatalogInfo&{osm:{mode:string;url:string|null;attribution:string}};
+import type {LayerId,LayerInfo} from '../lib/maps/types';
+type Info=Pick<CatalogInfo,'center'|'zoom'|'minZoom'|'maxZoom'|'sources'|'warnings'>&{mode:'single'|'multi'|'layers';layers:Record<LayerId,LayerInfo>;osm:{mode:string;url:string|null;attribution:string}};
 export default function MapCanvas(){
   const container=useRef<HTMLDivElement>(null);
+  const help=useRef<HTMLDialogElement>(null);
+  const [activeLayer,setActiveLayer]=useState('');
+  const [height,setHeight]=useState('');
   const [mapInstance,setMapInstance]=useState<L.Map|null>(null);
   const [buildingPoint,setBuildingPoint]=useState<Coordinate|null>(null);
   const [info,setInfo]=useState<Info|null>(null),[message,setMessage]=useState('TPK 메타데이터 확인 중…');
@@ -20,30 +24,42 @@ export default function MapCanvas(){
         const response=await fetch('/api/map-info',{signal:abort.signal});const data=await response.json();
         if(!response.ok)throw Error(data.error||'메타데이터 오류');if(abort.signal.aborted||!container.current)return;
         const metadata=data as Info;setInfo(metadata);setCenter(metadata.center);setZoom(metadata.zoom);
-        const b=metadata.bounds;const bounds:L.LatLngBoundsExpression=[[b.south,b.west],[b.north,b.east]];
         map=L.map(container.current,{minZoom:metadata.minZoom,maxZoom:metadata.maxZoom,zoomSnap:1}).setView(metadata.center,metadata.zoom);
         L.control.scale({imperial:false}).addTo(map);
         const boundary=L.featureGroup(metadata.sources.filter(source=>source.bounds&&source.status==='ready').map(source=>{
           const b=source.bounds!;
           return L.rectangle([[b.south,b.west],[b.north,b.east]],{color:source.role==='base'?'#6ca5e5':'#f5b33b',weight:2,fill:false,interactive:false});
         })).addTo(map);
-        const satellite=L.tileLayer(`/api/tiles/{z}/{x}/{y}?v=${metadata.revision}`,{tileSize:metadata.tileSize,bounds,noWrap:true,
-          minZoom:metadata.minZoom,maxZoom:metadata.maxZoom,
-          minNativeZoom:metadata.minZoom,maxNativeZoom:metadata.maxZoom,
-          attribution:metadata.attribution.replace(/[<>&"']/g,'')});
         const layers:Record<string,L.Layer>={};
-        if(metadata.usageConfirmed){
+        const names:Record<LayerId,string>={satellite:'위성영상',street:'일반 지도',elevation:'고도 지도'};
+        // Compatibility with the original local/online OSM metadata contract.
+        if(metadata.osm.url&&!metadata.layers.street.available)metadata.layers.street={available:true,url:metadata.osm.url,
+          attribution:metadata.osm.attribution,minNativeZoom:0,maxNativeZoom:19,online:metadata.osm.mode==='online'};
+        for(const id of ['satellite','street','elevation'] as const){
+          const source=metadata.layers[id];
+          if(!source.available||!source.url)continue;
+          const b=source.bounds;
+          const tile=L.tileLayer(`${source.url}${source.revision?'?v='+source.revision:''}`,{
+            tileSize:256,noWrap:true,bounds:b?[[b.south,b.west],[b.north,b.east]]:undefined,
+            minZoom:0,maxZoom:19,minNativeZoom:source.minNativeZoom??0,maxNativeZoom:source.maxNativeZoom??19,
+            attribution:(source.attribution||'').replace(/[<>&"']/g,'')});
           let failed=false;
-          satellite.on('tileerror',()=>{failed=true;setMessage('일부 타일이 없거나 읽을 수 없습니다. 데이터 범위와 서버 로그를 확인하세요.');});
-          satellite.on('loading',()=>{failed=false;setMessage('타일을 불러오는 중…');});
-          satellite.on('load',()=>{if(!failed)setMessage('');});
-          satellite.addTo(map);layers['위성영상']=satellite;setMessage('');
-        }else setMessage(metadata.mode==='multi'?'메타데이터만 확인했습니다. 허용된 TPK의 maps.json 항목에 usageConfirmed=true를 설정하세요.':'메타데이터만 확인했습니다. 사용 권한 확인 후 TPK_USAGE_CONFIRMED=true로 설정하세요.');
-        if(metadata.osm.url){
-          layers['OSM']=L.tileLayer(metadata.osm.url,{attribution:metadata.osm.attribution,noWrap:true,maxZoom:metadata.maxZoom});
-          if(!metadata.usageConfirmed)layers.OSM.addTo(map);
+          tile.on('tileerror',()=>{failed=true;setMessage('일부 타일이 없습니다. 데이터 범위와 서버 로그를 확인하세요.');});
+          tile.on('loading',()=>{failed=false;setMessage('타일을 불러오는 중…');});
+          tile.on('load',()=>{if(!failed)setMessage('');});
+          layers[names[id]]=tile;
+          if(Object.keys(layers).length===1){tile.addTo(map);setActiveLayer(names[id]);}
+          if(id!=='satellite'&&b)L.rectangle([[b.south,b.west],[b.north,b.east]],{
+            color:id==='street'?'#087f8c':'#a855f7',weight:2,fill:false,interactive:false}).addTo(boundary);
         }
+        setMessage(Object.keys(layers).length?'':'사용 가능한 지도 데이터가 없습니다. 오른쪽의 지도 데이터 준비를 확인하세요.');
         L.control.layers(layers,{'데이터 경계':boundary},{collapsed:false}).addTo(map);
+        map.on('baselayerchange',(event:L.LayersControlEvent)=>{
+          setActiveLayer(event.name);setMessage('');
+          const id=(Object.keys(names) as LayerId[]).find(id=>names[id]===event.name),b=id&&metadata.layers[id].bounds;
+          if(b){const area=L.latLngBounds([[b.south,b.west],[b.north,b.east]]);
+            if(!map!.getBounds().intersects(area))map!.fitBounds(area,{padding:[30,30],maxZoom:metadata.layers[id!].maxNativeZoom??16});}
+        });
         let point:L.CircleMarker|undefined;
         map.on('moveend zoomend',()=>{const c=map!.getCenter();setCenter([c.lat,c.lng]);setZoom(map!.getZoom());});
         map.on('click',(event:L.LeafletMouseEvent)=>{setClicked([event.latlng.lat,event.latlng.lng]);point?.remove();point=L.circleMarker(event.latlng,{radius:5,color:'#ff574e',fillOpacity:1}).addTo(map!);});
@@ -51,11 +67,22 @@ export default function MapCanvas(){
       }catch(error){if(!abort.signal.aborted)setMessage(error instanceof Error?error.message:'지도 초기화 실패');}
     })();return()=>{abort.abort();map?.remove();};
   },[]);
-  return <section className="map-panel"><div className="map-canvas" ref={container} aria-label="오프라인 위성지도"/>
+  useEffect(()=>{
+    if(!clicked||!info?.layers.elevation.available){setHeight('');return;}
+    const abort=new AbortController();setHeight('확인 중…');
+    fetch(`/api/elevation?lat=${clicked[0]}&lon=${clicked[1]}`,{signal:abort.signal}).then(async response=>{
+      const result=await response.json();if(!response.ok)throw Error(result.error||'고도 조회 실패');
+      if(!abort.signal.aborted)setHeight(result.elevationMeters===null?'데이터 없음':`${result.elevationMeters.toFixed(1)} m`);
+    }).catch(error=>{if(!abort.signal.aborted)setHeight(error instanceof Error?error.message:'고도 조회 실패');});
+    return()=>abort.abort();
+  },[clicked,info]);
+  return <section className="map-panel"><div className="map-canvas" ref={container} aria-label="오프라인 지도"/>
     <aside className="map-info" aria-label="지도 좌표 정보">
       <div>중심: {center?`${center[0].toFixed(6)}, ${center[1].toFixed(6)}`:'—'}</div>
       <div>Zoom: <span data-testid="zoom">{zoom??'—'}</span></div>
       <div data-testid="clicked">클릭: {clicked?`${clicked[0].toFixed(6)}, ${clicked[1].toFixed(6)}`:'지도를 클릭하세요'}</div>
+      {info?.layers.elevation.available&&<div data-testid="elevation-value">고도: {height||'지도를 클릭하세요'}</div>}
+      {activeLayer==='고도 지도'&&<small className="elevation-legend">고도 색상: 낮음 <span/> 높음<br/>{info?.layers.elevation.minElevation}–{info?.layers.elevation.maxElevation} m · {info?.layers.elevation.verticalDatum}</small>}
       <small>EPSG:3857 · {info?.osm.mode==='online'?'온라인 OSM 허용':'오프라인'} · 파랑: 기본 지도 · 노랑: 상세 지역</small>
       {info?.mode==='multi'&&mapInstance&&<DetailLocations map={mapInstance} sources={info.sources}/>}
       {info?.mode==='multi'&&<details data-testid="map-sources"><summary>지도 데이터 {info.sources.length}개 · 자동 해상도 선택</summary>
@@ -63,8 +90,20 @@ export default function MapCanvas(){
         <small>상세 타일이 없으면 가능한 낮은 줌 타일을 확대 표시합니다.</small>
         {info.warnings.map((warning,index)=><small key={index}>{warning}</small>)}
       </details>}
-      {info?.osm.mode==='unavailable'&&<small>오프라인 OSM 타일이 없어 위성영상만 제공합니다.</small>}
+      {info&&!info.layers.street.available&&<small>일반 지도 데이터가 준비되지 않았습니다.</small>}
     </aside>
+    <button className="map-data-help" onClick={()=>help.current?.showModal()}>지도 데이터 준비</button>
+    <dialog ref={help} className="building-dialog" aria-label="지도 데이터 준비">
+      <h2>지도 데이터 준비</h2>
+      <p>위성영상 TPK에는 도로·건물명 지도와 실제 고도값이 포함되지 않습니다. 각 데이터를 별도로 준비하세요.</p>
+      <ul>{(['satellite','street','elevation'] as const).map(id=><li key={id}>
+        <strong>{{satellite:'위성영상',street:'일반 지도',elevation:'고도 지도'}[id]}</strong>: {info?.layers[id].available?'사용 가능':info?.layers[id].reason||'메타데이터 확인 중'}
+      </li>)}</ul>
+      <p>일반 지도: <code>data/street/map.tpk</code> 또는 <code>data/street/maps.json</code>에 사용 허가된 도로·지명 TPK를 등록하세요. 단일 TPK는 <code>STREET_USAGE_CONFIRMED=true</code>로 설정합니다.</p>
+      <p>고도 지도: 미터 단위 DEM GeoTIFF를 <code>data/elevation/source/dem.tif</code>에 복사하고 실행 메뉴 6으로 변환하세요. 자세한 내용은 README의 일반 지도·고도 지도 항목을 참고하세요.</p>
+      <p>파일·설정 변경 후 서버를 재시작하고 새로고침하세요. 준비되지 않은 레이어는 선택 목록에 표시되지 않습니다.</p>
+      <button onClick={()=>help.current?.close()}>닫기</button>
+    </dialog>
     <div className="map-bottom-tools">
       {message&&<p role="status" className="map-status">{message}</p>}
       {mapInstance&&<MapMeasurements map={mapInstance} onRegisterBuilding={setBuildingPoint}/>}

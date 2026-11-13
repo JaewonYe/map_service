@@ -1,0 +1,12 @@
+import {mkdir,rm} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {makeElevation} from '../tests/fixtures/elevation-fixture';
+import {packageFile,color} from '../tests/fixtures/catalog-fixture';
+import {coordinate} from '../tests/fixtures/tpk-fixture';
+const directory=resolve('.cache/test-layers');
+await rm(directory,{recursive:true,force:true});
+await mkdir(directory,{recursive:true});
+await makeElevation(resolve(directory,'elevation'));
+const picture=await color(235,225,200);
+await packageFile(resolve(directory,'street'),'map.tpk',[15,16,17],[15,16,17].map(z=>({z,...coordinate(z),bytes:picture})));
+console.log('CC0 test-only street and elevation fixtures prepared');

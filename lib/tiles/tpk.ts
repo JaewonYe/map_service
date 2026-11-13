@@ -118,7 +118,7 @@ export class Tpk {
     const item=[...this.entries].find(([n])=>n.endsWith('/iteminfo.xml'));
     const itemInfo=item?parser.parse(await this.text(item[1])):null;
     this.metadata={revision:this.identity,center,bounds,minZoom:zoomLevels[0],maxZoom:zoomLevels.at(-1)!,zoom:zoomLevels.reduce((a,b)=>Math.abs(b-mapConfig.zoom)<Math.abs(a-mapConfig.zoom)?b:a),zoomLevels,
-      projection:'EPSG:3857',tileSize:size,source:'Esri World Imagery (TPK)',attribution:String((itemInfo&&find(itemInfo,'accessInformation'))||'Esri and its data providers'),format:String(find(config,'CacheTileFormat')),
+      projection:'EPSG:3857',tileSize:size,source:String((itemInfo&&find(itemInfo,'title'))||'Local raster TPK'),attribution:String((itemInfo&&find(itemInfo,'accessInformation'))||'Local TPK · see package licence'),format:String(find(config,'CacheTileFormat')),
       storage,packageVersion:String((itemInfo&&find(itemInfo,'version'))||this.prefix.match(/v\d+/)?.[0]||'Not declared in metadata'),
       licenseNotice:itemInfo?String(find(itemInfo,'licenseInfo')||'No explicit usage terms found in item metadata'):'No item license metadata present',usageConfirmed:false,archive:{entries:this.entries.size,bundles:[...this.entries.keys()].filter(name=>name.endsWith('.bundle')).length,zipMethods:[...new Set([...this.entries.values()].filter(entry=>entry.fileName.toLowerCase().endsWith('.bundle')).map(entry=>entry.compressionMethod))],packetSize:128,indexOrder:this.version===1?'column-major':'row-major'}};
   }

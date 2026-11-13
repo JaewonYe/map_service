@@ -26,3 +26,13 @@ data/tpk/*
 !data/buildings/
 data/buildings/*
 !data/buildings/README.md
+!data/street/
+data/street/*
+!data/street/README.md
+!data/street/maps.example.json
+!data/elevation/
+data/elevation/*
+!data/elevation/README.md
+!data/elevation/source/
+data/elevation/source/*
+!data/elevation/source/.gitkeep

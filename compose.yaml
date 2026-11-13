@@ -12,6 +12,9 @@ services:
       OSM_TILE_DIR: /data/osm
       OSM_USAGE_CONFIRMED: ${OSM_USAGE_CONFIRMED:-false}
       BUILDINGS_DIR: /data/buildings
+      STREET_TPK_DIR: /data/street
+      STREET_USAGE_CONFIRMED: ${STREET_USAGE_CONFIRMED:-false}
+      ELEVATION_DIR: /data/elevation
     volumes:
       - type: bind
         source: ${TPK_HOST_DIR:-./data/tpk}
@@ -23,6 +26,18 @@ services:
         source: ${OSM_HOST_DIR:-./data/osm}
         target: /data/osm
         read_only: true
+      - type: bind
+        source: ${STREET_HOST_DIR:-./data/street}
+        target: /data/street
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ELEVATION_HOST_DIR:-./data/elevation}
+        target: /data/elevation
+        read_only: true
+        bind:
+          create_host_path: false
       - tpk-cache:/cache
       - type: bind
         source: ${BUILDINGS_HOST_DIR:-./data/buildings}
@@ -32,5 +47,25 @@ services:
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-3001}:3001"
     restart: unless-stopped
+  prepare-elevation:
+    profiles: [tools]
+    image: map-service-elevation-tools:local
+    build:
+      context: ./scripts/elevation
+    environment:
+      ELEVATION_USAGE_CONFIRMED: ${ELEVATION_USAGE_CONFIRMED:-false}
+      DEM_MIN_ZOOM: ${DEM_MIN_ZOOM:-8}
+      DEM_MAX_ZOOM: ${DEM_MAX_ZOOM:-13}
+      DEM_SOURCE: ${DEM_SOURCE:-Local DEM}
+      DEM_ATTRIBUTION: ${DEM_ATTRIBUTION:-Local DEM; see source licence}
+      DEM_VERTICAL_DATUM: ${DEM_VERTICAL_DATUM:-Unknown vertical datum}
+    volumes:
+      - type: bind
+        source: ${ELEVATION_HOST_DIR:-./data/elevation}
+        target: /data/elevation
+        bind:
+          create_host_path: false
+    # The preparation tool only reads a local file and never needs a runtime network.
+    network_mode: none
 volumes:
   tpk-cache:

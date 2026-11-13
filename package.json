@@ -14,7 +14,8 @@
     "test:measure": "tsx --test tests/measure.test.ts",
     "test:buildings": "tsx --test tests/buildings.test.ts",
     "inspect:tpk": "tsx scripts/inspect-tpk.ts",
-    "test:tiles": "tsx --test tests/tpk.test.ts tests/catalog.test.ts"
+    "test:tiles": "tsx --test tests/tpk.test.ts tests/catalog.test.ts",
+    "test:layers": "tsx --test tests/elevation.test.ts"
   },
   "dependencies": {
     "next": "16.4.5",

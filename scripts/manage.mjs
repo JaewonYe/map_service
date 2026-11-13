@@ -36,7 +36,7 @@ async function dependenciesReady(projectRoot,action){
 export async function execute(action,run=runCommand,{projectRoot=root}={}){
   const command=(name,args,options={})=>run(name,args,{cwd:projectRoot,...options});
   const docker=(...args)=>command('docker',['compose',...args]);
-  if(!['start','dev','stop','status','inspect'].includes(action))throw Error('Unknown action');
+  if(!['start','dev','stop','status','inspect','elevation'].includes(action))throw Error('Unknown action');
   try{await access(join(projectRoot,'.env'));}catch(error){if(error.code!=='ENOENT')throw error;await copyFile(join(projectRoot,'.env.example'),join(projectRoot,'.env'));}
   if(action==='inspect'||action==='dev'){
     const npm=process.platform==='win32'?'npm.cmd':'npm';
@@ -49,12 +49,13 @@ export async function execute(action,run=runCommand,{projectRoot=root}={}){
   }
   await command('docker',['info','--format','{{.ServerVersion}}'],{capture:true});
   if(action==='start'){await docker('up','-d','--build');console.log('Default URL: http://localhost:3001 (use PORT from .env if changed).');}
+  if(action==='elevation')await docker('--profile','tools','run','--rm','--build','prepare-elevation');
   if(action==='stop')await docker('down');
   if(action==='status'){await docker('ps','-a');await docker('logs','--tail=60','web');}
 }
 async function main(){
   if(process.argv[2])return execute(process.argv[2]);
-  const menu={'1':['TPK 메타데이터 검사 (필요 시 패키지 자동 설치)','inspect'],'2':['Docker 시작','start'],'3':['개발 서버 실행','dev'],'4':['Docker 종료 (데이터 유지)','stop'],'5':['상태·로그','status']};
+  const menu={'1':['TPK 메타데이터 검사 (필요 시 패키지 자동 설치)','inspect'],'2':['Docker 시작','start'],'3':['개발 서버 실행','dev'],'4':['Docker 종료 (데이터 유지)','stop'],'5':['상태·로그','status'],'6':['고도 지도 준비 (DEM 파일·사용 권한 확인 필요)','elevation']};
   const reader=createInterface({input:process.stdin,output:process.stdout});
   try{while(true){console.log('\n=== 오프라인 TPK 지도 ===');for(const [id,[label]] of Object.entries(menu))console.log(`${id}. ${label}`);console.log('0. 메뉴 닫기');
     const choice=(await reader.question('선택: ')).trim();if(choice==='0')break;if(!menu[choice])continue;

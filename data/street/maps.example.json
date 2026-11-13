@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": "korea-base",
+      "name": "대한민국 기본 지도",
+      "file": "korea/base.tpk",
+      "role": "base",
+      "minZoom": 0,
+      "maxZoom": 13,
+      "priority": 0,
+      "usageConfirmed": false
+    },
+    {
+      "id": "taean",
+      "name": "태안 관심 지역",
+      "file": "regions/taean.tpk",
+      "role": "detail",
+      "minZoom": 14,
+      "maxZoom": 19,
+      "priority": 100,
+      "usageConfirmed": false
+    },
+    {
+      "id": "taean-port",
+      "name": "태안 항구 상세 지역",
+      "file": "regions/taean-port.tpk",
+      "role": "detail",
+      "minZoom": 14,
+      "maxZoom": 19,
+      "priority": 200,
+      "usageConfirmed": false,
+      "enabled": false
+    }
+  ]
+}

@@ -48,7 +48,7 @@ export type CatalogTile = {
 };
 type LoadedSource = {info: SourceInfo; reader: Tpk};
 type Candidate = {source: LoadedSource; zoom: number; x: number; y: number};
-type LoadOptions = {configPath?: string; legacyPath?: string; cache?: string};
+type LoadOptions = {configPath?: string; legacyPath?: string; cache?: string; configFile?: string; usageConfirmed?: boolean};
 const DEFAULT_CONFIG = 'maps.json';
 const TILE_LIMIT = 32 * 1024 * 1024;
 
@@ -158,16 +158,17 @@ export class MapCatalog {
   private async track(path: string) { this.tracked.set(path, await fingerprint(path)); }
   private async load(options: LoadOptions) {
     const legacyPath = resolve(/*turbopackIgnore: true*/ options.legacyPath || process.env.TPK_PATH || 'data/tpk/map.tpk');
-    const configPath = resolve(/*turbopackIgnore: true*/ options.configPath || join(/*turbopackIgnore: true*/ dirname(legacyPath), process.env.MAP_CONFIG_FILE || DEFAULT_CONFIG));
+    const configFile = options.configFile ?? process.env.MAP_CONFIG_FILE ?? DEFAULT_CONFIG;
+    const configPath = resolve(/*turbopackIgnore: true*/ options.configPath || join(/*turbopackIgnore: true*/ dirname(legacyPath), configFile));
     const cache = resolve(/*turbopackIgnore: true*/ options.cache || process.env.TPK_CACHE_DIR || '.cache/tpk');
     await this.track(configPath);
     if (this.tracked.get(configPath) === 'missing') {
-      if (options.configPath || process.env.MAP_CONFIG_FILE && process.env.MAP_CONFIG_FILE !== DEFAULT_CONFIG) {
+      if (options.configPath || configFile !== DEFAULT_CONFIG) {
         throw new TileError('Map catalog file missing. Check MAP_CONFIG_FILE.', 503);
       }
       await this.track(legacyPath);
       if (this.tracked.get(legacyPath) === 'missing') throw new TileError('No maps.json or TPK file found. Place data in data/tpk/.', 503);
-      const reader = await Tpk.load(legacyPath, cache);
+      const reader = await Tpk.load(legacyPath, cache, {usageConfirmed: options.usageConfirmed});
       const metadata = reader.info();
       const info: SourceInfo = {id: 'legacy', name: '위성영상', role: 'detail', priority: 0, status: 'ready',
         usageConfirmed: metadata.usageConfirmed, bounds: metadata.bounds, minZoom: metadata.minZoom,
