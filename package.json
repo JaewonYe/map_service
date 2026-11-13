@@ -15,7 +15,9 @@
     "test:buildings": "tsx --test tests/buildings.test.ts",
     "inspect:tpk": "tsx scripts/inspect-tpk.ts",
     "test:tiles": "tsx --test tests/tpk.test.ts tests/catalog.test.ts",
-    "test:layers": "tsx --test tests/elevation.test.ts"
+    "test:layers": "tsx --test tests/elevation.test.ts",
+    "test:osm": "tsx --test tests/osm.test.ts",
+    "predev": "node scripts/prepare-osm.mjs"
   },
   "dependencies": {
     "next": "16.4.5",
@@ -37,7 +39,7 @@
     "tsx": "4.23.15"
   },
   "engines": {
-    "node": ">=22.2.0"
+    "node": ">=22.13.0"
   },
   "type": "module"
 }

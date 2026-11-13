@@ -7,7 +7,7 @@ import MapBuildings from './MapBuildings';
 import type {Coordinate} from '../lib/map-measure';
 import type {CatalogInfo} from '../lib/tiles/catalog';
 import type {LayerId,LayerInfo} from '../lib/maps/types';
-type Info=Pick<CatalogInfo,'center'|'zoom'|'minZoom'|'maxZoom'|'sources'|'warnings'>&{mode:'single'|'multi'|'layers';layers:Record<LayerId,LayerInfo>;osm:{mode:string;url:string|null;attribution:string}};
+type Info=Pick<CatalogInfo,'center'|'zoom'|'minZoom'|'maxZoom'|'sources'|'warnings'>&{mode:'single'|'multi'|'layers';layers:Record<LayerId,LayerInfo>;osm:{mode:string;url:string|null;attribution:string;reason?:string}};
 export default function MapCanvas(){
   const container=useRef<HTMLDivElement>(null);
   const help=useRef<HTMLDialogElement>(null);
@@ -42,7 +42,7 @@ export default function MapCanvas(){
           const tile=L.tileLayer(`${source.url}${source.revision?'?v='+source.revision:''}`,{
             tileSize:256,noWrap:true,bounds:b?[[b.south,b.west],[b.north,b.east]]:undefined,
             minZoom:0,maxZoom:19,minNativeZoom:source.minNativeZoom??0,maxNativeZoom:source.maxNativeZoom??19,
-            attribution:(source.attribution||'').replace(/[<>&"']/g,'')});
+            attribution:source.attribution==='© OpenStreetMap contributors'?'<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors</a>':(source.attribution||'').replace(/[<>&"']/g,'')});
           let failed=false;
           tile.on('tileerror',()=>{failed=true;setMessage('일부 타일이 없습니다. 데이터 범위와 서버 로그를 확인하세요.');});
           tile.on('loading',()=>{failed=false;setMessage('타일을 불러오는 중…');});
@@ -90,7 +90,7 @@ export default function MapCanvas(){
         <small>상세 타일이 없으면 가능한 낮은 줌 타일을 확대 표시합니다.</small>
         {info.warnings.map((warning,index)=><small key={index}>{warning}</small>)}
       </details>}
-      {info&&!info.layers.street.available&&<small>일반 지도 데이터가 준비되지 않았습니다.</small>}
+      {info&&!info.layers.street.available&&<><small>일반 지도 데이터가 준비되지 않았습니다.</small>{info.osm.reason&&<small>{info.osm.reason}</small>}</>}
     </aside>
     <button className="map-data-help" onClick={()=>help.current?.showModal()}>지도 데이터 준비</button>
     <dialog ref={help} className="building-dialog" aria-label="지도 데이터 준비">
@@ -99,7 +99,8 @@ export default function MapCanvas(){
       <ul>{(['satellite','street','elevation'] as const).map(id=><li key={id}>
         <strong>{{satellite:'위성영상',street:'일반 지도',elevation:'고도 지도'}[id]}</strong>: {info?.layers[id].available?'사용 가능':info?.layers[id].reason||'메타데이터 확인 중'}
       </li>)}</ul>
-      <p>일반 지도: <code>data/street/map.tpk</code> 또는 <code>data/street/maps.json</code>에 사용 허가된 도로·지명 TPK를 등록하세요. 단일 TPK는 <code>STREET_USAGE_CONFIRMED=true</code>로 설정합니다.</p>
+      <p>OpenStreetMap 일반 지도: <code>data/osm/south-korea.osm.pbf</code>에 원본을 복사하고 메뉴 7로 준비하세요. 메뉴 3은 새 PBF를 감지하면 자동으로 준비합니다. 최초 변환에는 Docker가 필요하며, 이후에는 준비된 데이터를 재사용합니다.</p>
+      <p>별도 일반 지도 TPK: <code>data/street/map.tpk</code> 또는 <code>data/street/maps.json</code>에 사용 허가된 도로·지명 TPK를 등록하세요. 단일 TPK는 <code>STREET_USAGE_CONFIRMED=true</code>로 설정합니다.</p>
       <p>고도 지도: 미터 단위 DEM GeoTIFF를 <code>data/elevation/source/dem.tif</code>에 복사하고 실행 메뉴 6으로 변환하세요. 자세한 내용은 README의 일반 지도·고도 지도 항목을 참고하세요.</p>
       <p>파일·설정 변경 후 서버를 재시작하고 새로고침하세요. 준비되지 않은 레이어는 선택 목록에 표시되지 않습니다.</p>
       <button onClick={()=>help.current?.close()}>닫기</button>

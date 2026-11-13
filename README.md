@@ -4,7 +4,9 @@
 
 ## Quick Guide — Windows 11 / Ubuntu 24.04
 
-필수: Windows의 Docker Desktop(WSL 2·Linux containers) 또는 Ubuntu의 Docker Engine + Compose v2. 개발·파일 분석에는 Node.js 22.2 이상도 필요합니다.
+필수: Windows의 Docker Desktop(WSL 2·Linux containers) 또는 Ubuntu의 Docker Engine + Compose v2. 개발·파일 분석에는 Node.js 22.13 이상 (24 LTS 권장)도 필요합니다.
+
+**OSM 일반 지도부터 시작:** 다운로드한 PBF를 `data/osm/south-korea.osm.pbf` 또는 `south-korea-latest.osm.pbf`로 보관하고 Docker를 실행한 뒤 **`실행.cmd` → 3번**을 선택하세요. 새 PBF는 자동 준비하며, 완료 후 오른쪽 **일반 지도**를 선택합니다. Docker 운영은 **2번**, 수동 재준비는 **7번**입니다. DEM이 없다면 6번을 실행할 필요가 없습니다.
 
 1. 단일 TPK는 **`data/tpk/map.tpk`**에 복사합니다. 다중 해상도는 **`data/tpk/maps.example.json` → `maps.json`**으로 복사한 뒤 TPK 파일들을 등록합니다. [여러 TPK 등록 방법](#여러-tpk-등록-방법)을 참고하세요.
 2. `.env.example`을 `.env`로 복사합니다. 기존 `.env`가 있으면 필요한 항목만 반영하세요.
@@ -26,22 +28,51 @@ docker compose up -d --build
 
 | 기능 | 필요한 데이터 | 복사할 위치 |
 | --- | --- | --- |
-| 일반 지도 | 도로·지명이 렌더링된 래스터 **TPK** (EPSG:3857, 256px, Compact V1/V2) | `data/street/map.tpk` |
+| 일반 지도 (권장) | OpenStreetMap **`.osm.pbf` 원본** | `data/osm/south-korea.osm.pbf` |
+| 일반 지도 (별도 TPK) | 도로·지명이 렌더링된 래스터 **TPK** (EPSG:3857, 256px, Compact V1/V2) | `data/street/map.tpk` |
 | 고도 지도 | 미터 단위 높이를 가진 **단일 밴드 DEM GeoTIFF** (`.tif`) | `data/elevation/source/dem.tif` |
 
 ### 일반 지도
+
+**OSM PBF를 복사한 뒤 3번을 실행했는데 일반 지도가 없었던 원인**은 기존 버전에 PBF 변환 기능이 없었기 때문입니다. 최신 버전은 PBF를 로컬 공간 색인으로 변환한 뒤 Next.js에서 일반 지도 타일을 제공합니다.
+
+1. [Geofabrik 대한민국 다운로드](https://download.geofabrik.de/asia/south-korea.html)에서 `.osm.pbf`를 받아 `data/osm/`에 넣습니다. `south-korea.osm.pbf`와 `south-korea-latest.osm.pbf`를 모두 인식하므로 이름 변경은 선택입니다.
+2. 현재 개발 서버가 실행 중이면 **Ctrl+C로 종료**하고 최신 코드를 반영합니다. `.env`와 기존 `data/`는 보존하세요.
+3. Docker Desktop/Engine을 실행하고 **실행 메뉴 3**을 선택합니다. 최초에는 작업 이미지를 준비하고 PBF를 변환한 뒤 개발 서버가 시작됩니다. `npm run dev`도 사전 준비를 수행합니다. **2번 Docker 시작**에서도 새 PBF를 자동 준비합니다.
+4. http://localhost:3001 을 새로고침하고 **일반 지도**를 선택합니다. 기본 선택은 기존처럼 위성영상 → 일반 지도 → 고도 지도 순서입니다.
+
+PBF가 바뀌지 않았다면 원본 파일명·크기·수정 시간을 비교해 준비된 색인을 재사용합니다. PC 이전 등으로 시간이 달라졌지만 파일 크기가 같다면 SHA256을 확인하여 동일한 원본의 불필요한 재변환을 피합니다. 개발 서버 실행에 매번 Docker가 필요하지는 않으며 **새 PBF의 최초 준비/갱신 시**에만 사용합니다. **7번 OSM 일반 지도 준비·갱신**을 선택하면 수동으로 다시 변환합니다. 명시적으로 7번을 실행했는데 파일이 없거나 자동 변환에 실패한 경우 원인을 안내하고 기존 결과를 보존합니다. PBF가 없는 환경에서는 기존 위성/고도 지도를 그대로 실행할 수 있습니다. 입력이 준비되지 않은 상태로 서버를 직접 시작했다면 화면의 `지도 데이터 준비`에서 PBF 준비 안내를 확인할 수 있습니다.
+
+직접 명령을 사용하는 경우 두 OS에서 다음과 같습니다. PowerShell에서는 `npm.cmd`를 사용할 수 있습니다.
+
+```sh
+# 첫 1회 변환·색인 준비 (실행 메뉴 7에 해당)
+docker compose --profile tools run --rm --build prepare-osm
+# 개발 실행: 새 PBF는 자동 감지·변환
+npm run dev
+```
+
+준비 결과는 `data/osm/metadata.json`과 `data/osm/sets/<id>/map.sqlite`입니다. 원본 PBF는 수정하지 않고 SHA256을 기록합니다. **별도 타일 서버·Python 서버 없이 Next.js Route Handler가 공간 색인에서 필요한 도형을 조회해 PNG 타일을 생성**합니다. 지원 줌은 0–19이며 모든 줌의 전국 이미지 파일을 미리 생성하지 않습니다. 타일 응답은 ETag/캐시·중복 요청 병합·렌더링 대기열을 사용합니다. 지원 범위 밖은 404입니다.
+
+도로·건물·지명·공원/산림·수면/해안선을 표시하는 간단한 자체 스타일입니다. 한글 지명이 있으면 우선 사용하며 Docker 이미지에 한글 폰트를 포함합니다. **openstreetmap.org 표준 스타일과 동일한 디자인은 아닙니다.** 원본에 없는 객체는 나타나지 않습니다. 열린 해안선은 추출 데이터 외곽으로 연결하므로 잘린 데이터 경계의 해안 표현에는 한계가 있습니다. 전국 PBF는 준비에 시간과 여유 디스크가 필요하며 실제 처리 시간은 파일 크기와 PC 사양에 따라 달라집니다.
+
+입력·결과를 포함한 **data/osm 전체**를 백업하면 다른 PC로 옮길 수 있습니다. 새 PBF로 갱신할 때는 파일을 교체하고 메뉴 2/3을 다시 실행하세요. 직접 등록한 건물은 `data/buildings`에 분리되어 유지됩니다. 이전 결과 세트는 자동 삭제하지 않으므로 서비스를 중지한 뒤 현재 metadata.json이 참조하지 않는 세트만 정리합니다. 공용 OSM 타일 서버를 대량 수집하지 않으며, PBF는 [ODbL·출처 표시 조건](https://www.openstreetmap.org/copyright)에 따라 사용합니다.
+
+추가 환경변수: `OSM_PBF_FILE`은 폴더 없는 입력 파일명(기본 `south-korea.osm.pbf`), `OSM_HOST_DIR`은 Docker 호스트 폴더, `OSM_TILE_DIR`은 개발 서버가 읽을 폴더(기본 `data/osm`)입니다. 두 실행 방식을 번갈아 쓰면 같은 폴더를 가리키도록 설정하세요. 기본 제공 경로는 동일합니다. OSM 색인에서는 `metadata.json`의 이용 확인 상태를 사용하므로 기존 `.env`의 `OSM_USAGE_CONFIRMED=false`여도 변환된 OSM이 표시됩니다. 해당 환경변수는 기존 직접 준비한 XYZ 이미지 타일용입니다.
+
+직접 준비한 일반 지도 TPK를 사용하는 방법도 유지합니다.
 
 1. 허용된 **일반 지도 TPK**를 위 위치에 복사하고 `.env`에 `STREET_USAGE_CONFIRMED=true`를 설정합니다. 위성용 `TPK_USAGE_CONFIRMED`와 별개입니다.
 2. 여러 일반 지도 TPK가 있다면 `data/street/maps.example.json`을 `maps.json`으로 복사하고, 위성 카탈로그와 동일한 형식으로 기본/상세 TPK와 각각의 `usageConfirmed`를 등록합니다. `file` 경로는 **data/street 기준**입니다. 단일 파일은 모든 원본 줌을 사용하고, 다중 파일은 `minZoom`/`maxZoom`을 실제 데이터에 맞추세요.
 3. 서비스를 재시작하고 새로고침한 뒤 오른쪽 **일반 지도**를 선택합니다. 초기 선택은 위성영상 → 일반 지도 → 고도 지도 순으로 준비된 첫 레이어입니다.
 
-일반 지도에는 별도의 TPK 카탈로그가 적용됩니다. 겹침·우선순위·빈 상세 타일의 낮은 줌 대체 규칙은 기존 위성 지도와 같습니다. 위성 TPK와 파일을 혼합하지 마세요. `.pbf`와 벡터 MBTiles는 이 래스터 API에 바로 넣을 수 없습니다. 저장소에 남아 있는 예전 `data/vector/region.mbtiles`는 **모나코 영역의 벡터 데이터**로 태안 일반 지도 대신 사용할 수 없습니다.
+일반 지도에는 별도의 TPK 카탈로그가 적용됩니다. 겹침·우선순위·빈 상세 타일의 낮은 줌 대체 규칙은 기존 위성 지도와 같습니다. 위성 TPK와 파일을 혼합하지 마세요. 별도 TPK API에는 `.pbf`와 벡터 MBTiles를 직접 넣지 않으며, PBF는 위의 OSM 준비 절차를 사용합니다. 저장소에 남아 있는 예전 `data/vector/region.mbtiles`는 **모나코 영역의 벡터 데이터**로 태안 일반 지도 대신 사용할 수 없습니다.
 
-기존 `data/osm/z/x/y.png` 또는 `.jpg` 로컬 OSM도 사용할 수 있습니다. TPK 일반 지도가 준비되면 우선 사용하고, 없으면 허용된 로컬 OSM, 마지막으로 **명시적으로 MAP_MODE=online인 경우만** 공용 OSM을 사용합니다. 인터넷 연결을 켠다고 자동으로 온라인 모드로 바뀌지 않습니다. 로컬 XYZ에는 필요한 줌을 모두 준비해야 하며, TPK의 부모 타일 대체 기능은 적용되지 않습니다.
+기존 `data/osm/z/x/y.png` 또는 `.jpg` 로컬 OSM도 사용할 수 있습니다. TPK 일반 지도가 준비되면 우선 사용하고, 없으면 PBF로 준비한 로컬 OSM, 직접 준비한 XYZ OSM, 마지막으로 **명시적으로 MAP_MODE=online인 경우만** 공용 OSM을 사용합니다. 인터넷 연결을 켠다고 자동으로 온라인 모드로 바뀌지 않습니다. 로컬 XYZ에는 필요한 줌을 모두 준비해야 하며, TPK의 부모 타일 대체 기능은 적용되지 않습니다.
 
 ### 고도 지도
 
-**실행 메뉴 6번은 고도용 DEM `.tif` 전용입니다.** `No such file or directory: /data/elevation/source/dem.tif`는 해당 DEM이 없다는 뜻입니다. OSM에서 받은 `south-korea.osm.pbf`를 DEM으로 이름 변경하거나 고도 폴더에 넣지 마세요. OSM 원본의 보관 위치는 `data/osm/south-korea.osm.pbf`이며, **PBF → 일반 지도 타일 생성 기능은 현재 미구현**입니다. 온라인 일반 지도는 `.env`의 `MAP_MODE=online` 설정 후 서비스를 다시 실행하여 확인할 수 있습니다. DEM이 없어도 메뉴 2 또는 3으로 기존 지도를 실행할 수 있습니다.
+**실행 메뉴 6번은 고도용 DEM `.tif` 전용입니다.** `No such file or directory: /data/elevation/source/dem.tif`는 해당 DEM이 없다는 뜻입니다. OSM에서 받은 `south-korea.osm.pbf`를 DEM으로 이름 변경하거나 고도 폴더에 넣지 마세요. OSM 원본의 보관 위치는 `data/osm/south-korea.osm.pbf`이며, PBF 일반 지도는 **7번 메뉴 또는 3번의 자동 준비**를 사용합니다. 온라인 일반 지도는 `.env`의 `MAP_MODE=online` 설정 후 서비스를 다시 실행하여 확인할 수 있습니다. DEM이 없어도 메뉴 2 또는 3으로 기존 지도를 실행할 수 있습니다.
 
 메뉴 6은 Compose가 해석한 실제 데이터 폴더(`ELEVATION_HOST_DIR`)에서 `source/dem.tif`가 존재하는 비어 있지 않은 파일인지, 기존 변환 권한 확인값이 설정됐는지 먼저 검사합니다. 준비되지 않았다면 이미지 빌드 전에 이유와 경로를 안내합니다. 전체 GeoTIFF 형식·좌표계 검증은 GDAL 변환 도구에서 수행합니다.
 
@@ -353,6 +384,7 @@ npm run test:launcher
 npm run test:measure
 npm run test:buildings
 npm run test:layers
+npm run test:osm
 npx playwright install chromium
 npm test
 npm run typecheck
@@ -362,7 +394,7 @@ npm run typecheck
 
 **검증 범위:** 현재 Linux 클라우드의 합성 패키지 테스트이며, 실제 사용자 TPK 검증과 Windows 11/Ubuntu 24.04 실기 검증은 아직 완료되지 않았습니다. 실제 파일의 라이선스·내보내기 정보와 패키지 구조를 확인한 뒤 실제 위성영상 검증을 진행해야 합니다.
 
-현재 검증 결과: 타일·형식・다중 등록 테스트 **22개**, 실행 메뉴 **16개**, 거리·면적 계산 **9개**, 건물 저장소 **7개**, 단일/다중/측정/지역 이동/건물/추가 레이어 브라우저 **27개**를 통과했습니다. 다중 등록에서는 z0–13 기본 지도, z14–19 상세/누락 줌, 겹침·동일 우선순위, 부모 타일 위치별 crop, 투명 PNG 합성, 권한 격리, 손상/누락 상세 파일, 설정 변경 감지와 기존 단일 TPK 호환성을 검사합니다. Docker Compose의 외부 통신 차단 네트워크에서도 **3개 TPK의 선택·확대 대체·압축 bundle 캐시·404·비루트 실행·원본 읽기 전용 마운트**를 확인했습니다. 실행 메뉴에서는 의존성 설치·오프라인 재사용·설치 실패 처리·Windows npm 명령 구성도 검사합니다. 모두 합성/공개 형식 샘플 기준이며 실제 사용자 패키지의 완료 증거는 아닙니다.
+현재 검증 결과: 타일·형식・다중 등록 테스트 **22개**, 실행 메뉴 **22개**, 거리·면적 계산 **9개**, 건물 저장소 **7개**, 단일/다중/측정/지역 이동/건물/추가 레이어 브라우저 **29개**를 통과했습니다. 다중 등록에서는 z0–13 기본 지도, z14–19 상세/누락 줌, 겹침·동일 우선순위, 부모 타일 위치별 crop, 투명 PNG 합성, 권한 격리, 손상/누락 상세 파일, 설정 변경 감지와 기존 단일 TPK 호환성을 검사합니다. Docker Compose의 외부 통신 차단 네트워크에서도 **3개 TPK의 선택·확대 대체·압축 bundle 캐시·404·비루트 실행·원본 읽기 전용 마운트**를 확인했습니다. 실행 메뉴에서는 의존성 설치·오프라인 재사용·설치 실패 처리·Windows npm 명령 구성도 검사합니다. 모두 합성/공개 형식 샘플 기준이며 실제 사용자 패키지의 완료 증거는 아닙니다.
 
 건물 기능은 등록·새로고침 후 유지·수정·삭제·저장 실패 시 입력 보존·지연 응답·문자열 표시·버전 충돌·모바일을 검증했습니다. 외부 통신이 차단된 Docker Compose에서도 비루트 사용자로 건물을 등록·수정한 뒤 컨테이너를 강제로 재생성해 내용과 버전의 보존, 기존 z19 타일 제공, 삭제를 확인했습니다. 실제 사용자 건물 데이터는 테스트에 사용하지 않았습니다.
 
@@ -371,3 +403,9 @@ npm run typecheck
 오프라인 PC에서 **새 DEM 변환도** 하려면 인터넷이 있는 PC에서 `docker compose --profile tools build prepare-elevation` 후 `docker save -o elevation-tools-image.tar map-service-elevation-tools:local`로 도구 이미지도 복사하고, 대상 PC에서 `docker load -i elevation-tools-image.tar` 후 **`--build` 없이** `docker compose --profile tools run --rm --pull never prepare-elevation`을 사용하세요. 이미 변환된 데이터의 지도 표시에는 도구 이미지가 필요 없습니다.
 
 일반/고도 확장 검증: Node 단위 테스트 **6개**, GDAL 변환 테스트 **3개**, 추가 브라우저 테스트 **3개**를 통과했습니다. 네트워크가 차단된 Docker Compose에서 합성 GeoTIFF의 실제 변환, 세 레이어의 로컬 타일, 클릭 고도 123.5m, PNG/404, 비루트 실행, 읽기 전용 마운트를 확인했습니다. Windows/Ubuntu 실기와 실제 사용자 태안 데이터는 검증하지 않았습니다.
+
+OSM 검증: Node 렌더링 테스트 **4개**, PBF 변환 테스트 **4개**, 신규 브라우저 테스트 **2개**를 추가했습니다. 실행 메뉴는 자동 준비·원본 다운로드 파일명·변경 감지·캐시 재사용·이미지 재사용·실패 시 시작 중단을 포함합니다. Python 변환 테스트는 `docker compose --profile tools run --rm --entrypoint python3 -v ./tests:/tests:ro -e OSM_PREPARE_SCRIPT=/tools/prepare.py prepare-osm -m unittest discover -s /tests -p osm_prepare_test.py`로 실행할 수 있습니다. Windows PowerShell/Ubuntu에서 같은 상대 경로 마운트를 사용합니다. 실제 대한민국 전체 PBF와 Windows/Ubuntu 실기는 별도 검증 대상입니다.
+
+오프라인 PC에서 **새 PBF 준비도** 하려면 `map-service-osm-tools:local` 이미지를 함께 `docker save`/`docker load`로 옮기세요. 실행 메뉴는 해당 이미지가 있으면 네트워크 없이 재사용하며, 이미지가 없을 때만 빌드합니다. 명령으로 실행할 때는 `docker compose --profile tools run --rm --pull never prepare-osm`을 사용합니다. 준비된 지도 표시에는 도구 이미지가 필요 없습니다. 도구 코드가 바뀐 버전으로 갱신할 때는 인터넷 가능한 PC에서 `docker compose --profile tools build prepare-osm`으로 작업 이미지도 갱신하세요. 색인이 손상됐을 때의 강제 재변환은 메뉴 7 또는 `docker compose --profile tools run --rm --pull never prepare-osm --force`입니다.
+
+최종 OSM 통합 검증에서는 외부 통신이 차단된 Docker Compose에서 PBF → SQLite → Next.js PNG, 줌 0/13/16/19, ETag·404/400, 비루트 실행과 읽기 전용 원본, 로컬 한글 폰트를 확인했습니다. 공개 모나코 PBF로도 도로·건물·바다·지명 표시를 시각 확인했으며, 사용자 대한민국 PBF가 검증 환경에 제공된 것은 아닙니다.

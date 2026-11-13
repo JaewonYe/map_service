@@ -1,6 +1,6 @@
 import {resolve,join} from 'node:path';
 import {getCatalog,MapCatalog} from '../tiles/catalog';
-import {osmInfo} from '../tiles/osm';
+import {osmInfo,type OsmInfo} from '../tiles/osm';
 import {getElevation} from './elevation';
 import type {LayerId,LayerInfo} from './types';
 let street: Promise<MapCatalog> | undefined;
@@ -28,8 +28,10 @@ export async function mapLayers() {
     street:normal.status === 'fulfilled'?catalogLayer(normal.value,'/api/street/{z}/{x}/{y}','STREET_USAGE_CONFIRMED'):missing('도로·지명이 포함된 일반 지도 TPK를 data/street/에 등록하세요.'),
     elevation:terrain.status === 'fulfilled'?terrain.value.info():missing('DEM GeoTIFF를 준비하고 고도 데이터 변환을 실행하세요.')
   };
-  const osmMetadata = osm.status === 'fulfilled'?osm.value:{mode:'unavailable',url:null,attribution:''};
+  const osmMetadata:OsmInfo = osm.status === 'fulfilled'?osm.value:{mode:'unavailable',url:null,attribution:''};
   if (!layers.street.available && osmMetadata.url) layers.street = {available:true,url:osmMetadata.url,attribution:osmMetadata.attribution,
-    online:osmMetadata.mode === 'online',minNativeZoom:0,maxNativeZoom:19};
+    online:osmMetadata.mode === 'online',minNativeZoom:osmMetadata.minNativeZoom??0,maxNativeZoom:osmMetadata.maxNativeZoom??19,
+    bounds:osmMetadata.bounds,revision:osmMetadata.revision};
+  if(!layers.street.available&&osmMetadata.reason)layers.street.reason=osmMetadata.reason;
   return {catalog:satellite.status === 'fulfilled'?satellite.value.info():null,layers,osm:osmMetadata};
 }

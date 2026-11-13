@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,rm,readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {dirname,join} from 'node:path';
 import {commandSpec,execute,runCommand} from '../scripts/manage.mjs';
@@ -130,4 +131,72 @@ test('DEM preparation uses the Compose-resolved custom host directory and keeps 
   const f=await elevationFixture(t);
   await execute('elevation',f.run,{projectRoot:f.projectRoot});
   assert.deepEqual(f.calls.at(-1).slice(0,2),['docker',['compose','--profile','tools','run','--rm','--build','prepare-elevation']]);
+});
+
+async function osmFixture(t,{prepared=false,missingImage=false,fail=false,input=true}={}){
+  const {projectRoot,install}=await fixture(t);await install();
+  // Development and Compose paths can differ; automatic preparation must use the development folder.
+  const directory=join(projectRoot,'OSM data with spaces');await mkdir(directory,{recursive:true});
+  await writeFile(join(projectRoot,'.env'),`OSM_TILE_DIR="${directory.replaceAll('\\','/')}"\nOSM_HOST_DIR=data/osm\nOSM_PBF_FILE=south-korea.osm.pbf\n`);
+  if(input)await writeFile(join(directory,'south-korea-latest.osm.pbf'),'test PBF bytes');
+  async function publish(){
+    const {stat}=await import('node:fs/promises');const source=await stat(join(directory,'south-korea-latest.osm.pbf'));
+    await mkdir(join(directory,'sets','test'),{recursive:true});await writeFile(join(directory,'sets','test','map.sqlite'),'test index');
+    await writeFile(join(directory,'metadata.json'),JSON.stringify({version:1,type:'osm-sqlite',usageConfirmed:true,database:'sets/test/map.sqlite',
+      sourceFile:'south-korea-latest.osm.pbf',sourceSize:source.size,sourceMtimeMs:Math.floor(source.mtimeMs),sourceSha256:createHash('sha256').update(await readFile(join(directory,'south-korea-latest.osm.pbf'))).digest('hex')}));
+  }
+  if(prepared)await publish();
+  const calls=[];
+  const run=async(command,args,options)=>{
+    calls.push([command,args,options]);
+    if(args.includes('config'))return JSON.stringify({services:{'prepare-osm':{image:'map-service-osm-tools:local',
+      environment:{OSM_PBF_FILE:'south-korea.osm.pbf'},volumes:[{type:'bind',source:options.env.OSM_HOST_DIR,target:'/data/osm'}]}}});
+    if(args[0]==='image'&&missingImage)throw Error('No such image: map-service-osm-tools:local');
+    if(args.includes('prepare-osm')&&args.includes('run')){
+      assert.equal(options.env.OSM_HOST_DIR,directory);
+      if(fail)throw Error('OSM import failed');await publish();
+    }
+    return '';
+  };
+  return {projectRoot,directory,calls,run};
+}
+test('development prepares a newly placed PBF before starting Next.js and accepts the original latest filename',async t=>{
+  const f=await osmFixture(t);await execute('dev',f.run,{projectRoot:f.projectRoot});
+  const run=f.calls.find(([,args])=>args.includes('prepare-osm'));
+  assert.ok(run);assert.ok(run[1].includes('--pull'));assert.ok(!run[1].includes('--build'));
+  assert.deepEqual(f.calls.at(-1).slice(0,2),[npm,['run','dev']]);
+  f.calls.length=0;
+  await execute('dev',f.run,{projectRoot:f.projectRoot});
+  assert.deepEqual(f.calls.map(([name,args])=>[name,args]),[[npm,['run','dev']]]);
+});
+test('changed PBF triggers a new preparation instead of reusing stale metadata',async t=>{
+  const f=await osmFixture(t,{prepared:true});
+  await writeFile(join(f.directory,'south-korea-latest.osm.pbf'),'updated PBF bytes with a different size');
+  await execute('dev',f.run,{projectRoot:f.projectRoot});
+  assert.ok(f.calls.some(([,args])=>args.includes('prepare-osm')));
+});
+test('missing OSM tool image is built once and preparation failure prevents Next startup',async t=>{
+  const f=await osmFixture(t,{missingImage:true,fail:true});
+  await assert.rejects(execute('dev',f.run,{projectRoot:f.projectRoot}),/OSM import failed/);
+  assert.ok(f.calls.some(([,args])=>args.includes('prepare-osm')&&args.includes('--build')));
+  assert.ok(!f.calls.some(([command])=>command===npm));
+});
+test('manual OSM preparation explains missing PBF without attempting an image build',async t=>{
+  const f=await osmFixture(t,{input:false});
+  await assert.rejects(execute('osm',f.run,{projectRoot:f.projectRoot,osmDirectory:f.directory}),/OSM PBF가 없습니다/);
+  assert.ok(!f.calls.some(([,args])=>args.includes('prepare-osm')||args.includes('--build')));
+});
+test('manual OSM preparation rebuilds the data with an existing offline tool image',async t=>{
+  const f=await osmFixture(t,{prepared:true});
+  await execute('osm',f.run,{projectRoot:f.projectRoot,osmDirectory:f.directory});
+  const [,args]=f.calls.find(([,args])=>args.includes('prepare-osm'));
+  assert.ok(args.includes('--force'));assert.ok(args.includes('--pull'));assert.ok(!args.includes('--build'));
+});
+
+test('copied PBF with different timestamps reuses a matching SHA256 index without Docker',async t=>{
+  const f=await osmFixture(t,{prepared:true});
+  const filename=join(f.directory,'metadata.json'),m=JSON.parse(await readFile(filename,'utf8'));
+  m.sourceMtimeMs-=60000;await writeFile(filename,JSON.stringify(m));
+  await execute('dev',f.run,{projectRoot:f.projectRoot});
+  assert.deepEqual(f.calls.map(([name,args])=>[name,args]),[[npm,['run','dev']]]);
 });

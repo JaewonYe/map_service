@@ -10,6 +10,7 @@ services:
       TPK_USAGE_CONFIRMED: ${TPK_USAGE_CONFIRMED:-false}
       MAP_MODE: ${MAP_MODE:-offline}
       OSM_TILE_DIR: /data/osm
+      OSM_PBF_FILE: ${OSM_PBF_FILE:-south-korea.osm.pbf}
       OSM_USAGE_CONFIRMED: ${OSM_USAGE_CONFIRMED:-false}
       BUILDINGS_DIR: /data/buildings
       STREET_TPK_DIR: /data/street
@@ -47,6 +48,20 @@ services:
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-3001}:3001"
     restart: unless-stopped
+  prepare-osm:
+    profiles: [tools]
+    image: map-service-osm-tools:local
+    build:
+      context: ./scripts/osm
+    environment:
+      OSM_PBF_FILE: ${OSM_PBF_FILE:-south-korea.osm.pbf}
+    volumes:
+      - type: bind
+        source: ${OSM_HOST_DIR:-./data/osm}
+        target: /data/osm
+        bind:
+          create_host_path: false
+    network_mode: none
   prepare-elevation:
     profiles: [tools]
     image: map-service-elevation-tools:local

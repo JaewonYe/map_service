@@ -36,3 +36,7 @@ data/elevation/*
 !data/elevation/source/
 data/elevation/source/*
 !data/elevation/source/.gitkeep
+
+!data/osm/
+data/osm/*
+!data/osm/README.md

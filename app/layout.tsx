@@ -4,7 +4,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: '태안군 지도',
-  description: 'TPK 기반 오프라인 위성지도'
+  description: 'OSM 일반 지도·TPK 위성영상·DEM 고도 지도'
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

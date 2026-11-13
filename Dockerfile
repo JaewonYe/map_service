@@ -18,6 +18,11 @@ ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3001 BUI
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
+# Local Korean labels for the offline OSM renderer; no font/CDN runtime requests.
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -s /run/secrets/proxy_ca ]; then set -- -o Acquire::https::CaInfo=/run/secrets/proxy_ca; else set --; fi; \
+    apt-get "$@" update && apt-get "$@" install -y --no-install-recommends fonts-noto-cjk fontconfig && \
+    rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /cache /data/buildings && chown node:node /cache /data/buildings
 USER node
 EXPOSE 3001
