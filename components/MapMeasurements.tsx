@@ -6,7 +6,7 @@ import {areaSquareMeters, distanceMeters, formatArea, formatDistance, isSelfInte
 
 type Kind = 'distance' | 'area';
 type ContextMenu = {point: Coordinate; x: number; y: number};
-export default function MapMeasurements({map}: {map: L.Map}) {
+export default function MapMeasurements({map, onRegisterBuilding}: {map: L.Map; onRegisterBuilding: (point: Coordinate) => void}) {
   const [kind, setKind] = useState<Kind | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [points, setPoints] = useState<Coordinate[]>([]);
@@ -134,11 +134,12 @@ export default function MapMeasurements({map}: {map: L.Map}) {
       <button type="button" onClick={clear} disabled={!kind}>초기화</button>
     </div>
   </aside>
-    {menu && <div ref={menuElement} role="menu" aria-label="지도 측정 메뉴" className="map-context-menu"
+    {menu && <div ref={menuElement} role="menu" aria-label="지도 메뉴" className="map-context-menu"
       style={{left: menu.x, top: menu.y, maxWidth: Math.max(0, map.getSize().x - 16)}}
       onKeyDown={navigateMenu} onContextMenu={event => event.preventDefault()}>
       <button type="button" role="menuitem" onClick={() => start('distance', menu.point)}>거리 측정 시작</button>
       <button type="button" role="menuitem" onClick={() => start('area', menu.point)}>면적 측정 시작</button>
+      <button type="button" role="menuitem" onClick={() => {const point = menu.point; stop(); onRegisterBuilding(point);}}>건물 정보 등록</button>
     </div>}
   </>;
 }

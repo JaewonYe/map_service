@@ -11,6 +11,7 @@ services:
       MAP_MODE: ${MAP_MODE:-offline}
       OSM_TILE_DIR: /data/osm
       OSM_USAGE_CONFIRMED: ${OSM_USAGE_CONFIRMED:-false}
+      BUILDINGS_DIR: /data/buildings
     volumes:
       - type: bind
         source: ${TPK_HOST_DIR:-./data/tpk}
@@ -23,6 +24,11 @@ services:
         target: /data/osm
         read_only: true
       - tpk-cache:/cache
+      - type: bind
+        source: ${BUILDINGS_HOST_DIR:-./data/buildings}
+        target: /data/buildings
+        bind:
+          create_host_path: false
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-3001}:3001"
     restart: unless-stopped

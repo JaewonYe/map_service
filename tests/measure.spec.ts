@@ -76,7 +76,7 @@ test('right-click starts distance at the clicked point without adding a menu-cli
   await open(page);
   const map = page.locator('.leaflet-container'), bounds = (await map.boundingBox())!;
   await map.click({button: 'right', position: position.a});
-  const menu = page.getByRole('menu', {name: '지도 측정 메뉴'});
+  const menu = page.getByRole('menu', {name: '지도 메뉴'});
   await expect(menu).toBeVisible();
   await expect(page.getByTestId('measurement-points')).toHaveText('선택한 점: 0개');
   await menu.getByRole('menuitem', {name: '거리 측정 시작'}).click();
@@ -96,7 +96,7 @@ test('right-click menu supports keyboard selection of area measurement', async (
   await open(page);
   const map = page.locator('.leaflet-container');
   await map.click({button: 'right', position: position.a});
-  const menu = page.getByRole('menu', {name: '지도 측정 메뉴'});
+  const menu = page.getByRole('menu', {name: '지도 메뉴'});
   await expect(menu.getByRole('menuitem', {name: '거리 측정 시작'})).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await expect(menu.getByRole('menuitem', {name: '면적 측정 시작'})).toBeFocused();
@@ -117,7 +117,7 @@ test('opening or dismissing a right-click menu preserves the current measurement
   await map.click({position: position.a}); await map.click({position: position.b});
   const result = await page.getByTestId('measurement-result').textContent();
   await map.click({button: 'right', position: position.c});
-  const menu = page.getByRole('menu', {name: '지도 측정 메뉴'});
+  const menu = page.getByRole('menu', {name: '지도 메뉴'});
   await expect(menu).toBeVisible(); await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
   await expect(page.getByTestId('measurement-points')).toHaveText('선택한 점: 2개');
@@ -132,7 +132,7 @@ test('right-click menu stays inside the map on a narrow screen and dismisses on 
   await page.setViewportSize({width: 390, height: 844}); await open(page);
   const map = page.locator('.leaflet-container'), bounds = (await map.boundingBox())!;
   await map.click({button: 'right', position: {x: bounds.width - 9, y: bounds.height - 70}});
-  const menu = page.getByRole('menu', {name: '지도 측정 메뉴'});
+  const menu = page.getByRole('menu', {name: '지도 메뉴'});
   await expect(menu).toBeVisible();
   const menuBounds = (await menu.boundingBox())!;
   expect(menuBounds.x).toBeGreaterThanOrEqual(bounds.x);

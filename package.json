@@ -12,6 +12,7 @@
     "manage": "node scripts/manage.mjs",
     "test:launcher": "node --test --test-isolation=none tests/manage.test.mjs",
     "test:measure": "tsx --test tests/measure.test.ts",
+    "test:buildings": "tsx --test tests/buildings.test.ts",
     "inspect:tpk": "tsx scripts/inspect-tpk.ts",
     "test:tiles": "tsx --test tests/tpk.test.ts tests/catalog.test.ts"
   },

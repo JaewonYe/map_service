@@ -23,3 +23,6 @@ data/imagery/*
 data/tpk/*
 !data/tpk/README.md
 !data/tpk/maps.example.json
+!data/buildings/
+data/buildings/*
+!data/buildings/README.md

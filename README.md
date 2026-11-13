@@ -139,6 +139,29 @@ docker compose restart web
 
 측정은 **평균 지구 반경 6,371,008.8m의 구면**에서 위경도로 계산하며, 화면 픽셀이나 EPSG:3857 평면 면적에 의존하지 않습니다. 거리는 선택한 점 사이 최단 구면 경로의 합, 면적은 구면 다각형 면적입니다. 지형 고도는 반영하지 않습니다. 브라우저 안에서 계산하므로 외부 API·CDN·새 패키지 설치가 필요하지 않고 오프라인에서도 동작합니다. 측정 결과는 현재 화면에만 유지하며 페이지 새로고침 시 초기화됩니다. 계산 검증은 적도 1도 거리·구면 팔분구 면적·날짜 변경선·태안 부근 1m² 도형·교차 판정을 포함하고, 브라우저에서는 점 선택·되돌리기·완료·초기화·확대 후 유지·모바일·오프라인을 확인합니다.
 
+## 건물 정보 등록·조회·수정
+
+**지도 우클릭 → 건물 정보 등록**을 선택하면 해당 위치의 좌표가 자동 입력됩니다. 건물명을 입력하고 저장하면 보라색 건물 마커가 나타납니다. 마커를 클릭하면 최신 정보를 다시 읽어 수정할 수 있고, 삭제는 별도 확인 버튼을 눌러야 실행됩니다. 건물 등록을 시작할 때 진행 중인 측정은 멈추지만 기존 측정 결과는 유지됩니다.
+
+| 항목 | 입력 방식 |
+| --- | --- |
+| 건물명 | 필수, 최대 120자 |
+| 설명 | 선택, 최대 5,000자, 여러 줄 지원 |
+| 용도·분류 | 미분류·주거·상업·공공시설·공장/창고·교육·의료·문화/관광·기타 |
+| 주소·연락처·관련 URL | 선택. URL은 HTTP/HTTPS만 지원하며 자동 외부 조회는 하지 않음 |
+| 위도·경도 | 우클릭한 위치에서 자동 입력, 필요 시 직접 수정 가능 |
+| 등록일·수정일 | 서버가 자동 기록, 화면에서는 한국 시간으로 표시 |
+
+추천하는 후속 확장 항목은 **관리 담당자, 관리 상태, 층수, 최근 점검일, 현장 사진**입니다. 현재 버전에는 위 표의 항목을 제공합니다. 주소는 직접 입력하며 온라인 주소 검색·지오코딩에 의존하지 않습니다.
+
+등록 정보는 브라우저가 아닌 **`data/buildings/<건물 ID>.json`**에 저장합니다. 새로고침·Docker 종료·컨테이너 재생성·이미지 재빌드 후에도 남습니다. TPK·타일 캐시와 별도 보관하며 Git/Docker 이미지에 실제 등록 데이터를 포함하지 않습니다. **백업·서버 이전 시 서비스를 종료한 뒤 `data/buildings/` 전체를 함께 복사**하세요. 기존 `data/tpk/`, `.env`, Compose 파일도 기존 절차대로 옮깁니다.
+
+- 호스트 개발: `BUILDINGS_DIR` (기본 `data/buildings`)
+- Docker 호스트: `BUILDINGS_HOST_DIR` (기본 `./data/buildings`, 디렉터리가 존재해야 함)
+- Docker 내부: `/data/buildings` 읽기/쓰기 마운트. Ubuntu에서는 컨테이너 node 사용자(UID 1000)의 쓰기 권한이 필요함
+
+저장은 임시 파일을 완성한 뒤 원자적으로 교체합니다. 같은 서버 프로세스 안에서 쓰기를 순서대로 처리하며, 다른 화면에서 먼저 수정한 내용은 409 충돌로 알려 덮어쓰지 않습니다. 충돌 시 창을 닫고 마커를 다시 열면 최신 버전을 읽습니다. 저장 실패 시 입력 중인 내용은 창에 유지됩니다. 현재 파일 저장 방식은 **웹 서버 프로세스 1개**, 건물 최대 10,000개를 대상으로 하며 여러 서버의 동시 쓰기는 지원하지 않습니다. 기존 서비스처럼 로그인 없이 로컬에서 사용하며, 새 쓰기 API는 다른 출처의 브라우저 요청을 거부합니다.
+
 ## 구현과 파일
 
 | 파일 | 기능 |
@@ -151,6 +174,9 @@ docker compose restart web
 | `components/MapCanvas.tsx` | Leaflet, 좌표·줌, 클릭 위치, scale bar, 경계·레이어 전환 |
 | `components/DetailLocations.tsx` | detail 지역 목록·상태 표시·경계에 맞춘 위치 이동 |
 | `components/MapMeasurements.tsx` | 거리·면적 도구, 점 선택·완료·되돌리기·초기화 |
+| `components/MapBuildings.tsx` | 건물 마커·등록/수정 창·저장 실패 표시 |
+| `lib/buildings/` | 건물 입력 검증·원자적 JSON 저장·버전 충돌 처리 |
+| `app/api/buildings/` | 건물 목록·등록·단건 조회/수정/삭제 API |
 | `lib/map-measure.ts` | 구면 거리·면적, 경계 교차 판정, 단위 표시 |
 | `scripts/inspect-tpk.ts` | 원본을 변경하지 않는 검사 CLI |
 | `data/tpk/` | 사용자 원본, 읽기 전용 볼륨 |
@@ -163,6 +189,14 @@ Compact V1은 별도 `.bundlx`의 5바이트 offset과 **column-major** 인덱�
 [Esri Compact Cache V2 형식 문서](https://github.com/Esri/raster-tiles-compactcache/blob/master/CompactCacheV2.md)를 기준으로 구현했습니다. 저장 방식과 실제 이미지의 JPEG/PNG magic bytes를 검증합니다.
 
 ## API 동작
+
+건물 등록 API는 다음과 같습니다. 모든 응답은 `no-store`이며, 수정·삭제는 단건 조회의 `ETag` 또는 응답 데이터 `version`을 `If-Match: "현재 버전"`으로 전달합니다.
+
+- `GET /api/buildings`: `{buildings: [...]}` 목록
+- `POST /api/buildings`: 건물 정보를 JSON으로 등록, 201과 `{building: ...}` 반환
+- `GET /api/buildings/{id}`: 단건 조회와 버전 ETag
+- `PUT /api/buildings/{id}`: 정보 수정, `DELETE /api/buildings/{id}`: 삭제(204)
+- 입력 오류 400, 다른 출처 쓰기 403, 없음 404, 버전 충돌 409, 본문 32KiB 초과 413, 버전 누락 428, 저장소 오류 503
 
 - `GET /api/map-info`: 카메라·전체 경계·표시 줌 및 `sources[]`의 실제 TPK 메타데이터. 다중 모드의 표시 줌은 0–19, 실제 원본 줌은 각 `sources[].zoomLevels`이며 누락 상태는 `warnings`로 제공
 - `GET /api/tiles/16/{x}/{y}`: 실제 JPEG/PNG MIME, ETag 및 `If-None-Match`의 304 처리
@@ -193,6 +227,7 @@ Compact V1은 별도 `.bundlx`의 5바이트 offset과 **column-major** 인덱�
 - `TPK_CACHE_DIR`: 호스트 개발은 `.cache/tpk`, 컨테이너는 `/cache`
 - `TPK_USAGE_CONFIRMED`: 허용된 실제 패키지 사용을 확인한 뒤 `true`
 - `MAP_MODE`, `OSM_HOST_DIR`(Compose 호스트 폴더), `OSM_TILE_DIR`(호스트 개발 경로), `OSM_USAGE_CONFIRMED`: OSM 제공 방식
+- `BUILDINGS_HOST_DIR`(Compose 호스트 폴더), `BUILDINGS_DIR`(호스트 개발 경로): 등록 건물 데이터 보관 위치
 
 ```sh
 npm ci
@@ -227,7 +262,7 @@ docker compose build
 docker save -o map-service-image.tar map-service-web:local
 ```
 
-`map-service-image.tar`, 저장소의 `compose.yaml`/`.env`, **`maps.json`과 하위 폴더를 포함한 `data/tpk/` 전체**, 필요 시 `data/osm/`을 대상 PC에 복사합니다. JSON은 상대 경로를 유지하므로 Windows/Ubuntu 사이에서도 동일하게 사용합니다. 대상 PC에서:
+`map-service-image.tar`, 저장소의 `compose.yaml`/`.env`, **`maps.json`과 하위 폴더를 포함한 `data/tpk/` 전체**, **`data/buildings/`**, 필요 시 `data/osm/`을 대상 PC에 복사합니다. JSON은 상대 경로를 유지하므로 Windows/Ubuntu 사이에서도 동일하게 사용합니다. 대상 PC에서:
 
 ```sh
 docker load -i map-service-image.tar
@@ -242,6 +277,7 @@ docker compose up -d --no-build --pull never
 npm run test:tiles
 npm run test:launcher
 npm run test:measure
+npm run test:buildings
 npx playwright install chromium
 npm test
 npm run typecheck
@@ -251,4 +287,6 @@ npm run typecheck
 
 **검증 범위:** 현재 Linux 클라우드의 합성 패키지 테스트이며, 실제 사용자 TPK 검증과 Windows 11/Ubuntu 24.04 실기 검증은 아직 완료되지 않았습니다. 실제 파일의 라이선스·내보내기 정보와 패키지 구조를 확인한 뒤 실제 위성영상 검증을 진행해야 합니다.
 
-현재 검증 결과: 타일·형식・다중 등록 테스트 **22개**, 실행 메뉴 **12개**, 거리·면적 계산 **9개**, 단일/다중/측정/지역 이동 브라우저 **19개**를 통과했습니다. 다중 등록에서는 z0–13 기본 지도, z14–19 상세/누락 줌, 겹침·동일 우선순위, 부모 타일 위치별 crop, 투명 PNG 합성, 권한 격리, 손상/누락 상세 파일, 설정 변경 감지와 기존 단일 TPK 호환성을 검사합니다. Docker Compose의 외부 통신 차단 네트워크에서도 **3개 TPK의 선택·확대 대체·압축 bundle 캐시·404·비루트 실행·원본 읽기 전용 마운트**를 확인했습니다. 실행 메뉴에서는 의존성 설치·오프라인 재사용·설치 실패 처리·Windows npm 명령 구성도 검사합니다. 모두 합성/공개 형식 샘플 기준이며 실제 사용자 패키지의 완료 증거는 아닙니다.
+현재 검증 결과: 타일·형식・다중 등록 테스트 **22개**, 실행 메뉴 **12개**, 거리·면적 계산 **9개**, 건물 저장소 **7개**, 단일/다중/측정/지역 이동/건물 브라우저 **24개**를 통과했습니다. 다중 등록에서는 z0–13 기본 지도, z14–19 상세/누락 줌, 겹침·동일 우선순위, 부모 타일 위치별 crop, 투명 PNG 합성, 권한 격리, 손상/누락 상세 파일, 설정 변경 감지와 기존 단일 TPK 호환성을 검사합니다. Docker Compose의 외부 통신 차단 네트워크에서도 **3개 TPK의 선택·확대 대체·압축 bundle 캐시·404·비루트 실행·원본 읽기 전용 마운트**를 확인했습니다. 실행 메뉴에서는 의존성 설치·오프라인 재사용·설치 실패 처리·Windows npm 명령 구성도 검사합니다. 모두 합성/공개 형식 샘플 기준이며 실제 사용자 패키지의 완료 증거는 아닙니다.
+
+건물 기능은 등록·새로고침 후 유지·수정·삭제·저장 실패 시 입력 보존·지연 응답·문자열 표시·버전 충돌·모바일을 검증했습니다. 외부 통신이 차단된 Docker Compose에서도 비루트 사용자로 건물을 등록·수정한 뒤 컨테이너를 강제로 재생성해 내용과 버전의 보존, 기존 z19 타일 제공, 삭제를 확인했습니다. 실제 사용자 건물 데이터는 테스트에 사용하지 않았습니다.

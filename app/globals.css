@@ -35,4 +35,25 @@ main { flex: 1; min-height: 240px; position: relative; display: flex; }
 .detail-location-name {display:block;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .detail-location-meta {display:block;font-size:10px;line-height:12px;color:#52616b;}
 .detail-locations-empty {margin:6px 0;font-size:11px;color:#52616b;}
+.building-marker {cursor:pointer;}
+.building-marker svg {display:block;width:28px;height:28px;}
+.building-marker:focus-visible {outline:3px solid #38bdf8;border-radius:50%;}
+.building-tooltip {max-width:260px;white-space:normal;overflow-wrap:anywhere;}
+.building-dialog {box-sizing:border-box;width:580px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow-y:auto;padding:20px;border:1px solid #cbd5e1;border-radius:8px;color:#1e293b;background:#fff;font-size:14px;}
+.building-dialog::backdrop {background:#0f172a88;}
+.building-dialog h2 {margin:0 0 14px;font-size:20px;}
+.building-dialog fieldset {display:grid;gap:10px;border:0;padding:0;margin:0;min-width:0;}
+.building-dialog label {display:grid;gap:4px;}
+.building-dialog input,.building-dialog textarea,.building-dialog select {box-sizing:border-box;width:100%;min-width:0;padding:8px;border:1px solid #aab7c4;border-radius:4px;font:inherit;}
+.building-dialog textarea {resize:vertical;}
+.building-coordinates {display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.building-dialog-actions,.building-delete-confirm {margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;}
+.building-delete-confirm p {width:100%;margin:0 0 4px;}
+.building-dialog button,.building-load-error button {padding:8px 12px;border:1px solid #aab7c4;border-radius:4px;background:#fff;font:inherit;cursor:pointer;}
+.building-dialog button[type="submit"] {background:#6941a5;color:white;border-color:#6941a5;}
+.building-dialog button:disabled {opacity:0.5;cursor:default;}
+.building-dialog :focus-visible {outline:2px solid #6941a5;outline-offset:2px;}
+.building-error {color:#b91c1c;white-space:pre-wrap;}
+.building-dates {font-size:11px;color:#52616b;}
+.building-load-error {position:absolute;right:12px;top:110px;z-index:1000;box-sizing:border-box;max-width:calc(100% - 24px);padding:10px;background:#fff4db;border:1px solid #c18b38;font-size:12px;}
 @media(max-width:600px){header{padding:8px;gap:8px;}h1{font-size:16px;}.map-info{left:48px;font-size:11px;padding:6px;}.map-status{font-size:12px;}}

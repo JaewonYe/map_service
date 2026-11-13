@@ -3,11 +3,14 @@ import {useEffect,useRef,useState} from 'react';
 import L from 'leaflet';
 import MapMeasurements from './MapMeasurements';
 import DetailLocations from './DetailLocations';
+import MapBuildings from './MapBuildings';
+import type {Coordinate} from '../lib/map-measure';
 import type {CatalogInfo} from '../lib/tiles/catalog';
 type Info=CatalogInfo&{osm:{mode:string;url:string|null;attribution:string}};
 export default function MapCanvas(){
   const container=useRef<HTMLDivElement>(null);
   const [mapInstance,setMapInstance]=useState<L.Map|null>(null);
+  const [buildingPoint,setBuildingPoint]=useState<Coordinate|null>(null);
   const [info,setInfo]=useState<Info|null>(null),[message,setMessage]=useState('TPK 메타데이터 확인 중…');
   const [center,setCenter]=useState<[number,number]|null>(null),[zoom,setZoom]=useState<number|null>(null),[clicked,setClicked]=useState<[number,number]|null>(null);
   useEffect(()=>{
@@ -64,7 +67,8 @@ export default function MapCanvas(){
     </aside>
     <div className="map-bottom-tools">
       {message&&<p role="status" className="map-status">{message}</p>}
-      {mapInstance&&<MapMeasurements map={mapInstance}/>}
+      {mapInstance&&<MapMeasurements map={mapInstance} onRegisterBuilding={setBuildingPoint}/>}
     </div>
+    {mapInstance&&<MapBuildings map={mapInstance} requestedPoint={buildingPoint} onRequestClosed={()=>setBuildingPoint(null)}/>}
   </section>;
 }

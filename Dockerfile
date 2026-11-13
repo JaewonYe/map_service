@@ -14,11 +14,11 @@ RUN npm run build
 
 FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3001
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3001 BUILDINGS_DIR=/data/buildings
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
-RUN mkdir -p /cache && chown node:node /cache
+RUN mkdir -p /cache /data/buildings && chown node:node /cache /data/buildings
 USER node
 EXPOSE 3001
 CMD ["node", "server.js"]
