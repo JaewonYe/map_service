@@ -82,3 +82,52 @@ test('process arguments with spaces and shell metacharacters remain literal',asy
   const output=await runCommand(process.execPath,['-e','process.stdout.write(process.argv[1])',value],{capture:true});
   assert.equal(output,value);
 });
+
+async function elevationFixture(t,{input='valid',permission='true'}={}){
+  const {projectRoot}=await fixture(t);
+  // The resolved Compose bind may differ from the project's default folder.
+  const directory=join(projectRoot,'custom DEM data');
+  await mkdir(join(directory,'source'),{recursive:true});
+  if(input==='valid')await writeFile(join(directory,'source','dem.tif'),Buffer.from([0x49,0x49,0x2a,0]));
+  if(input==='empty')await writeFile(join(directory,'source','dem.tif'),'');
+  if(input==='directory')await mkdir(join(directory,'source','dem.tif'));
+  if(input==='pbf'){
+    await mkdir(join(projectRoot,'data','osm'),{recursive:true});
+    await writeFile(join(projectRoot,'data','osm','south-korea.osm.pbf'),'OSM data is not a DEM');
+  }
+  const calls=[];
+  const run=async(command,args,options)=>{
+    calls.push([command,args,options]);
+    if(args.includes('config')){
+      assert.equal(options.capture,true);
+      return JSON.stringify({services:{'prepare-elevation':{volumes:[{type:'bind',source:directory,target:'/data/elevation'}],
+        environment:{ELEVATION_USAGE_CONFIRMED:permission}}}});
+    }
+    return '';
+  };
+  return {projectRoot,calls,run};
+}
+test('PBF-only input stops DEM preparation before an image build and explains the separate datasets',async t=>{
+  const f=await elevationFixture(t,{input:'pbf'});
+  await assert.rejects(execute('elevation',f.run,{projectRoot:f.projectRoot}),error=>{
+    assert.match(error.message,/DEM 파일/);assert.match(error.message,/\.osm\.pbf/);assert.match(error.message,/메뉴 2 또는 3/);return true;
+  });
+  assert.equal(f.calls.length,2);assert.ok(!f.calls.some(([,args])=>args.includes('run')||args.includes('--build')));
+});
+test('DEM preparation rejects an empty file or a directory before an image build',async t=>{
+  for(const input of ['empty','directory']){
+    const f=await elevationFixture(t,{input});
+    await assert.rejects(execute('elevation',f.run,{projectRoot:f.projectRoot}),/비어 있지 않은 DEM/);
+    assert.ok(!f.calls.some(([,args])=>args.includes('--build')));
+  }
+});
+test('DEM usage confirmation is checked before building a preparation image',async t=>{
+  const f=await elevationFixture(t,{permission:'false'});
+  await assert.rejects(execute('elevation',f.run,{projectRoot:f.projectRoot}),/ELEVATION_USAGE_CONFIRMED=true/);
+  assert.ok(!f.calls.some(([,args])=>args.includes('--build')));
+});
+test('DEM preparation uses the Compose-resolved custom host directory and keeps arguments separate',async t=>{
+  const f=await elevationFixture(t);
+  await execute('elevation',f.run,{projectRoot:f.projectRoot});
+  assert.deepEqual(f.calls.at(-1).slice(0,2),['docker',['compose','--profile','tools','run','--rm','--build','prepare-elevation']]);
+});

@@ -1,8 +1,8 @@
 import {spawn} from 'node:child_process';
-import {copyFile,access} from 'node:fs/promises';
+import {copyFile,access,stat} from 'node:fs/promises';
 import {createInterface} from 'node:readline/promises';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {join,win32} from 'node:path';
+import {join,resolve,win32} from 'node:path';
 const root=fileURLToPath(new URL('../',import.meta.url));
 // .cmd files need a shell on Windows. Invoke npm's JavaScript CLI through Node
 // instead so paths and arguments remain separate, including spaces/metacharacters.
@@ -49,13 +49,31 @@ export async function execute(action,run=runCommand,{projectRoot=root}={}){
   }
   await command('docker',['info','--format','{{.ServerVersion}}'],{capture:true});
   if(action==='start'){await docker('up','-d','--build');console.log('Default URL: http://localhost:3001 (use PORT from .env if changed).');}
-  if(action==='elevation')await docker('--profile','tools','run','--rm','--build','prepare-elevation');
+  if(action==='elevation'){
+    // Compose resolves .env, shell overrides and Windows paths. Do not guess the
+    // host folder or print the resolved config (which may contain credentials).
+    const output=await command('docker',['compose','--profile','tools','config','--format','json'],{capture:true});
+    let config;
+    try{config=JSON.parse(output);}catch{throw Error('Docker Compose 설정을 읽지 못했습니다. Compose v2를 확인하세요.');}
+    const service=config.services?.['prepare-elevation'];
+    const mount=service?.volumes?.find(volume=>volume.type==='bind'&&volume.target==='/data/elevation');
+    if(typeof mount?.source!=='string')throw Error('고도 데이터 폴더 설정을 확인하세요: ELEVATION_HOST_DIR');
+    const filename=resolve(projectRoot,mount.source,'source','dem.tif');
+    let file;
+    try{file=await stat(filename);}catch(error){
+      if(['ENOENT','ENOTDIR'].includes(error.code))throw Error(`고도 DEM 파일이 없습니다: ${filename}\n6번은 고도용 DEM GeoTIFF(.tif) 전용입니다. OSM .osm.pbf는 고도 데이터가 아니며 이 메뉴로 변환할 수 없습니다.\n고도 지도가 필요하면 해당 위치에 DEM을 준비하세요. 기존 지도 실행은 메뉴 2 또는 3을 사용하세요.`);
+      throw error;
+    }
+    if(!file.isFile()||file.size===0)throw Error(`비어 있지 않은 DEM GeoTIFF 파일을 준비하세요: ${filename}`);
+    if(String(service.environment?.ELEVATION_USAGE_CONFIRMED)!=='true')throw Error('DEM 변환·자체 웹 사용이 허용된 파일인지 확인한 뒤 .env의 ELEVATION_USAGE_CONFIRMED=true를 설정하세요.');
+    await docker('--profile','tools','run','--rm','--build','prepare-elevation');
+  }
   if(action==='stop')await docker('down');
   if(action==='status'){await docker('ps','-a');await docker('logs','--tail=60','web');}
 }
 async function main(){
   if(process.argv[2])return execute(process.argv[2]);
-  const menu={'1':['TPK 메타데이터 검사 (필요 시 패키지 자동 설치)','inspect'],'2':['Docker 시작','start'],'3':['개발 서버 실행','dev'],'4':['Docker 종료 (데이터 유지)','stop'],'5':['상태·로그','status'],'6':['고도 지도 준비 (DEM 파일·사용 권한 확인 필요)','elevation']};
+  const menu={'1':['TPK 메타데이터 검사 (필요 시 패키지 자동 설치)','inspect'],'2':['Docker 시작','start'],'3':['개발 서버 실행','dev'],'4':['Docker 종료 (데이터 유지)','stop'],'5':['상태·로그','status'],'6':['고도 지도 준비 (DEM .tif 전용 · OSM PBF 불가)','elevation']};
   const reader=createInterface({input:process.stdin,output:process.stdout});
   try{while(true){console.log('\n=== 오프라인 TPK 지도 ===');for(const [id,[label]] of Object.entries(menu))console.log(`${id}. ${label}`);console.log('0. 메뉴 닫기');
     const choice=(await reader.question('선택: ')).trim();if(choice==='0')break;if(!menu[choice])continue;

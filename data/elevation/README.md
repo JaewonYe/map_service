@@ -1,6 +1,7 @@
 # 고도 데이터
 
 원본(값이 미터 단위인 단일 밴드 DEM GeoTIFF)을 `source/dem.tif`에 보관합니다.
+**메뉴 6은 DEM `.tif` 전용이며 OSM `.osm.pbf`는 사용할 수 없습니다.** DEM이 없으면 해당 메뉴를 실행하지 않아도 기존 지도는 사용할 수 있습니다. 메뉴에서 파일·설정을 확인한 뒤 이미지 빌드를 시작합니다.
 사진으로 된 위성 TPK에는 DEM 높이값이 없습니다.
 
 1. `.env`의 `ELEVATION_USAGE_CONFIRMED=true`를 허용된 데이터에 한해 설정합니다.
