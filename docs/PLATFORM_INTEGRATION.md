@@ -27,7 +27,7 @@
 
 - XYZ 문자열은 선행 0 없는 0 이상의 정수, z ≤ 24, x/y < 2^z. 각 데이터의 실제 제공 줌은 더 좁을 수 있다. 위경도는 lat ±85.05112878, lon ±180 범위다.
 - `bounds`는 `{south,west,north,east}`. 카메라 `center`는 `[위도,경도]`다. `layers`의 satellite/street/elevation에는 `available`, 선택적 `reason/url/revision/bounds/minNativeZoom/maxNativeZoom/attribution/online`이 있고 고도에는 최저·최고 고도와 기준이 추가된다. OSM에는 `mode`, `url`, `attribution`과 준비 상태·범위 등이 있다.
-- BuildingInput: 필수 `name`(trim 후 1–120자), 숫자 `latitude/longitude`; 선택 문자열 `description`(5000), `address`(300), `contact`(160), `website`(2048, http/https), `category`(기본 미분류; 주거/상업/공공시설/공장·창고/교육/의료/문화·관광/기타). 생략 문자열은 빈 값이다. PUT은 부분 패치가 아니다.
+- BuildingInput: 필수 `name`(trim 후 1–120자), 숫자 `latitude/longitude`; 선택 문자열 `description`(5000), `address`(300), `contact`(160), `website`(2048, http/https), `category`(기본 미분류; 주거/상업/공공시설/공장·창고/교육/의료/문화·관광/기타/시험장/주차장/야외 공간). 생략 문자열은 빈 값이다. PUT은 부분 패치가 아니다.
 - Building은 입력에 UUID v4 `id`, 양의 정수 `version`, ISO `createdAt/updatedAt`을 더한다. UUID는 지도 건물 레코드 ID이며 플랫폼 시설 ID가 아니다. `BUILDINGS_DIR/<id>.json`에 저장하며 최대 10,000개다. 프로세스 내부 쓰기 직렬화와 버전 검사이며 여러 인스턴스 간 트랜잭션 보장은 없다.
 - 쓰기는 `Sec-Fetch-Site: cross-site`를 거부하고 Origin이 있으면 요청 Host와 비교한다. Origin이 없는 요청도 가능하다. 공개 서비스용 접근 제어가 승인·구축됐다고 간주할 수 없다.
 - `TileError`의 기본 상태는 422이며 메타데이터·형식·경로 검증 오류에 사용된다. 일반 예외는 500이다. OSM 준비 데이터 검증 실패는 `osmInfo`에서 mode:error로 축소되어 타일 요청에서는 404로 나타날 수 있다.
@@ -88,3 +88,8 @@ map-info 200 이후 필요한 `layers.*.available`, `osm.mode`, `reason`, 범위
 `.env.example`을 참고하고 기존 .env·데이터는 보존한다. TPK·DEM·PBF·사용자 건물 JSON·키는 커밋하지 않는다. 이 조사에는 외부 API 키가 필요 없다.
 
 검증 기록과 환경별 미실행 범위는 [VALIDATION.md](VALIDATION.md)를 참조한다.
+
+
+## 이슈 #3 이후 변경
+
+사용자는 별도의 공통 시설 ID 도입을 우선 보류하고 건물·야외 시설을 맵에서 추가·조회하기로 결정했다. 지도에서 위치를 선택해 등록하고 마커에서 상세 내용을 읽을 수 있다. 기존 `/api/buildings`에 시험장·주차장·야외 공간 분류를 추가했으며 내부 UUID·버전·저장 파일 구조는 유지한다. 앞의 시설 원장/ID 매핑 제안은 향후 플랫폼 연동 검토 사항이며 현재 필수 등록 조건이 아니다. 별도 시설 API나 승인된 공통 계약을 만들지 않았다. 기존 클라이언트가 분류를 고정 enum으로 처리한다면 새 분류값 지원을 확인해야 한다.

@@ -7,7 +7,7 @@ import type {Coordinate} from '../lib/map-measure';
 
 async function responseData(response: Response) {
   const body = await response.json();
-  if (!response.ok) throw Error(body.error || '건물 정보 요청을 처리하지 못했습니다.');
+  if (!response.ok) throw Error(body.error || '시설·건물 정보 요청을 처리하지 못했습니다.');
   return body;
 }
 type Editor = {building: Building | null; point: Coordinate};
@@ -25,7 +25,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed}: Pro
     try {
       const body = await responseData(await fetch('/api/buildings', {signal, cache: 'no-store'}));
       if (!signal?.aborted && sequence === listRequest.current) {setBuildings(body.buildings); setError('');}
-    } catch (error) {if (!signal?.aborted && sequence === listRequest.current) setError(error instanceof Error ? error.message : '건물 정보를 불러오지 못했습니다.');}
+    } catch (error) {if (!signal?.aborted && sequence === listRequest.current) setError(error instanceof Error ? error.message : '시설·건물 정보를 불러오지 못했습니다.');}
   }
   useEffect(() => {const abort = new AbortController(); void load(abort.signal); return () => abort.abort();}, []);
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed}: Pro
       listRequest.current++;
       setBuildings(previous => previous.map(item => item.id === id ? building : item));
       setEditor({building, point: [building.latitude, building.longitude]}); setError('');
-    } catch (error) {if (sequence === selectionRequest.current) setError(error instanceof Error ? error.message : '건물 정보를 불러오지 못했습니다.');}
+    } catch (error) {if (sequence === selectionRequest.current) setError(error instanceof Error ? error.message : '시설·건물 정보를 불러오지 못했습니다.');}
   }
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed}: Pro
       const marker = L.marker([building.latitude, building.longitude], {icon, keyboard: true, bubblingMouseEvents: false})
         .bindTooltip(text, {direction: 'top', className: 'building-tooltip'})
         .on('click', () => void openBuilding(building.id)).addTo(group);
-      marker.getElement()?.setAttribute('aria-label', `${building.name} 건물 정보 보기`);
+      marker.getElement()?.setAttribute('aria-label', `${building.name} 시설·건물 정보 보기`);
     }
     return () => {group.remove();};
   }, [map, buildings]);
@@ -80,6 +80,7 @@ function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted}: {
   const [input, setInput] = useState({name: building?.name || '', description: building?.description || '',
     category: building?.category || BUILDING_CATEGORIES[0], address: building?.address || '', contact: building?.contact || '', website: building?.website || '',
     latitude: String(Number(point[0].toFixed(7))), longitude: String(Number(point[1].toFixed(7)))});
+  const [editing, setEditing] = useState(!building);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [confirmDelete, setConfirmDelete] = useState(false);
   useEffect(() => {
     const element = dialog.current!; element.showModal();
@@ -112,10 +113,25 @@ function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted}: {
 
   return <dialog ref={dialog} className="building-dialog" aria-labelledby="building-dialog-title"
     onCancel={event => {event.preventDefault(); if (!busy) onClose();}}>
-    <h2 id="building-dialog-title">{building ? '건물 정보 수정' : '건물 정보 등록'}</h2>
-    <form onSubmit={save}>
+    <h2 id="building-dialog-title">{building ? (editing ? '시설·건물 정보 수정' : '시설·건물 정보') : '시설·건물 정보 등록'}</h2>
+    {!editing && building ? <>
+      <h3>{building.name}</h3>
+      <dl className="facility-details">
+        <dt>용도·분류</dt><dd>{building.category}</dd>
+        <dt>설명</dt><dd>{building.description || '등록된 설명이 없습니다.'}</dd>
+        <dt>주소</dt><dd>{building.address || '—'}</dd>
+        <dt>연락처</dt><dd>{building.contact || '—'}</dd>
+        <dt>관련 URL</dt><dd>{/^https?:\/\//i.test(building.website) ? <a href={building.website} target="_blank" rel="noopener noreferrer">{building.website}</a> : '—'}</dd>
+        <dt>위치</dt><dd>{building.latitude.toFixed(7)}, {building.longitude.toFixed(7)}</dd>
+      </dl>
+      <p className="building-dates">등록 {date(building.createdAt)} · 수정 {date(building.updatedAt)}</p>
+      <div className="building-dialog-actions">
+        <button type="button" onClick={() => setEditing(true)}>수정</button>
+        <button type="button" onClick={onClose}>닫기</button>
+      </div>
+    </> : <form onSubmit={save}>
       <fieldset disabled={busy}>
-        <label>건물명<input required maxLength={FIELD_LIMITS.name} value={input.name} onChange={event => change('name', event.target.value)}/></label>
+        <label>시설명<input required maxLength={FIELD_LIMITS.name} value={input.name} onChange={event => change('name', event.target.value)}/></label>
         <label>설명<textarea rows={4} maxLength={FIELD_LIMITS.description} value={input.description} onChange={event => change('description', event.target.value)}/></label>
         <label>용도·분류<select value={input.category} onChange={event => change('category', event.target.value)}>
           {BUILDING_CATEGORIES.map(category => <option key={category}>{category}</option>)}
@@ -131,7 +147,7 @@ function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted}: {
       {building && <p className="building-dates">등록 {date(building.createdAt)} · 수정 {date(building.updatedAt)}</p>}
       {error && <p className="building-error" role="alert">{error}</p>}
       {confirmDelete ? <div className="building-delete-confirm">
-        <p>이 건물 정보를 삭제하시겠습니까?</p>
+        <p>이 시설·건물 정보를 삭제하시겠습니까?</p>
         <button type="button" disabled={busy} onClick={() => void remove()}>삭제 확인</button>
         <button type="button" disabled={busy} onClick={() => setConfirmDelete(false)}>돌아가기</button>
       </div> : <div className="building-dialog-actions">
@@ -139,6 +155,6 @@ function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted}: {
         <button type="button" disabled={busy} onClick={onClose}>취소</button>
         {building && <button type="button" disabled={busy} onClick={() => setConfirmDelete(true)}>삭제</button>}
       </div>}
-    </form>
+    </form>}
   </dialog>;
 }

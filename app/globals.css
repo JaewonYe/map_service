@@ -6,7 +6,7 @@ header p { margin: 0; color: #555; }
 main { flex: 1; min-height: 240px; position: relative; display: flex; }
 .map-canvas { position: absolute; inset: 0; }
 .map-bottom-tools {position:absolute;bottom:28px;left:12px;right:12px;z-index:1000;display:flex;flex-direction:column;align-items:flex-start;gap:8px;pointer-events:none;}
-.map-status {align-self:stretch;pointer-events:auto;margin:0;padding:12px;background:#fff4db;color:#542e00;border:1px solid #c18b38;}
+.map-status {align-self:flex-start;box-sizing:border-box;width:350px;max-width:100%;pointer-events:none;margin:0;padding:12px;background:#fff4db;color:#542e00;border:1px solid #c18b38;}
 .map-measurements {pointer-events:auto;box-sizing:border-box;width:350px;max-width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;background:#fffef5;box-shadow:0 1px 5px #0002;font-size:13px;}
 .measurement-buttons {display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;}
 .measurement-buttons button {padding:6px 9px;min-height:32px;border:1px solid #a9b8bf;border-radius:4px;background:#fff;color:#1e293b;font:inherit;cursor:pointer;}
@@ -59,3 +59,12 @@ main { flex: 1; min-height: 240px; position: relative; display: flex; }
 @media(max-width:600px){header{padding:8px;gap:8px;}h1{font-size:16px;}.map-info{left:48px;font-size:11px;padding:6px;}.map-status{font-size:12px;}}
 .map-data-help {position:absolute;right:10px;top:145px;z-index:600;padding:7px;border:1px solid #aab7c4;border-radius:4px;background:white;color:#1e293b;font:12px system-ui;cursor:pointer;}
 .elevation-legend span {display:inline-block;width:65px;height:10px;background:linear-gradient(to right,#418f6c,#dac17b,#805432,#faf6eb);}
+
+.leaflet-grab.facility-selecting {cursor:crosshair;}
+.facility-tools {display:flex;gap:6px;flex-wrap:wrap;}
+.facility-tools button {padding:8px 12px;min-height:40px;border:1px solid #6941a5;border-radius:4px;background:#fff;color:#6941a5;font:inherit;cursor:pointer;}
+.facility-tools button[aria-pressed="true"] {background:#6941a5;color:#fff;}
+.facility-tools button:focus-visible {outline:3px solid #38bdf8;outline-offset:2px;}
+.facility-details {display:grid;grid-template-columns:85px minmax(0,1fr);gap:10px;}
+.facility-details dt {font-weight:600;}
+.facility-details dd {margin:0;white-space:pre-wrap;overflow-wrap:anywhere;}

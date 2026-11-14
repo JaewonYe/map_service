@@ -1,4 +1,4 @@
-export const BUILDING_CATEGORIES = ['미분류', '주거', '상업', '공공시설', '공장·창고', '교육', '의료', '문화·관광', '기타'] as const;
+export const BUILDING_CATEGORIES = ['미분류', '주거', '상업', '공공시설', '공장·창고', '교육', '의료', '문화·관광', '기타', '시험장', '주차장', '야외 공간'] as const;
 export type BuildingCategory = typeof BUILDING_CATEGORIES[number];
 export type BuildingInput = {
   name: string;
@@ -36,7 +36,7 @@ export function parseBuilding(value: unknown): BuildingInput {
     if (result.length > FIELD_LIMITS[key]) throw new BuildingError(`${key}: 최대 ${FIELD_LIMITS[key]}자까지 입력할 수 있습니다.`);
     return result;
   };
-  const name = text('name'); if (!name) throw new BuildingError('건물명을 입력하세요.');
+  const name = text('name'); if (!name) throw new BuildingError('시설명을 입력하세요.');
   const category = input.category ?? BUILDING_CATEGORIES[0];
   if (!BUILDING_CATEGORIES.includes(category as BuildingCategory)) throw new BuildingError('올바른 건물 분류를 선택하세요.');
   const latitude = input.latitude, longitude = input.longitude;

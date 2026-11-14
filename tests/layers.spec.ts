@@ -42,5 +42,5 @@ test('clicking the map queries local elevation and retains measurement tools acr
   await page.getByRole('radio',{name:'일반 지도',exact:true}).check();
   await expect(page.getByRole('button',{name:'거리',exact:true})).toBeVisible();
   await page.locator('.leaflet-container').click({position:{x:500,y:300},button:'right'});
-  await expect(page.getByRole('menuitem',{name:'건물 정보 등록'})).toBeVisible();
+  await expect(page.getByRole('menuitem',{name:'시설·건물 정보 등록'})).toBeVisible();
 });

@@ -85,3 +85,16 @@ test('HTTP input is bounded and cross-site writes are rejected', async () => {
   assert.equal(buildingVersion(new Request(url, {headers: {'If-Match': '"2"'}})), 2);
   assert.throws(() => buildingVersion(new Request(url)), /If-Match/);
 });
+
+
+test('outdoor facilities persist alongside existing buildings without a supplied identifier', async t => {
+  const {directory, store} = await fixture(t);
+  const legacy = await store.create(input);
+  for (const category of ['시험장', '주차장', '야외 공간']) {
+    const facility = await store.create({name: category, category, latitude: 36, longitude: 126});
+    assert.match(facility.id, /^[0-9a-f-]{36}$/);
+    assert.equal((await new BuildingStore(directory).get(facility.id)).category, category);
+  }
+  assert.equal((await new BuildingStore(directory).list()).length, 4);
+  assert.deepEqual(await store.get(legacy.id), legacy);
+});
