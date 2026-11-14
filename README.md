@@ -409,3 +409,7 @@ OSM 검증: Node 렌더링 테스트 **4개**, PBF 변환 테스트 **4개**, �
 오프라인 PC에서 **새 PBF 준비도** 하려면 `map-service-osm-tools:local` 이미지를 함께 `docker save`/`docker load`로 옮기세요. 실행 메뉴는 해당 이미지가 있으면 네트워크 없이 재사용하며, 이미지가 없을 때만 빌드합니다. 명령으로 실행할 때는 `docker compose --profile tools run --rm --pull never prepare-osm`을 사용합니다. 준비된 지도 표시에는 도구 이미지가 필요 없습니다. 도구 코드가 바뀐 버전으로 갱신할 때는 인터넷 가능한 PC에서 `docker compose --profile tools build prepare-osm`으로 작업 이미지도 갱신하세요. 색인이 손상됐을 때의 강제 재변환은 메뉴 7 또는 `docker compose --profile tools run --rm --pull never prepare-osm --force`입니다.
 
 최종 OSM 통합 검증에서는 외부 통신이 차단된 Docker Compose에서 PBF → SQLite → Next.js PNG, 줌 0/13/16/19, ETag·404/400, 비루트 실행과 읽기 전용 원본, 로컬 한글 폰트를 확인했습니다. 공개 모나코 PBF로도 도로·건물·바다·지명 표시를 시각 확인했으며, 사용자 대한민국 PBF가 검증 환경에 제공된 것은 아닙니다.
+
+## 플랫폼 연동 검토
+
+현행 API·데이터 책임·승인 전 연동안은 [플랫폼 연동 조사](docs/PLATFORM_INTEGRATION.md), 이번 실행 결과는 [검증 기록](docs/VALIDATION.md)을 참고하세요. 공통 API 계약이나 시설 식별자 정책의 승인을 의미하지 않습니다.
