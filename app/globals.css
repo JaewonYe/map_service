@@ -1,3 +1,4 @@
+@import "../design-system/platform/tokens.css";
 html, body { height: 100%; margin: 0; font-family: system-ui, sans-serif; }
 body { display: flex; flex-direction: column; }
 header { padding: 12px 20px; display: flex; align-items: baseline; gap: 16px; }
@@ -85,20 +86,37 @@ main { flex: 1; min-height: 240px; position: relative; display: flex; }
 .facility-results button:hover,.facility-results button[aria-current="location"] {background:#f4effa;border-color:#6941a5;}
 @media(max-width:600px){.facility-panel{width:280px;max-height:min(260px,max(80px,calc(100% - 530px)));}.facility-list-toggle{min-height:40px;}}
 .measurement-fieldset {border:0;margin:0;padding:0;min-width:0;}
-.facility-boundary-editor {position:absolute;top:185px;right:12px;z-index:1000;box-sizing:border-box;width:360px;max-width:calc(100% - 24px);max-height:calc(100% - 215px);overflow:auto;overscroll-behavior:contain;padding:12px;background:#fff;border:2px solid #be185d;border-radius:6px;font-size:13px;color:#1e293b;}
-.facility-boundary-editor h2 {margin:0 0 8px;font-size:16px;overflow-wrap:anywhere;}
+.facility-boundary-editor {position:absolute;top:185px;right:12px;z-index:1000;box-sizing:border-box;width:360px;max-width:calc(100% - 24px);max-height:calc(100% - 215px);overflow:auto;overscroll-behavior:contain;padding:12px;background:var(--color-surface);border:2px solid var(--color-control-border);border-radius:var(--radius-panel);font-size:var(--font-size-small);line-height:var(--line-height-body);font-family:var(--font-body);color:var(--color-foreground);}
+.facility-boundary-editor h2 {margin:0 0 8px;font-size:20px;overflow-wrap:anywhere;}
 .facility-boundary-editor p {margin:7px 0;}
 .facility-boundary-editor output {display:block;margin:8px 0;font-weight:600;}
 .facility-boundary-editor fieldset {margin:0;padding:0;border:0;min-width:0;}
-.facility-boundary-editor button {min-height:40px;padding:6px 8px;border:1px solid #aab7c4;background:#fff;border-radius:4px;font:inherit;cursor:pointer;}
+.facility-boundary-editor button {min-height:var(--control-min-height);padding:6px 8px;border:1px solid var(--color-control-border);background:var(--color-surface);border-radius:var(--radius-control);font:inherit;cursor:pointer;}
 .facility-boundary-editor button:disabled {opacity:.5;cursor:default;}
-.facility-boundary-editor :focus-visible,.facility-boundary-saved:focus-visible {outline:3px solid #be185d;outline-offset:2px;}
-.boundary-actions {display:flex;flex-wrap:wrap;gap:5px;margin:8px 0;}
+.facility-boundary-editor :focus-visible,.facility-boundary-saved:focus-visible {outline:3px solid var(--color-focus);outline-offset:2px;}
+.boundary-actions {display:flex;flex-wrap:wrap;gap:var(--space-2);margin:8px 0;}
 .facility-boundary-editor summary {cursor:pointer;min-height:32px;}
-.boundary-coordinate-entry {display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.boundary-coordinate-entry {display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);}
 .boundary-coordinate-entry label {display:grid;gap:4px;}
-.boundary-coordinate-entry input {box-sizing:border-box;width:100%;min-width:0;padding:7px;border:1px solid #aab7c4;font:inherit;}
+.boundary-coordinate-entry input {box-sizing:border-box;width:100%;min-width:0;padding:7px;border:1px solid var(--color-control-border);font:inherit;}
 .boundary-coordinate-list {max-height:120px;overflow:auto;padding-left:20px;}
 .boundary-coordinate-list li {margin-top:5px;overflow-wrap:anywhere;}
 .boundary-coordinate-list button {display:block;}
 @media(max-width:600px){.facility-boundary-editor{top:185px;max-height:min(285px,calc(100% - 440px));}.map-measurements:has(fieldset:disabled){max-height:110px;overflow:auto;}}
+
+.facility-boundary-editor {right:max(12px,env(safe-area-inset-right));scroll-padding:12px;}
+.facility-boundary-editor input {min-height:var(--control-min-height);font-size:16px;color:var(--color-foreground);}
+.facility-boundary-editor button {color:var(--color-foreground);touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+.facility-boundary-editor button:enabled:hover,.facility-boundary-editor button:enabled:active {background:var(--color-primary-subtle);}
+.facility-boundary-editor .boundary-save {background:var(--color-primary);color:var(--color-on-primary);border-color:var(--color-primary);}
+.facility-boundary-editor .boundary-save:enabled:hover,.facility-boundary-editor .boundary-save:enabled:active {background:var(--color-primary-hover);}
+.facility-boundary-editor summary {min-height:var(--control-min-height);}
+.facility-boundary-editor .building-error {color:var(--color-danger);overflow-wrap:anywhere;}
+.building-dialog {font-family:var(--font-body);font-size:var(--font-size-body);line-height:var(--line-height-body);color:var(--color-foreground);overscroll-behavior:contain;}
+.building-dialog button {min-height:var(--control-min-height);border-color:var(--color-control-border);border-radius:var(--radius-control);touch-action:manipulation;}
+.building-dialog button:enabled:hover,.building-dialog button:enabled:active {background:var(--color-primary-subtle);}
+.building-dialog button[type="submit"],.building-dialog .boundary-start {background:var(--color-primary);color:var(--color-on-primary);border-color:var(--color-primary);}
+.building-dialog button[type="submit"]:enabled:hover,.building-dialog .boundary-start:enabled:hover {background:var(--color-primary-hover);}
+.building-dialog .boundary-remove {color:var(--color-danger);border-color:var(--color-danger);}
+.building-dialog :focus-visible {outline-color:var(--color-focus);}
+.building-dialog input,.building-dialog textarea,.building-dialog select {border-color:var(--color-control-border);background:var(--color-surface);color:var(--color-foreground);min-height:var(--control-min-height);}

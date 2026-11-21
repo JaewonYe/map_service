@@ -34,7 +34,7 @@ async function triangle(editor:Locator) {
   await add(editor,'36.600','126.2445');await add(editor,'36.600','126.2455');await add(editor,'36.601','126.245');
 }
 
-test('drawn boundary persists on reload; measurement reset leaves it and marker; saved polygon opens detail', async({page,request})=>{
+test('drawn boundary persists on reload; measurement reset leaves it and marker; saved polygon opens detail', async({page,request},testInfo)=>{
   const a=await create(request);
   try {
     await isolate(page,[a.id]);await page.goto('/');const editor=await edit(page,a);
@@ -43,6 +43,7 @@ test('drawn boundary persists on reload; measurement reset leaves it and marker;
     await expect(editor.getByTestId('boundary-point-count')).toHaveText('정점 3 / 128개');
     await expect(editor.locator('output')).toContainText('면적');
     await expect(page.locator('.facility-boundary-draft')).toHaveCount(1);
+    await page.screenshot({path:testInfo.outputPath('facility-boundary-editor-desktop.png')});
     await editor.getByRole('button',{name:'경계 저장',exact:true}).click();await expect(editor).toHaveCount(0);
     const stored=await get(request,a.id);expect(stored.boundary.coordinates[0]).toHaveLength(4);expect(stored.version).toBe(2);
     await page.reload();await expect(page.locator('.facility-boundary-saved')).toHaveCount(1);
@@ -149,6 +150,7 @@ test('filters synchronize polygons and markers; mobile keyboard adds modifies sa
     await triangle(editor);await editor.getByLabel('정점 위도',{exact:true}).fill('36.6012');await editor.getByLabel('정점 경도',{exact:true}).fill('126.245');
     await editor.getByRole('button',{name:'3번 정점 수정'}).focus();await page.keyboard.press('Enter');
     await expect(editor.getByText('3: 36.6012, 126.245',{exact:true})).toBeVisible();
+    expect(await editor.getByRole('button',{name:'정점 추가',exact:true}).evaluate(el=>el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
     const bounds=(await editor.boundingBox())!;expect(bounds.x).toBeGreaterThanOrEqual(0);expect(bounds.x+bounds.width).toBeLessThanOrEqual(390);
     await page.screenshot({path:testInfo.outputPath('facility-boundary-editor-mobile.png')});
     await editor.getByRole('button',{name:'경계 저장',exact:true}).focus();await page.keyboard.press('Enter');await expect(editor).toHaveCount(0);

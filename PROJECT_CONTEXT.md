@@ -62,3 +62,7 @@
 - 검색·분류·목록·마커·경계·상세를 연결한다. 편집은 시설/버전에 고정하고 저장 중 대상 변경을 막는다. 실패/충돌은 초안과 저장 도형을 보존하며 재시도·재조회 안내를 제공한다. 취소/Esc/다른 시설 선택은 초안을 저장하지 않는다.
 - 서버에서 형식·숫자/범위·중복/퇴화·면적·교차/접촉·정점 수·경도 폭을 검증한다. 날짜변경선·구멍·여러 영역·공유 경계·예약 규칙은 제외한다. 관리용 경계이며 법적 측량 정확도를 보증하지 않는다.
 - 공통 OpenAPI·모듈 책임·타 DB·상위 gitlink는 변경하지 않는다. 검증 결과와 최종 SHA·PR/CI 증거는 [VALIDATION](docs/VALIDATION.md)과 [이슈 #11](https://github.com/JaewonYe/map_service/issues/11) 완료 댓글에 기록한다. 실데이터·OS 실기·인증/운영·플랫폼 공통 계약은 미검증이다.
+
+## 공통 디자인 스킬 설치
+
+UI UX Pro Max와 Web Design Guidelines를 `.agents/skills/`에 설치하고 AGENTS.md에 UI 작업 시 사용 절차를 연결했다. 공통 기준은 [MASTER.md](design-system/platform/MASTER.md)와 tokens.css이며 upstream 커밋/파일 해시는 skills.lock.json에 기록한다. 실제 화면을 일괄 변경하지 않았고 기존 업무·API·기술 승인 상태를 유지한다.

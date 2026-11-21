@@ -175,3 +175,12 @@ README의 합성 변환 CI 절차대로 두 production Dockerfile을 `map-servic
 실제 최종 head SHA·PR·PR/main push별 run URL·job/테스트 결과·artifact는 실행 완료 후 [이슈 #11](https://github.com/JaewonYe/map_service/issues/11) 완료 댓글에 기록한다. 다른 SHA/로컬 통과를 원격 성공으로 간주하지 않는다.
 
 실제 사용자 경계/대규모 성능·TPK/DEM/PBF·Windows/Ubuntu 실기·인증/운영·승인된 플랫폼 소비자 계약은 미검증이다. 관리용 경계의 법적/실측 정확도는 보장하지 않는다. 구멍/여러 영역/날짜변경선·공유 경계·예약 규칙은 제외하며 다중 서버 동시 쓰기 한계도 유지한다. 상위 gitlink·공통 OpenAPI를 변경하지 않았다.
+
+
+### 작업 중 추가된 main 디자인 기준 반영
+
+PR #12 생성 후 최신 main의 `5f365d30f4967eb6a23a9c37d6b77be5ba96b091`에서 공통 UI 디자인 스킬·토큰·무결성 workflow가 추가된 것을 확인했다. 이를 병합하면서 PROJECT_CONTEXT의 양쪽 기록을 모두 유지했다. 새 AGENTS 지침에 따라 두 스킬/공통 MASTER/토큰을 읽고 로컬 검색·변경 UI 검토를 수행했다. 자세한 파일:줄 결과와 검토 한계는 [BOUNDARY_UI_REVIEW](BOUNDARY_UI_REVIEW.md)에 기록한다.
+
+변경한 경계/상세 UI에 공통 토큰과 44px 조작 높이·hover/focus·입력 metadata·초안 이탈 경고를 적용했다. 기존 지도 레이어 색상/도형 구분과 작업 공간은 유지한다. 공통 스냅샷과 lock은 수정하지 않았고 `python3 scripts/check_design_skills.py`가 통과했다. main 반영 후 최종 SHA에 대해 기존 3개 회귀 job과 추가된 Design skill integrity 결과도 확인한다.
+
+main 디자인 기준 반영 후 로컬 typecheck, Node 앱 83개/집계 도구 5개, CI 모드 Playwright 전체 43개 재실행 통과(실패/취소/flaky/스킵 0). 데스크톱/모바일 편집 스크린샷을 직접 검토했다. 변환 코드는 추가 변경하지 않았다.

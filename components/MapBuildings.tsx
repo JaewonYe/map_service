@@ -278,30 +278,30 @@ function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted, onBou
       <p>{building.boundary ? `저장된 경계 · 면적 ${formatArea(boundaryMetrics(building.boundary).area)} · 둘레 ${formatDistance(boundaryMetrics(building.boundary).perimeter)}` : '저장된 경계 없음'}</p>
       {error && <p className="building-error" role="alert">{error}</p>}
       <div className="building-dialog-actions">
-        <button type="button" disabled={busy} onClick={onBoundary}>{building.boundary ? '경계 수정' : '경계 추가'}</button>
-        {building.boundary && <button type="button" disabled={busy} onClick={() => setConfirmBoundary(true)}>경계 제거</button>}
+        <button className="boundary-start" type="button" disabled={busy} onClick={onBoundary}>{building.boundary ? '경계 수정' : '경계 추가'}</button>
+        {building.boundary && <button className="boundary-remove" type="button" disabled={busy} onClick={() => setConfirmBoundary(true)}>경계 제거</button>}
       </div>
       {confirmBoundary && <div className="building-delete-confirm"><p>시설 정보는 유지하고 경계만 제거하시겠습니까?</p>
-        <button type="button" disabled={busy} onClick={() => void removeBoundary()}>경계 제거 확인</button>
+        <button className="boundary-remove" type="button" disabled={busy} onClick={() => void removeBoundary()}>경계 제거 확인</button>
         <button type="button" disabled={busy} onClick={() => setConfirmBoundary(false)}>경계 제거 취소</button></div>}
       <p className="building-dates">등록 {date(building.createdAt)} · 수정 {date(building.updatedAt)}</p>
       <div className="building-dialog-actions">
         <button type="button" disabled={busy} onClick={() => setEditing(true)}>수정</button>
         <button type="button" disabled={busy} onClick={onClose}>닫기</button>
       </div>
-    </> : <form onSubmit={save}>
+    </> : <form onSubmit={save} autoComplete="off">
       <fieldset disabled={busy}>
-        <label>시설명<input required maxLength={FIELD_LIMITS.name} value={input.name} onChange={event => change('name', event.target.value)}/></label>
-        <label>설명<textarea rows={4} maxLength={FIELD_LIMITS.description} value={input.description} onChange={event => change('description', event.target.value)}/></label>
-        <label>용도·분류<select value={input.category} onChange={event => change('category', event.target.value)}>
+        <label>시설명<input required maxLength={FIELD_LIMITS.name} name="name" value={input.name} onChange={event => change('name', event.target.value)}/></label>
+        <label>설명<textarea rows={4} maxLength={FIELD_LIMITS.description} name="description" value={input.description} onChange={event => change('description', event.target.value)}/></label>
+        <label>용도·분류<select name="category" value={input.category} onChange={event => change('category', event.target.value)}>
           {BUILDING_CATEGORIES.map(category => <option key={category}>{category}</option>)}
         </select></label>
-        <label>주소<input maxLength={FIELD_LIMITS.address} value={input.address} onChange={event => change('address', event.target.value)}/></label>
-        <label>연락처<input maxLength={FIELD_LIMITS.contact} value={input.contact} onChange={event => change('contact', event.target.value)}/></label>
-        <label>관련 URL<input type="url" maxLength={FIELD_LIMITS.website} placeholder="https://" value={input.website} onChange={event => change('website', event.target.value)}/></label>
+        <label>주소<input maxLength={FIELD_LIMITS.address} name="address" value={input.address} onChange={event => change('address', event.target.value)}/></label>
+        <label>연락처<input type="tel" maxLength={FIELD_LIMITS.contact} name="contact" value={input.contact} onChange={event => change('contact', event.target.value)}/></label>
+        <label>관련 URL<input type="url" maxLength={FIELD_LIMITS.website} placeholder="https://" name="website" value={input.website} onChange={event => change('website', event.target.value)}/></label>
         <div className="building-coordinates">
-          <label>위도<input required type="number" step="any" min={-85.05112878} max={85.05112878} value={input.latitude} onChange={event => change('latitude', event.target.value)}/></label>
-          <label>경도<input required type="number" step="any" min={-180} max={180} value={input.longitude} onChange={event => change('longitude', event.target.value)}/></label>
+          <label>위도<input required type="number" step="any" min={-85.05112878} max={85.05112878} name="latitude" value={input.latitude} onChange={event => change('latitude', event.target.value)}/></label>
+          <label>경도<input required type="number" step="any" min={-180} max={180} name="longitude" value={input.longitude} onChange={event => change('longitude', event.target.value)}/></label>
         </div>
       </fieldset>
       {building && <p className="building-dates">등록 {date(building.createdAt)} · 수정 {date(building.updatedAt)}</p>}

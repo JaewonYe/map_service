@@ -40,3 +40,7 @@ data/elevation/source/*
 !data/osm/
 data/osm/*
 !data/osm/README.md
+
+# Local Python design skill caches
+__pycache__/
+*.pyc
