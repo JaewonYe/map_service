@@ -31,7 +31,7 @@ class ConversionGate(unittest.TestCase):
     def test_import_and_assertion_errors_remain_failed(self):
         with tempfile.TemporaryDirectory() as folder:
             Path(folder, 'broken_test.py').write_text('raise ImportError("missing GDAL")')
-            suite = unittest.defaultTestLoader.discover(folder, pattern='broken_test.py')
+            suite = unittest.TestLoader().discover(folder, pattern='broken_test.py')
             result = unittest.TestResult(); suite.run(result)
             report = module.counts(result, 1)
             self.assertEqual(report['errors'], 1); self.assertFalse(report['valid'])

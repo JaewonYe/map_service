@@ -63,7 +63,7 @@ def run(kind):
         report.update(preflight(kind, root))
         print('CONVERSION_ENVIRONMENT ' + json.dumps(report, sort_keys=True), flush=True)
         # unittest reports import errors as errors; they are never skipped or accepted as success.
-        suite = unittest.defaultTestLoader.discover(str(root/'tests'), pattern=pattern)
+        suite = unittest.TestLoader().discover(str(root/'tests'), pattern=pattern)
         result = unittest.TextTestRunner(verbosity=2).run(suite)
         report.update(counts(result, expected))
     except Exception as error:

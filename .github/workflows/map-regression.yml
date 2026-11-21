@@ -100,7 +100,11 @@ jobs:
         with:
           persist-credentials: false
       - name: Check conversion reporting gates
-        run: python3 -m unittest discover -s tests/tooling -p conversion_ci_test.py -v
+        shell: bash
+        run: |
+          mkdir -p .cache/ci/conversion
+          set -o pipefail
+          python3 -m unittest discover -s tests/tooling -p conversion_ci_test.py -v 2>&1 | tee .cache/ci/conversion/reporting-gates.log
       - name: Build production conversion images
         shell: bash
         run: |
