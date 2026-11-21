@@ -70,3 +70,13 @@ UI UX Pro Max와 Web Design Guidelines를 `.agents/skills/`에 설치하고 AGEN
 ## Light/Dark 시안 구현 스킬
 
 사용자 요청에 따라 프로젝트 전용 `platform-ui-design`과 두 테마 토큰·시안 구현 규칙·로컬 참고 화면을 공통 버전 2.0.0으로 연결한다. 모듈 UI 구현은 같은 기준을 참조하며 실제 앱 리디자인/테마 전환 완료 여부는 별도 구현·검증으로 보고한다.
+
+
+## 이슈 #13 전체 지도 UI·테마
+
+- 이슈 #11의 기능을 유지하면서 화면 전체를 공통 Light/Dark 시안에 맞춰 재구성한다. 56px 헤더 + 320px 좌측 시설 찾기 + 나머지 지도, 상단 주요/보조 도구, 하단 좌표, 작은 선택 카드와 내부 스크롤 편집 패널을 제공한다. 모바일은 접는 drawer와 줌을 가리지 않는 선택/경계 영역을 사용한다.
+- 앱 배경/헤더/목록/폼/메뉴/측정/정보/Leaflet 컨트롤·tooltip과 상태를 같은 의미 토큰으로 전환한다. 기존 누적 흰색/보라 primary override를 정리하며 원본 지도/DEM 데이터 색상은 보존한다.
+- Light/Dark/System 선택을 헤더/네이티브 편집창에 제공한다. 첫 paint 전 저장 선호 적용, platform.theme 저장·오류/잘못된 값 fallback, OS 추종·동일 탭/다른 탭 동기화, theme 변경 중 카메라/선택/입력/초안 보존을 검증한다.
+- 공통 skill/lock/themes/reference를 수정하거나 새 API/데이터/예약/로그인을 도입하지 않는다. API·UUID·boundary·저장 방식과 오프라인 제한은 유지한다. ResizeObserver는 실제 지도 크기 변경만 처리하고 카메라를 보존한다.
+- 실제 변경 전/참고/후 캡처와 기준별 일치/의도적 차이는 [UI_REDESIGN_REVIEW](docs/UI_REDESIGN_REVIEW.md)에 남긴다. 이미지와 manifest를 저장소에 보관하여 PR에서 직접 조회할 수 있다. 합성 fixture이며 실데이터/OS 실기/접근성 인증은 미검증이다.
+- 테마/전체 배치 브라우저 검사 7개를 추가해 기존 43 → 50개, 기존 5개 프로젝트와 Node 앱 83/도구 5·변환 7/도구 5를 유지한다. 최종 SHA·PR/main CI 증거는 검증 문서 및 이슈 #13 완료 댓글에 기록한다. 검증된 모듈 SHA를 상위 별도 gitlink 통합용으로 보고하며 포인터는 직접 바꾸지 않는다.

@@ -8,6 +8,7 @@ test('multi-resolution UI shows registered areas, coordinates, boundaries and on
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
   await page.goto('/'); await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible();
   await expect(page.locator('.leaflet-overlay-pane path')).toHaveCount(3);
+  if(await page.getByRole('button',{name:'지도 정보',exact:true}).getAttribute('aria-expanded')!=='true')await page.getByRole('button',{name:'지도 정보',exact:true}).click();
   await page.getByTestId('map-sources').locator('summary').click();
   await expect(page.getByTestId('map-sources')).toContainText('CC0 기본 지도');
   await expect(page.getByTestId('map-sources')).toContainText('CC0 항구 지역');
@@ -74,6 +75,7 @@ test('detail locations exclude the base and navigate between registered bounds w
     await route.fulfill({json: info});
   });
   await page.goto('/'); await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible();
+  await page.getByRole('button',{name:'지도 정보',exact:true}).click();
   const panel = page.locator('.detail-locations'), list = page.getByRole('list', {name: '상세 지역 목록'});
   await expect(list.getByRole('button')).toHaveCount(2);
   await expect(list).not.toContainText('CC0 기본 지도');
@@ -82,6 +84,7 @@ test('detail locations exclude the base and navigate between registered bounds w
   await page.locator('.leaflet-container').click({position: {x: 780, y: 210}});
   await page.getByRole('button', {name: '측정 완료'}).click();
   const measurement = await page.getByTestId('measurement-result').textContent();
+  if(await page.getByRole('button',{name:'지도 정보',exact:true}).getAttribute('aria-expanded')!=='true')await page.getByRole('button',{name:'지도 정보',exact:true}).click();
   await list.getByRole('button', {name: 'CC0 태안 지역 위치로 이동'}).click();
   await expect(page.getByText(/^중심:/)).toHaveText(boundsCenter(taeanBounds!));
   await expect(panel).toHaveJSProperty('open', false);
@@ -103,6 +106,7 @@ test('detail navigation shows unavailable statuses and permits metadata-only loc
     await route.fulfill({json: info});
   });
   await page.goto('/'); await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible();
+  await page.getByRole('button',{name:'지도 정보',exact:true}).click();
   const list = page.getByRole('list', {name: '상세 지역 목록'});
   await expect(list.getByRole('button')).toHaveCount(3);
   await expect(list.getByRole('button', {name: 'CC0 항구 지역 위치로 이동'})).toBeDisabled();
@@ -120,6 +124,7 @@ test('detail navigation explains an empty detail registry', async ({page}) => {
     await route.fulfill({json: info});
   });
   await page.goto('/'); await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible();
+  await page.getByRole('button',{name:'지도 정보',exact:true}).click();
   await expect(page.locator('.detail-locations')).toContainText('등록된 상세 지역이 없습니다.');
 });
 
@@ -127,6 +132,7 @@ test('detail navigation remains usable on a narrow offline screen', async ({page
   await page.setViewportSize({width: 390, height: 844});
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
   await page.goto('/'); await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible();
+  await page.getByRole('button',{name:'지도 정보',exact:true}).click();
   const list = page.getByRole('list', {name: '상세 지역 목록'});
   const button = list.getByRole('button', {name: 'CC0 항구 지역 위치로 이동'}), bounds = (await button.boundingBox())!;
   expect(bounds.x).toBeGreaterThanOrEqual(0); expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);

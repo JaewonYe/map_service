@@ -1,5 +1,5 @@
 'use client';
-import {useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useRef,useState} from 'react';
 import L from 'leaflet';
 import MapMeasurements from './MapMeasurements';
 import DetailLocations from './DetailLocations';
@@ -11,6 +11,17 @@ type Info=Pick<CatalogInfo,'center'|'zoom'|'minZoom'|'maxZoom'|'sources'|'warnin
 export default function MapCanvas(){
   const container=useRef<HTMLDivElement>(null);
   const help=useRef<HTMLDialogElement>(null);
+  const [sidebarHost,setSidebarHost]=useState<HTMLDivElement|null>(null);
+  const [facilitiesExpanded,setFacilitiesExpanded]=useState(false);
+  const [mapAction,setMapAction]=useState(0);
+  const [infoOpen,setInfoOpen]=useState(false);
+  const expandFacilities=useCallback((value: boolean | ((previous: boolean)=>boolean))=>{setFacilitiesExpanded(value);setInfoOpen(false);},[]);
+  const startMapAction=()=>{setMapAction(value=>value+1);if(matchMedia('(max-width:800px)').matches)setFacilitiesExpanded(false);setInfoOpen(false);};
+  useEffect(()=>{
+    const media=matchMedia('(min-width:801px)');
+    const resize=()=>setFacilitiesExpanded(media.matches);resize();
+    media.addEventListener('change',resize);return()=>media.removeEventListener('change',resize);
+  },[]);
   const [activeLayer,setActiveLayer]=useState('');
   const [height,setHeight]=useState('');
   const [mapInstance,setMapInstance]=useState<L.Map|null>(null);
@@ -25,7 +36,8 @@ export default function MapCanvas(){
         const response=await fetch('/api/map-info',{signal:abort.signal});const data=await response.json();
         if(!response.ok)throw Error(data.error||'메타데이터 오류');if(abort.signal.aborted||!container.current)return;
         const metadata=data as Info;setInfo(metadata);setCenter(metadata.center);setZoom(metadata.zoom);
-        map=L.map(container.current,{minZoom:metadata.minZoom,maxZoom:metadata.maxZoom,zoomSnap:1}).setView(metadata.center,metadata.zoom);
+        map=L.map(container.current,{minZoom:metadata.minZoom,maxZoom:metadata.maxZoom,zoomSnap:1,zoomControl:false,trackResize:false,zoomAnimation:!matchMedia('(prefers-reduced-motion: reduce)').matches,fadeAnimation:!matchMedia('(prefers-reduced-motion: reduce)').matches}).setView(metadata.center,metadata.zoom);
+        L.control.zoom({position:'bottomleft'}).addTo(map);
         L.control.scale({imperial:false}).addTo(map);
         const boundary=L.featureGroup(metadata.sources.filter(source=>source.bounds&&source.status==='ready').map(source=>{
           const b=source.bounds!;
@@ -53,8 +65,8 @@ export default function MapCanvas(){
           if(id!=='satellite'&&b)L.rectangle([[b.south,b.west],[b.north,b.east]],{
             color:id==='street'?'#087f8c':'#a855f7',weight:2,fill:false,interactive:false}).addTo(boundary);
         }
-        setMessage(Object.keys(layers).length?'':'사용 가능한 지도 데이터가 없습니다. 오른쪽의 지도 데이터 준비를 확인하세요.');
-        L.control.layers(layers,{'데이터 경계':boundary},{collapsed:false}).addTo(map);
+        setMessage(Object.keys(layers).length?'':'사용 가능한 지도 데이터가 없습니다. 지도 정보의 데이터 준비를 확인하세요.');
+        L.control.layers(layers,{'데이터 경계':boundary},{collapsed:matchMedia('(max-width:800px)').matches}).addTo(map);
         map.on('baselayerchange',(event:L.LayersControlEvent)=>{
           setActiveLayer(event.name);setMessage('');
           const id=(Object.keys(names) as LayerId[]).find(id=>names[id]===event.name),b=id&&metadata.layers[id].bounds;
@@ -77,12 +89,32 @@ export default function MapCanvas(){
     }).catch(error=>{if(!abort.signal.aborted)setHeight(error instanceof Error?error.message:'고도 조회 실패');});
     return()=>abort.abort();
   },[clicked,info]);
-  return <section className="map-panel"><div className="map-canvas" ref={container} aria-label="오프라인 지도"/>
-    <aside className="map-info" aria-label="지도 좌표 정보">
-      <div data-testid="map-center">중심: {center?`${center[0].toFixed(6)}, ${center[1].toFixed(6)}`:'—'}</div>
-      <div>Zoom: <span data-testid="zoom">{zoom??'—'}</span></div>
-      <div data-testid="clicked">클릭: {clicked?`${clicked[0].toFixed(6)}, ${clicked[1].toFixed(6)}`:'지도를 클릭하세요'}</div>
-      {info?.layers.elevation.available&&<div data-testid="elevation-value">고도: {height||'지도를 클릭하세요'}</div>}
+  useEffect(()=>{
+    if(!mapInstance||!container.current)return;
+    let frame=0;
+    const observer=new ResizeObserver(()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{
+      const element=container.current;if(!element)return;
+      if(mapInstance.getSize().equals(L.point(element.clientWidth,element.clientHeight)))return;
+      const center=mapInstance.getCenter(),zoom=mapInstance.getZoom();
+      mapInstance.invalidateSize({animate:false});
+      const options={animate:false,reset:true}; // Preserve the precise camera after a real layout resize.
+      mapInstance.setView(center,zoom,options);
+    });});
+    observer.observe(container.current);
+    return()=>{observer.disconnect();cancelAnimationFrame(frame);};
+  },[mapInstance]);
+  return <section className="map-workspace" data-boundary-editing={boundaryEditing || undefined}>
+    <div className="facility-sidebar-slot" ref={setSidebarHost}/>
+    <section className="map-panel" aria-label="지도 작업 영역"><div className="map-stage">
+    <div className="map-canvas" ref={container} role="region" aria-label="오프라인 지도"/>
+    <div className="map-toolbar">
+      {mapInstance&&<MapMeasurements map={mapInstance} disabled={boundaryEditing} onStartAction={startMapAction} onRegisterBuilding={setBuildingPoint}/>}
+      <button type="button" className="map-info-toggle" disabled={boundaryEditing} aria-controls="map-data-panel" aria-expanded={infoOpen}
+        onClick={()=>{if(!infoOpen)setMapAction(value=>value+1);setInfoOpen(value=>!value);if(matchMedia('(max-width:800px)').matches)setFacilitiesExpanded(false);}}>지도 정보</button>
+    </div>
+    <section id="map-data-panel" className="map-data-panel" aria-label="지도 데이터 정보" hidden={!infoOpen}>
+      <div className="panel-heading"><h2>지도 정보</h2><button type="button" onClick={()=>setInfoOpen(false)} aria-label="지도 정보 닫기">닫기</button></div>
+      <p className="map-basemap-note">앱 테마와 관계없이 원본 지도 영상의 색상을 유지합니다.</p>
       {activeLayer==='고도 지도'&&<small className="elevation-legend">고도 색상: 낮음 <span/> 높음<br/>{info?.layers.elevation.minElevation}–{info?.layers.elevation.maxElevation} m · {info?.layers.elevation.verticalDatum}</small>}
       <small>EPSG:3857 · {info?.osm.mode==='online'?'온라인 OSM 허용':'오프라인'} · 파랑: 기본 지도 · 노랑: 상세 지역</small>
       {info?.mode==='multi'&&mapInstance&&<DetailLocations map={mapInstance} sources={info.sources}/>}
@@ -92,8 +124,8 @@ export default function MapCanvas(){
         {info.warnings.map((warning,index)=><small key={index}>{warning}</small>)}
       </details>}
       {info&&!info.layers.street.available&&<><small>일반 지도 데이터가 준비되지 않았습니다.</small>{info.osm.reason&&<small>{info.osm.reason}</small>}</>}
-    </aside>
     <button className="map-data-help" onClick={()=>help.current?.showModal()}>지도 데이터 준비</button>
+    </section>
     <dialog ref={help} className="building-dialog" aria-label="지도 데이터 준비">
       <h2>지도 데이터 준비</h2>
       <p>위성영상 TPK에는 도로·건물명 지도와 실제 고도값이 포함되지 않습니다. 각 데이터를 별도로 준비하세요.</p>
@@ -106,10 +138,17 @@ export default function MapCanvas(){
       <p>파일·설정 변경 후 서버를 재시작하고 새로고침하세요. 준비되지 않은 레이어는 선택 목록에 표시되지 않습니다.</p>
       <button onClick={()=>help.current?.close()}>닫기</button>
     </dialog>
-    <div className="map-bottom-tools">
-      {message&&<p role="status" className="map-status">{message}</p>}
-      {mapInstance&&<MapMeasurements map={mapInstance} disabled={boundaryEditing} onRegisterBuilding={setBuildingPoint}/>}
+    {mapInstance&&sidebarHost&&<MapBuildings map={mapInstance} mapAction={mapAction} sidebarHost={sidebarHost} expanded={facilitiesExpanded} setExpanded={expandFacilities}
+      onBoundaryEditingChange={setBoundaryEditing} requestedPoint={buildingPoint} onRequestClosed={()=>setBuildingPoint(null)}/>}
     </div>
-    {mapInstance&&<MapBuildings map={mapInstance} onBoundaryEditingChange={setBoundaryEditing} requestedPoint={buildingPoint} onRequestClosed={()=>setBuildingPoint(null)}/>}
+    <aside className="map-info" aria-label="지도 좌표 정보">
+      <div data-testid="map-center">중심: {center?`${center[0].toFixed(6)}, ${center[1].toFixed(6)}`:'—'}</div>
+      <div>Zoom: <span data-testid="zoom">{zoom??'—'}</span></div>
+      <div data-testid="clicked">클릭: {clicked?`${clicked[0].toFixed(6)}, ${clicked[1].toFixed(6)}`:'지도를 클릭하세요'}</div>
+      {info?.layers.elevation.available&&<div data-testid="elevation-value">고도: {height||'지도를 클릭하세요'}</div>}
+      <span className="map-projection">EPSG:3857 · {info?.osm.mode==='online'?'온라인 OSM 허용':'오프라인'}</span>
+      {message&&<p role="status" className="map-status">{message}</p>}
+    </aside>
+    </section>
   </section>;
 }

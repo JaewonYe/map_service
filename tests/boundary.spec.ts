@@ -16,7 +16,7 @@ async function isolate(page:Page,ids:string[]) {
   });
 }
 async function show(page:Page,b:any,filter='') {
-  await page.getByRole('button',{name:'시설 목록',exact:true}).click();
+  if(await page.getByRole('button',{name:'시설 목록',exact:true}).getAttribute('aria-expanded')!=='true')await page.getByRole('button',{name:'시설 목록',exact:true}).click();
   await page.getByRole('searchbox',{name:'시설명 검색'}).fill(filter);
   await page.getByRole('list',{name:'시설 검색 결과'}).getByRole('button',{name:new RegExp(b.name)}).click();
   return page.getByRole('dialog');

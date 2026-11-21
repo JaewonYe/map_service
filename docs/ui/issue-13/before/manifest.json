@@ -1,0 +1,139 @@
+{
+  "stage": "before",
+  "baseURL": "http://127.0.0.1:3120",
+  "fixture": "Isolated ui-13-data; synthetic catalog tiles and three synthetic facilities",
+  "captures": [
+    {
+      "file": "desktop-light-base.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "state": "base",
+      "search": "",
+      "facility": null
+    },
+    {
+      "file": "desktop-light-selected.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "state": "selected",
+      "search": "",
+      "facility": "제1시험장 · 시각 검증용"
+    },
+    {
+      "file": "desktop-light-boundary.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "state": "boundary",
+      "search": "",
+      "facility": "제1시험장 · 시각 검증용"
+    },
+    {
+      "file": "desktop-dark-base.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "state": "base",
+      "search": "",
+      "facility": null
+    },
+    {
+      "file": "desktop-dark-selected.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "state": "selected",
+      "search": "",
+      "facility": "제1시험장 · 시각 검증용"
+    },
+    {
+      "file": "desktop-dark-boundary.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "state": "boundary",
+      "search": "",
+      "facility": "제1시험장 · 시각 검증용"
+    },
+    {
+      "file": "mobile-light-base.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "base",
+      "search": "",
+      "facility": null
+    },
+    {
+      "file": "mobile-light-selected.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "selected",
+      "search": "",
+      "facility": "제1시험장 · 시각 검증용"
+    },
+    {
+      "file": "mobile-light-boundary.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "boundary",
+      "search": "",
+      "facility": "제1시험장 · 시각 검증용"
+    },
+    {
+      "file": "mobile-dark-base.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "base",
+      "search": "",
+      "facility": null
+    },
+    {
+      "file": "mobile-dark-selected.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "selected",
+      "search": "",
+      "facility": "제1시험장 · 시각 검증용"
+    },
+    {
+      "file": "mobile-dark-boundary.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "boundary",
+      "search": "",
+      "facility": "제1시험장 · 시각 검증용"
+    }
+  ]
+}

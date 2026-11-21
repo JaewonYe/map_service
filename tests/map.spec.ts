@@ -25,6 +25,7 @@ test('metadata comes from package, JPEG/PNG and conditional caching work; missin
 test('offline network denial does not break satellite rendering',async({page})=>{
   await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
   await page.goto('/');await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible();
+  await page.getByRole('button',{name:'지도 정보',exact:true}).click();
   await expect(page.getByText('일반 지도 데이터가 준비되지 않았습니다.')).toBeVisible();
 });
 

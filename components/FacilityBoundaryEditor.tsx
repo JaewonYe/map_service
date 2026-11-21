@@ -73,7 +73,7 @@ export default function FacilityBoundaryEditor({map, building, onSaved, onCancel
     }
   }
   return <section ref={panel} tabIndex={-1} className="facility-boundary-editor" aria-label="시설 경계 편집" aria-busy={busy}>
-    <h2>{building.name} · 경계 편집</h2>
+    <div className="boundary-editor-content"><h2>{building.name} · 경계 편집</h2>
     <p>지도에서 경계를 따라 점을 선택하세요. 붉은 점선은 미저장 편집, 청록 실선은 저장된 경계입니다.</p>
     <p role="status" data-testid="boundary-point-count">정점 {points.length} / {MAX_BOUNDARY_VERTICES}개</p>
     <output aria-live="polite">{preview.metrics ? `면적 ${formatArea(preview.metrics.area)} · 둘레 ${formatDistance(preview.metrics.perimeter)}` : preview.error}</output>
@@ -99,11 +99,11 @@ export default function FacilityBoundaryEditor({map, building, onSaved, onCancel
           }}>{index + 1}번 정점 수정</button>
         </li>)}</ol>
       </details>
-      <div className="boundary-actions">
-        <button className="boundary-save" type="button" disabled={!preview.boundary} onClick={() => void save()}>{busy ? '경계 저장 중…' : '경계 저장'}</button>
-        <button type="button" onClick={onCancel}>경계 편집 취소</button>
+    </fieldset></div>
+      <div className="boundary-editor-footer">
+        <button className="boundary-save" type="button" disabled={busy || !preview.boundary} onClick={() => void save()}>{busy ? '경계 저장 중…' : '경계 저장'}</button>
+        <button type="button" disabled={busy} onClick={onCancel}>경계 편집 취소</button>
       </div>
-    </fieldset>
-    <small>시설 관리용 경계이며 법적 측량 경계가 아닙니다. Esc로 취소할 수 있습니다.</small>
+    <small>관리용 경계 · 법적 측량 경계 아님 · Esc 취소</small>
   </section>;
 }

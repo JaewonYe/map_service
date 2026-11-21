@@ -8,7 +8,7 @@ import {useMapPointDrawing} from './useMapPointDrawing';
 
 type Kind = 'distance' | 'area';
 type ContextMenu = {point: Coordinate; x: number; y: number};
-export default function MapMeasurements({map, onRegisterBuilding, disabled = false}: {map: L.Map; disabled?: boolean; onRegisterBuilding: (point: Coordinate) => void}) {
+export default function MapMeasurements({map, onRegisterBuilding, disabled = false, onStartAction}: {map: L.Map; disabled?: boolean; onStartAction?: () => void; onRegisterBuilding: (point: Coordinate) => void}) {
   const [kind, setKind] = useState<Kind | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [selectingFacility, setSelectingFacility] = useState(false);
@@ -109,7 +109,7 @@ export default function MapMeasurements({map, onRegisterBuilding, disabled = fal
     });
   }, [map, points, kind, invalid]);
 
-  function start(next: Kind, first?: Coordinate) {setSelectingFacility(false); setMenu(null); setKind(next); setPoints(first ? [first] : []); setDrawing(true);}
+  function start(next: Kind, first?: Coordinate) {onStartAction?.();setSelectingFacility(false); setMenu(null); setKind(next); setPoints(first ? [first] : []); setDrawing(true);}
   function stop() {setSelectingFacility(false); setMenu(null); setDrawing(false);}
   function undo() {setSelectingFacility(false); setMenu(null); setPoints(previous => previous.slice(0, -1)); if (kind) setDrawing(true);}
   function clear() {setSelectingFacility(false); setMenu(null); setDrawing(false); setKind(null); setPoints([]);}
@@ -126,18 +126,18 @@ export default function MapMeasurements({map, onRegisterBuilding, disabled = fal
     }
   }
 
-  return <><aside className="map-measurements" aria-label="거리와 면적 측정">
-    <fieldset disabled={disabled} className="measurement-fieldset"><div className="facility-tools">
-      <button type="button" aria-pressed={selectingFacility} onClick={() => {setMenu(null); setDrawing(false); setSelectingFacility(value => !value);}}>시설·건물 추가</button>
-      {selectingFacility && <button type="button" onClick={() => setSelectingFacility(false)}>위치 선택 취소</button>}
+  return <><aside className="map-measurements" data-active={!!kind || selectingFacility} data-disabled={disabled} aria-label="거리와 면적 측정">
+    <fieldset disabled={disabled} className="measurement-fieldset"><div className="map-tool-row"><div className="facility-tools">
+      <button type="button" className="primary" aria-label="시설·건물 추가" aria-pressed={selectingFacility} onClick={() => {onStartAction?.();setMenu(null); setDrawing(false); setSelectingFacility(value => !value);}}>시설 추가</button>
     </div>
-    <p className="measurement-help" role="status">{selectingFacility ? '지도에서 등록할 위치를 선택하세요. Esc로 취소할 수 있습니다.' : '시설·건물을 추가하고 마커를 눌러 정보를 확인하세요.'}</p>
-    <strong>거리·면적 측정</strong>
     <div className="measurement-buttons" role="group" aria-label="측정 도구">
       <button type="button" aria-pressed={!drawing && !selectingFacility} onClick={stop}>이동</button>
       <button type="button" aria-pressed={drawing && kind === 'distance'} onClick={() => start('distance')}>거리</button>
       <button type="button" aria-pressed={drawing && kind === 'area'} onClick={() => start('area')}>면적</button>
     </div>
+    </div><div className="measurement-readout">
+    {selectingFacility && <button type="button" onClick={() => setSelectingFacility(false)}>위치 선택 취소</button>}
+    <p className="measurement-help" role="status">{selectingFacility ? '지도에서 등록할 위치를 선택하세요. Esc로 취소할 수 있습니다.' : '마커를 눌러 시설 정보를 확인하세요.'}</p>
     <p className="measurement-help">{drawing ? (kind === 'distance' ? '지도를 차례로 클릭해 경로를 선택하세요.' : '경계를 따라 점을 선택하세요. 마지막 변은 자동 연결됩니다.') : kind ? '측정 결과가 유지됩니다. 지도를 이동하거나 새 측정을 시작하세요.' : '지도 우클릭 또는 측정 버튼으로 거리·면적 측정을 시작하세요.'}</p>
     <div data-testid="measurement-points">선택한 점: {points.length}개</div>
     <output data-testid="measurement-result" aria-live="polite">
@@ -150,7 +150,7 @@ export default function MapMeasurements({map, onRegisterBuilding, disabled = fal
       <button type="button" onClick={undo} disabled={!points.length}>마지막 점 취소</button>
       <button type="button" onClick={clear} disabled={!kind}>초기화</button>
     </div>
-  </fieldset></aside>
+    </div></fieldset></aside>
     {menu && <div ref={menuElement} role="menu" aria-label="지도 메뉴" className="map-context-menu"
       style={{left: menu.x, top: menu.y, maxWidth: Math.max(0, map.getSize().x - 16)}}
       onKeyDown={navigateMenu} onContextMenu={event => event.preventDefault()}>

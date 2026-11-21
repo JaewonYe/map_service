@@ -62,6 +62,7 @@ test('failed save keeps the editor draft and existing stored record', async ({pa
       ? route.fulfill({status: 503, json: {error: '테스트 저장 공간 오류'}}) : route.continue());
     await dialog.getByRole('button', {name: '저장', exact: true}).click();
     await expect(dialog.getByRole('alert')).toHaveText('테스트 저장 공간 오류');
+    await expect(dialog.getByRole('alert')).toBeFocused();
     await expect(dialog.getByRole('textbox', {name: '설명', exact: true})).toHaveValue('실패해도 보존할 입력');
     expect((await (await request.get(`/api/buildings/${building.id}`)).json()).building.description).toBe('');
     await dialog.getByRole('button', {name: '취소', exact: true}).click();
@@ -271,7 +272,7 @@ test('an offscreen list selection pans to the latest detail coordinates and pres
   await expect(details.getByText('최신 상세 정보')).toBeVisible();
   await expect(page.getByTestId('map-center')).toHaveText('중심: 35.123456, 129.123456');
   await expect(page.getByTestId('zoom')).toHaveText(zoom);
-  await expect(panel.getByRole('button', {name: '시설 목록', exact: true})).toHaveAttribute('aria-expanded', 'false');
+  await expect(panel.getByRole('button', {name: '시설 목록', exact: true})).toHaveAttribute('aria-expanded', 'true');
   await details.getByRole('button', {name: '닫기', exact: true}).click();
   await expect(panel.getByRole('button', {name: '시설 목록', exact: true})).toBeFocused();
   await page.getByRole('button', {name: `${record.name} 시설·건물 정보 보기`, exact: true}).click();
@@ -386,7 +387,7 @@ test('mobile and keyboard facility selection leaves map measurement and registra
   await page.keyboard.press('Tab'); await expect(panel.getByRole('button', {name: /West Field/})).toBeFocused();
   const bounds = (await panel.boundingBox())!, addBounds = (await page.getByRole('button', {name: '시설·건물 추가', exact: true}).boundingBox())!;
   expect(bounds.x).toBeGreaterThanOrEqual(0); expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
-  expect(bounds.y + bounds.height).toBeLessThanOrEqual(addBounds.y);
+  expect(bounds.y).toBeGreaterThanOrEqual(addBounds.y + addBounds.height);
   await page.screenshot({path: testInfo.outputPath('facility-list-mobile.png')});
   await page.keyboard.press('Enter'); await expect(page.getByRole('dialog', {name: '시설·건물 정보', exact: true})).toBeVisible();
   await expect(page.getByTestId('map-center')).toHaveText('중심: 35.100000, 129.100000');

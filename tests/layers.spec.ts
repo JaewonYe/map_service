@@ -14,6 +14,7 @@ test('satellite, general and elevation switch offline; native zoom is overzoomed
   for(let z=17;z<=19;z++){await page.locator('.leaflet-control-zoom-in').click();await expect(page.getByTestId('zoom')).toHaveText(String(z));}
   await expect(page.getByTestId('zoom')).toHaveText('19');await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible();
   const tile=page.locator('.leaflet-tile-loaded').first();await expect(tile).toHaveAttribute('src',/\/api\/elevation\/tiles\/17\//);
+  await page.getByRole('button',{name:'지도 정보',exact:true}).click();
   await expect(page.getByText('고도 색상: 낮음')).toBeVisible();expect(external).toEqual([]);
   await page.getByRole('button',{name:'지도 데이터 준비',exact:true}).click();
   await expect(page.getByRole('dialog',{name:'지도 데이터 준비'})).toContainText('DEM GeoTIFF');

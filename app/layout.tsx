@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import 'leaflet/dist/leaflet.css';
 import './globals.css';
+import {themeBootstrap} from '../lib/theme';
 
 export const metadata: Metadata = {
   title: '태안군 지도',
@@ -8,5 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ko"><body>{children}</body></html>;
+  // Only this root attribute is set before hydration by the static theme bootstrap.
+  return <html lang="ko" suppressHydrationWarning><head>
+    <meta name="theme-color" content="#172b4d"/>
+    <script dangerouslySetInnerHTML={{__html: themeBootstrap}}/>
+  </head><body>{children}</body></html>;
 }

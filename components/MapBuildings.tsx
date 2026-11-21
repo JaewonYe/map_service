@@ -2,8 +2,10 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState, type FormEvent} from 'react';
 import L from 'leaflet';
+import {createPortal} from 'react-dom';
 import {BUILDING_CATEGORIES, FIELD_LIMITS, type Building, type BuildingCategory, type BuildingInput} from '../lib/buildings/model';
 import {filterBuildings, matchesBuilding, mergeBuildingSnapshot} from '../lib/buildings/search';
+import ThemeControl from './ThemeControl';
 import FacilityBoundaryEditor from './FacilityBoundaryEditor';
 import {boundaryMetrics, boundaryPoints} from '../lib/buildings/boundary';
 import {formatArea, formatDistance} from '../lib/map-measure';
@@ -15,9 +17,9 @@ async function responseData(response: Response) {
   return body;
 }
 type Editor = {building: Building | null; point: Coordinate};
-type Props = {map: L.Map; requestedPoint: Coordinate | null; onRequestClosed: () => void; onBoundaryEditingChange: (editing: boolean) => void};
+type Props = {mapAction: number; sidebarHost: HTMLElement; expanded: boolean; setExpanded: (value: boolean | ((previous: boolean)=>boolean))=>void; map: L.Map; requestedPoint: Coordinate | null; onRequestClosed: () => void; onBoundaryEditingChange: (editing: boolean) => void};
 
-export default function MapBuildings({map, requestedPoint, onRequestClosed, onBoundaryEditingChange}: Props) {
+export default function MapBuildings({map, requestedPoint, onRequestClosed, onBoundaryEditingChange, sidebarHost, expanded, setExpanded, mapAction}: Props) {
   const [boundaryTarget, setBoundaryTarget] = useState<Building | null>(null);
   const boundaryBusy = useRef(false);
   useEffect(() => {onBoundaryEditingChange(!!boundaryTarget); return () => onBoundaryEditingChange(false);}, [boundaryTarget, onBoundaryEditingChange]);
@@ -28,16 +30,22 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
   const [detailError, setDetailError] = useState('');
   const [detailLoading, setDetailLoading] = useState(false);
   const [retryId, setRetryId] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
+  const collapseForMap = useCallback(()=>{if(matchMedia('(max-width:800px)').matches)setExpanded(false);},[setExpanded]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<BuildingCategory | ''>('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useEffect(()=>{if(mapAction && !boundaryTarget)setEditor(null);},[mapAction]);
   const selectionRequest = useRef(0);
   const listRequest = useRef(0);
   const revision = useRef(0);
   const changes = useRef(new Map<string, {revision: number; building: Building | null}>());
   const toggle = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement>(map.getContainer());
+  useEffect(()=>{
+    if(!expanded || editor || boundaryTarget || !matchMedia('(max-width:800px)').matches)return;
+    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();setExpanded(false);toggle.current?.focus();}};
+    document.addEventListener('keydown',escape);return()=>document.removeEventListener('keydown',escape);
+  },[expanded,editor,boundaryTarget,setExpanded]);
   const visible = useMemo(() => filterBuildings(buildings, search, category), [buildings, search, category]);
 
   async function load(signal?: AbortSignal) {
@@ -65,7 +73,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
     if (requestedPoint && !boundaryBusy.current) {
       setBoundaryTarget(null);
       selectionRequest.current++; setDetailLoading(false); setDetailError(''); setRetryId(null);
-      setSelectedId(null); setExpanded(false); returnFocus.current = map.getContainer();
+      setSelectedId(null); collapseForMap(); returnFocus.current = map.getContainer();
       setEditor({building: null, point: requestedPoint});
     }
   }, [requestedPoint, map]);
@@ -82,7 +90,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
     setBoundaryTarget(null); setEditor(null);
     const sequence = ++selectionRequest.current;
     returnFocus.current = fromList && toggle.current ? toggle.current : map.getContainer();
-    setExpanded(false); setDetailLoading(true); setDetailError(''); setRetryId(null);
+    collapseForMap(); setDetailLoading(true); setDetailError(''); setRetryId(null);
     try {
       const response = await fetch(`/api/buildings/${id}`, {cache: 'no-store'});
       if (sequence !== selectionRequest.current) return;
@@ -111,7 +119,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
         setDetailError(error instanceof Error ? error.message : '시설 정보를 불러오지 못했습니다.'); setRetryId(id);
       }
     } finally {if (sequence === selectionRequest.current) setDetailLoading(false);}
-  }, [map, search, category, boundaryTarget]);
+  }, [map, search, category, boundaryTarget, collapseForMap]);
 
   useEffect(() => {
     const group = L.layerGroup().addTo(map);
@@ -164,12 +172,12 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
   }
 
   return <>
-    {!boundaryTarget && <aside className="facility-panel" aria-label="시설 목록">
-      <button ref={toggle} type="button" className="facility-list-toggle" aria-label="시설 목록" aria-expanded={expanded} aria-controls="facility-list-content"
-        onClick={() => setExpanded(value => !value)}>시설 목록 <span aria-hidden="true">{expanded ? '접기' : '펼치기'}{(search.trim() || category) && ' · 조건 적용 중'}</span></button>
+    {!boundaryTarget && createPortal(<aside className="facility-panel" data-expanded={expanded} aria-label="시설 목록">
+      <div className="facility-panel-heading"><h2>시설 찾기</h2><button ref={toggle} type="button" className="facility-list-toggle" aria-label="시설 목록" aria-expanded={expanded} aria-controls="facility-list-content"
+        onClick={() => setExpanded(value => !value)}><span aria-hidden="true">{expanded ? '접기' : '펼치기'}{(search.trim() || category) && ' · 조건 적용 중'}</span></button></div>
       {expanded && <div id="facility-list-content" className="facility-list-content">
-        <label>시설명 검색<input type="search" value={search} onChange={event => changeFilters(event.target.value, category)} placeholder="시설명으로 찾기"/></label>
-        <label>시설 분류<select value={category} onChange={event => changeFilters(search, event.target.value as BuildingCategory | '')}>
+        <label>시설명 검색<input type="search" value={search} onChange={event => changeFilters(event.target.value, category)} name="facility-search" autoComplete="off" placeholder="시설명을 입력하세요…"/></label>
+        <label>시설 분류<select name="facility-category" value={category} onChange={event => changeFilters(search, event.target.value as BuildingCategory | '')}>
           <option value="">전체</option>{BUILDING_CATEGORIES.map(value => <option key={value} value={value}>{value}</option>)}
         </select></label>
         <div className="facility-list-actions">
@@ -185,12 +193,12 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
             : <ul className="facility-results" aria-label="시설 검색 결과">{visible.map(building => <li key={building.id}>
               <button type="button" aria-current={selectedId === building.id ? 'location' : undefined}
                 onClick={() => void openBuilding(building.id, true)}>
-                <span>{building.name}</span><small>{building.category}</small>
+                <span>{building.name}</span><small>{building.category}{building.address && ` · ${building.address}`}</small>
               </button>
             </li>)}</ul>}
         </>}
       </div>}
-    </aside>}
+    </aside>, sidebarHost)}
     {(detailLoading || detailError) && <div className="building-load-error" role="status">
       <span>{detailLoading ? '시설 정보를 불러오는 중…' : detailError}</span>
       {detailError && <button type="button" onClick={retryDetail}>
@@ -199,11 +207,11 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
     {editor && <BuildingDialog key={editor.building?.id || 'new'} editor={editor} returnFocus={returnFocus.current}
       onClose={close} onSaved={saved} onDeleted={deleted} onBoundary={() => {
         if (!editor.building) return;
-        selectionRequest.current++; setBoundaryTarget(editor.building); setEditor(null); setExpanded(false);
+        selectionRequest.current++; setBoundaryTarget(editor.building); setEditor(null); collapseForMap();
       }}/>}
-    {boundaryTarget && <FacilityBoundaryEditor key={`${boundaryTarget.id}:${boundaryTarget.version}`} map={map} building={boundaryTarget}
+    {boundaryTarget && createPortal(<FacilityBoundaryEditor key={`${boundaryTarget.id}:${boundaryTarget.version}`} map={map} building={boundaryTarget}
       onBusy={value => {boundaryBusy.current = value;}} onSaved={building => {setBoundaryTarget(null); saved(building);}}
-      onCancel={() => {if (boundaryBusy.current) return; setBoundaryTarget(null); setEditor(null); map.getContainer().focus();}}/>}
+      onCancel={() => {if (boundaryBusy.current) return; setBoundaryTarget(null); setEditor(null); map.getContainer().focus();}}/>, sidebarHost)}
   </>;
 }
 
@@ -214,7 +222,7 @@ function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted, onBou
   const {building, point} = editor;
   const alive = useRef(false), abort = useRef<AbortController | null>(null);
   const [confirmBoundary, setConfirmBoundary] = useState(false);
-  const dialog = useRef<HTMLDialogElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null), errorSummary = useRef<HTMLParagraphElement>(null);
   const [input, setInput] = useState({name: building?.name || '', description: building?.description || '',
     category: building?.category || BUILDING_CATEGORIES[0], address: building?.address || '', contact: building?.contact || '', website: building?.website || '',
     latitude: String(Number(point[0].toFixed(7))), longitude: String(Number(point[1].toFixed(7)))});
@@ -222,9 +230,15 @@ function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted, onBou
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [confirmDelete, setConfirmDelete] = useState(false);
   useEffect(() => {
     alive.current = true;
-    const element = dialog.current!; element.showModal();
+    const element = dialog.current!; if (editing) element.showModal(); else {element.show();element.focus({preventScroll:true});element.scrollTop=0;}
     return () => {alive.current = false; abort.current?.abort(); element.close(); returnFocus.focus({preventScroll: true});};
-  }, [returnFocus]);
+  }, [returnFocus, editing]);
+  useEffect(()=>{
+    if(editing)return;
+    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&!busy){event.preventDefault();onClose();}};
+    document.addEventListener('keydown',escape);return()=>document.removeEventListener('keydown',escape);
+  },[editing,busy,onClose]);
+  useEffect(()=>{if(error)errorSummary.current?.focus();},[error]);
   const change = (key: keyof typeof input, value: string) => setInput(previous => ({...previous, [key]: value}));
 
   async function save(event: FormEvent) {
@@ -262,21 +276,23 @@ function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted, onBou
   }
   const date = (value: string) => new Intl.DateTimeFormat('ko-KR', {dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Seoul'}).format(new Date(value));
 
-  return <dialog ref={dialog} className="building-dialog" aria-labelledby="building-dialog-title"
+  return <div role={!editing && building ? 'region' : undefined} aria-label={!editing && building ? '선택 시설' : undefined} className={!editing && building ? 'facility-selection' : undefined}>
+    <dialog ref={dialog} tabIndex={-1} className={`building-dialog ${!editing && building ? 'facility-details-card' : ''}`} aria-labelledby="building-dialog-title"
     onCancel={event => {event.preventDefault(); if (!busy) onClose();}}>
-    <h2 id="building-dialog-title">{building ? (editing ? '시설·건물 정보 수정' : '시설·건물 정보') : '시설·건물 정보 등록'}</h2>
+    <h2 id="building-dialog-title" className={!editing && building ? 'sr-only' : undefined}>{building ? (editing ? '시설·건물 정보 수정' : '시설·건물 정보') : '시설·건물 정보 등록'}</h2>
+    {editing && <ThemeControl label="편집창 화면 테마"/>}
     {!editing && building ? <>
       <h3>{building.name}</h3>
-      <dl className="facility-details">
-        <dt>용도·분류</dt><dd>{building.category}</dd>
-        <dt>설명</dt><dd>{building.description || '등록된 설명이 없습니다.'}</dd>
+      <span className="facility-category-badge">{building.category}</span>
+      <p className="facility-description">{building.description || '등록된 설명이 없습니다.'}</p>
+      <details className="facility-more"><summary>시설 상세 정보</summary><dl className="facility-details">
         <dt>주소</dt><dd>{building.address || '—'}</dd>
         <dt>연락처</dt><dd>{building.contact || '—'}</dd>
         <dt>관련 URL</dt><dd>{/^https?:\/\//i.test(building.website) ? <a href={building.website} target="_blank" rel="noopener noreferrer">{building.website}</a> : '—'}</dd>
         <dt>위치</dt><dd>{building.latitude.toFixed(7)}, {building.longitude.toFixed(7)}</dd>
-      </dl>
+      </dl></details>
       <p>{building.boundary ? `저장된 경계 · 면적 ${formatArea(boundaryMetrics(building.boundary).area)} · 둘레 ${formatDistance(boundaryMetrics(building.boundary).perimeter)}` : '저장된 경계 없음'}</p>
-      {error && <p className="building-error" role="alert">{error}</p>}
+      {error && <p ref={errorSummary} tabIndex={-1} className="building-error" role="alert">{error}</p>}
       <div className="building-dialog-actions">
         <button className="boundary-start" type="button" disabled={busy} onClick={onBoundary}>{building.boundary ? '경계 수정' : '경계 추가'}</button>
         {building.boundary && <button className="boundary-remove" type="button" disabled={busy} onClick={() => setConfirmBoundary(true)}>경계 제거</button>}
@@ -305,16 +321,16 @@ function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted, onBou
         </div>
       </fieldset>
       {building && <p className="building-dates">등록 {date(building.createdAt)} · 수정 {date(building.updatedAt)}</p>}
-      {error && <p className="building-error" role="alert">{error}</p>}
+      {error && <p ref={errorSummary} tabIndex={-1} className="building-error" role="alert">{error}</p>}
       {confirmDelete ? <div className="building-delete-confirm">
         <p>이 시설·건물 정보를 삭제하시겠습니까?</p>
-        <button type="button" disabled={busy} onClick={() => void remove()}>삭제 확인</button>
+        <button className="danger" type="button" disabled={busy} onClick={() => void remove()}>삭제 확인</button>
         <button type="button" disabled={busy} onClick={() => setConfirmDelete(false)}>돌아가기</button>
       </div> : <div className="building-dialog-actions">
         <button type="submit" disabled={busy}>{busy ? '저장 중…' : '저장'}</button>
         <button type="button" disabled={busy} onClick={onClose}>취소</button>
-        {building && <button type="button" disabled={busy} onClick={() => setConfirmDelete(true)}>삭제</button>}
+        {building && <button className="danger" type="button" disabled={busy} onClick={() => setConfirmDelete(true)}>삭제</button>}
       </div>}
     </form>}
-  </dialog>;
+  </dialog></div>;
 }
