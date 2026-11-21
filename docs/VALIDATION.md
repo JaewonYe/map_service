@@ -240,3 +240,9 @@ main 디자인 기준 반영 후 로컬 typecheck, Node 앱 83개/집계 도구 
 보완 후 로컬 typecheck와 해당 시나리오 10회 반복(각 3회 추가 크기 전환) 모두 통과했다. 이 반복 수는 앱 기본 회귀 50개와 별도로 기록한다. 이후 전체 회귀와 새 최종 SHA의 PR/main 결과를 완료 댓글에 기록한다. 최초 실패 artifact `browser-diagnostics-44936595555-1`(ID 14718974548) 및 conversion artifact(ID 14720125082)의 업로드/7일 만료를 확인했다. 실패 원인은 job 로그로 확인했으며 원격 trace 파일을 내려받아 검토했다고 주장하지 않는다.
 
 반응형 상태 보완 후 전체 Playwright 50개도 로컬에서 다시 통과했다(실패/flaky/스킵 0). 같은 촬영 도구로 변경 후 12장을 다시 캡처했다. 시각/테마/기본 배치는 유지되며 최초 원격 main 실패 이력과 수정 SHA의 결과를 구분한다.
+
+### 보완 PR의 체크아웃 정체 재시도
+
+보완 코드 `dcdfe26b2d31b6790048f65a7add97f88ee691fc`의 PR run [44937344600](https://github.com/JaewonYe/map_service/actions/runs/44937344600)에서 브라우저 50개·변환·디자인 검사는 통과했다. Node job(ID 136946761788)은 checkout 단계에서 수 분간 진행되지 않았고 아직 typecheck/Node 테스트를 시작하지 못했다. 로그 archive 조회도 준비되지 않은 BlobNotFound를 반환했다. 원인을 코드/네트워크 허용 목록 문제로 단정하지 않으며 이 상태를 Node 테스트 성공이나 실패 수에 합산하지 않는다.
+
+해당 진행 기록을 추가한 새 커밋으로 PR 전체 CI를 다시 시작한다. 기존 concurrency 규칙이 이전 진행 중 실행을 정리하며 workflow·timeout·worker·retry·skip·코드는 바꾸지 않는다. 최종 새 SHA의 실제 전체 검사 결과를 완료 댓글/PR에 별도 기록한다.
