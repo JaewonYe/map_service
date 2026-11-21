@@ -84,3 +84,21 @@ main { flex: 1; min-height: 240px; position: relative; display: flex; }
 .facility-results button small {display:block;margin-top:3px;color:#52616b;}
 .facility-results button:hover,.facility-results button[aria-current="location"] {background:#f4effa;border-color:#6941a5;}
 @media(max-width:600px){.facility-panel{width:280px;max-height:min(260px,max(80px,calc(100% - 530px)));}.facility-list-toggle{min-height:40px;}}
+.measurement-fieldset {border:0;margin:0;padding:0;min-width:0;}
+.facility-boundary-editor {position:absolute;top:185px;right:12px;z-index:1000;box-sizing:border-box;width:360px;max-width:calc(100% - 24px);max-height:calc(100% - 215px);overflow:auto;overscroll-behavior:contain;padding:12px;background:#fff;border:2px solid #be185d;border-radius:6px;font-size:13px;color:#1e293b;}
+.facility-boundary-editor h2 {margin:0 0 8px;font-size:16px;overflow-wrap:anywhere;}
+.facility-boundary-editor p {margin:7px 0;}
+.facility-boundary-editor output {display:block;margin:8px 0;font-weight:600;}
+.facility-boundary-editor fieldset {margin:0;padding:0;border:0;min-width:0;}
+.facility-boundary-editor button {min-height:40px;padding:6px 8px;border:1px solid #aab7c4;background:#fff;border-radius:4px;font:inherit;cursor:pointer;}
+.facility-boundary-editor button:disabled {opacity:.5;cursor:default;}
+.facility-boundary-editor :focus-visible,.facility-boundary-saved:focus-visible {outline:3px solid #be185d;outline-offset:2px;}
+.boundary-actions {display:flex;flex-wrap:wrap;gap:5px;margin:8px 0;}
+.facility-boundary-editor summary {cursor:pointer;min-height:32px;}
+.boundary-coordinate-entry {display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.boundary-coordinate-entry label {display:grid;gap:4px;}
+.boundary-coordinate-entry input {box-sizing:border-box;width:100%;min-width:0;padding:7px;border:1px solid #aab7c4;font:inherit;}
+.boundary-coordinate-list {max-height:120px;overflow:auto;padding-left:20px;}
+.boundary-coordinate-list li {margin-top:5px;overflow-wrap:anywhere;}
+.boundary-coordinate-list button {display:block;}
+@media(max-width:600px){.facility-boundary-editor{top:185px;max-height:min(285px,calc(100% - 440px));}.map-measurements:has(fieldset:disabled){max-height:110px;overflow:auto;}}

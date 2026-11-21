@@ -142,3 +142,95 @@ test('a delayed list snapshot retains unrelated rows and overlays later create, 
   assert.equal(JSON.stringify(snapshot), before);
   assert.deepEqual(mergeBuildingSnapshot([kept], [{id: added.id, building: added}]), [kept, added]);
 });
+
+// Boundary fixtures are synthetic EPSG:4326 positions, never user survey data.
+import {chmod} from 'node:fs/promises';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {boundaryFromPoints, boundaryMetrics, boundaryPoints, normalizeBoundary, MAX_BOUNDARY_VERTICES} from '../lib/buildings/boundary';
+const rectangle = {type: 'Polygon', coordinates: [[[126,36],[126.001,36],[126.001,36.001],[126,36.001],[126,36]]]};
+test('boundary canonicalization closes, rounds, rotates and winds without mutating input', () => {
+  const raw = {type: 'Polygon', coordinates: [[[126.001000001,36.001],[126.001,36],[126,36],[126,36.001]]]};
+  const before = JSON.stringify(raw), normalized = normalizeBoundary(raw);
+  assert.deepEqual(normalized, rectangle); assert.equal(JSON.stringify(raw), before);
+  assert.deepEqual(boundaryFromPoints(boundaryPoints(normalized)), normalized);
+  const metrics = boundaryMetrics(normalized);
+  assert.ok(metrics.area > 9900 && metrics.area < 10200); assert.ok(metrics.perimeter > 400 && metrics.perimeter < 410);
+  assert.deepEqual(parseBuilding({...input, boundary: raw}).boundary, normalized);
+});
+test('boundary rejects unsupported structures, duplicate, degenerate, crossing and touching rings', () => {
+  const poly = (ring: unknown) => ({type:'Polygon', coordinates:[ring]});
+  const invalid: unknown[] = [[], {}, null, {type:'MultiPolygon',coordinates:[[rectangle.coordinates]]},
+    {type:'Polygon',coordinates:[...rectangle.coordinates,...rectangle.coordinates]},
+    poly([[126,36],[126.001,36]]), poly([[126,36],[126,36],[126.001,36.001]]),
+    poly([[126,36],[126.001,36],[126.00100001,36],[126,36.001]]),
+    poly([[126,36],[126.001,36],[126.002,36]]),
+    poly([[126,36],[126.001,36.001],[126,36.001],[126.001,36]]),
+    poly([[126,36],[126.002,36],[126.002,36.002],[126.001,36],[126,36.002]])];
+  for (const boundary of invalid) assert.throws(() => normalizeBoundary(boundary));
+  // null is the explicit remove command; malformed values become client errors.
+  for (const boundary of invalid.filter(value => value !== null)) assert.throws(() => parseBuilding({...input,boundary}), BuildingError);
+  assert.equal(parseBuilding({...input,boundary:null}).boundary,null);
+});
+test('boundary requires finite numeric lon/lat, bounds and supported longitude extent', () => {
+  for (const point of [[NaN,36],[Infinity,36],[126,-Infinity],[181,36],[126,85.1],[36,126],['126',36],[126,36,0]]) {
+    assert.throws(() => normalizeBoundary({type:'Polygon',coordinates:[[point,[126.001,36],[126,36.001]]]}));
+  }
+  for (const ring of [[[179,36],[-179,36],[179,37]], [[-90,0],[90,0],[0,1]]])
+    assert.throws(() => normalizeBoundary({type:'Polygon',coordinates:[ring]}), /날짜변경선/);
+  assert.deepEqual(boundaryPoints(normalizeBoundary(rectangle))[0], [36,126]);
+  const edge = normalizeBoundary({type:'Polygon',coordinates:[[[0,85.05112878],[0.001,85.05112878],[0,85.05]]]});
+  assert.deepEqual(normalizeBoundary(edge),edge);
+  assert.ok(boundaryPoints(edge).every(([lat])=>lat<=85.05112878));
+});
+test('boundary vertex and existing byte limits apply to the complete record', async t => {
+  const ring = Array.from({length:MAX_BOUNDARY_VERTICES}, (_, i) => [126 + 0.01*Math.cos(i*2*Math.PI/MAX_BOUNDARY_VERTICES),36+0.01*Math.sin(i*2*Math.PI/MAX_BOUNDARY_VERTICES)]);
+  const boundary = normalizeBoundary({type:'Polygon',coordinates:[ring]});
+  assert.equal(boundary.coordinates[0].length,129);
+  assert.throws(() => normalizeBoundary({type:'Polygon',coordinates:[[...ring,[126.02,36.02]]]}));
+  const {store,directory} = await fixture(t);
+  const data = {...input,name:'가'.repeat(120),description:'나'.repeat(5000),address:'다'.repeat(300),contact:'라'.repeat(160),website:'https://example.com/'+ 'x'.repeat(2000),boundary};
+  const request = new Request('http://localhost/api/buildings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  assert.deepEqual(await buildingBody(request),data);
+  const record = await store.create(data); assert.deepEqual(await new BuildingStore(directory).get(record.id),record);
+  await assert.rejects(buildingBody(new Request('http://localhost/api/buildings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,padding:'x'.repeat(32768)})})), (e: unknown) => e instanceof BuildingError && e.status===413);
+});
+test('legacy files and old PUT omission preserve boundaries, explicit null removes without touching neighbours', async t => {
+  const {store,directory} = await fixture(t);
+  const legacy = await store.create(input), oldPath = join(directory,`${legacy.id}.json`), bytes = await readFile(oldPath,'utf8');
+  const a = await store.create({...input,boundary:rectangle}), b = await store.create({...input,name:'야외',boundary:rectangle});
+  assert.equal(await readFile(oldPath,'utf8'),bytes); assert.ok(!Object.hasOwn(await store.get(legacy.id),'boundary'));
+  const edited = await store.update(a.id,{...input,name:'이전 클라이언트'},1);
+  assert.deepEqual(edited.boundary,rectangle); assert.equal(edited.id,a.id); assert.equal(edited.createdAt,a.createdAt);
+  assert.equal(edited.version,2);
+  const removed = await store.update(a.id,{...input,boundary:null},2);
+  assert.ok(!Object.hasOwn(removed,'boundary')); assert.equal(removed.version,3);
+  await store.delete(a.id,3); assert.deepEqual(await store.get(b.id),b);
+  assert.equal(await readFile(oldPath,'utf8'),bytes);
+});
+test('boundary persists through independent server process restarts', async t => {
+  const {store,directory} = await fixture(t); const record = await store.create({...input,boundary:rectangle});
+  const script = 'import {BuildingStore} from "./lib/buildings/store.ts"; console.log(JSON.stringify(await new BuildingStore(process.argv[1]).get(process.argv[2])));';
+  for (let i=0;i<2;i++) {
+    const {stdout} = await promisify(execFile)(process.execPath,['--import','tsx','--input-type=module','-e',script,directory,record.id]);
+    assert.deepEqual(JSON.parse(stdout),record);
+  }
+});
+test('boundary updates and removals reject stale versions and invalid geometry without changing disk', async t => {
+  const {store,directory} = await fixture(t); const a=await store.create({...input,boundary:rectangle});
+  const changed=await store.update(a.id,{...input,boundary:{type:'Polygon',coordinates:[[[126,36],[126.002,36],[126,36.002]]]}},1);
+  const path=join(directory,`${a.id}.json`), bytes=await readFile(path,'utf8');
+  for (const boundary of [null,rectangle]) await assert.rejects(store.update(a.id,{...input,boundary},1), (e:unknown)=>e instanceof BuildingError && e.status===409);
+  await assert.rejects(store.update(a.id,{...input,boundary:{type:'Polygon',coordinates:[[[126,36],[126,36],[126,36]]]}},2));
+  assert.equal(await readFile(path,'utf8'),bytes); assert.deepEqual(await store.get(a.id),changed);
+});
+test('real storage write failure preserves saved boundary and permits retry after repair', async t => {
+  const {store,directory}=await fixture(t), record=await store.create({...input,boundary:rectangle});
+  const path=join(directory,`${record.id}.json`), bytes=await readFile(path,'utf8');
+  await chmod(directory,0o500);
+  try {await assert.rejects(store.update(record.id,{...input,boundary:null},1)); assert.equal(await readFile(path,'utf8'),bytes);}
+  finally {await chmod(directory,0o700);}
+  assert.deepEqual(await store.get(record.id),record);
+  assert.ok(!Object.hasOwn(await store.update(record.id,{...input,boundary:null},1),'boundary'));
+  assert.equal((await readdir(directory)).filter(file=>file.endsWith('.tmp')).length,0);
+});

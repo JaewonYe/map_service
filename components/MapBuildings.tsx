@@ -4,6 +4,9 @@ import {useCallback, useEffect, useMemo, useRef, useState, type FormEvent} from 
 import L from 'leaflet';
 import {BUILDING_CATEGORIES, FIELD_LIMITS, type Building, type BuildingCategory, type BuildingInput} from '../lib/buildings/model';
 import {filterBuildings, matchesBuilding, mergeBuildingSnapshot} from '../lib/buildings/search';
+import FacilityBoundaryEditor from './FacilityBoundaryEditor';
+import {boundaryMetrics, boundaryPoints} from '../lib/buildings/boundary';
+import {formatArea, formatDistance} from '../lib/map-measure';
 import type {Coordinate} from '../lib/map-measure';
 
 async function responseData(response: Response) {
@@ -12,9 +15,12 @@ async function responseData(response: Response) {
   return body;
 }
 type Editor = {building: Building | null; point: Coordinate};
-type Props = {map: L.Map; requestedPoint: Coordinate | null; onRequestClosed: () => void};
+type Props = {map: L.Map; requestedPoint: Coordinate | null; onRequestClosed: () => void; onBoundaryEditingChange: (editing: boolean) => void};
 
-export default function MapBuildings({map, requestedPoint, onRequestClosed}: Props) {
+export default function MapBuildings({map, requestedPoint, onRequestClosed, onBoundaryEditingChange}: Props) {
+  const [boundaryTarget, setBoundaryTarget] = useState<Building | null>(null);
+  const boundaryBusy = useRef(false);
+  useEffect(() => {onBoundaryEditingChange(!!boundaryTarget); return () => onBoundaryEditingChange(false);}, [boundaryTarget, onBoundaryEditingChange]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [listStatus, setListStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -56,7 +62,8 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed}: Pro
     return () => {abort.abort(); selectionRequest.current++;};
   }, []);
   useEffect(() => {
-    if (requestedPoint) {
+    if (requestedPoint && !boundaryBusy.current) {
+      setBoundaryTarget(null);
       selectionRequest.current++; setDetailLoading(false); setDetailError(''); setRetryId(null);
       setSelectedId(null); setExpanded(false); returnFocus.current = map.getContainer();
       setEditor({building: null, point: requestedPoint});
@@ -71,6 +78,8 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed}: Pro
   }, [visible, selectedId, editor, onRequestClosed]);
 
   const openBuilding = useCallback(async (id: string, fromList = false) => {
+    if (boundaryBusy.current || boundaryTarget?.id === id) return;
+    setBoundaryTarget(null); setEditor(null);
     const sequence = ++selectionRequest.current;
     returnFocus.current = fromList && toggle.current ? toggle.current : map.getContainer();
     setExpanded(false); setDetailLoading(true); setDetailError(''); setRetryId(null);
@@ -91,20 +100,37 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed}: Pro
         setSelectedId(null); setEditor(null); setDetailError('변경된 시설이 현재 검색 조건에서 제외되었습니다.'); return;
       }
       setSelectedId(id);
-      map.panTo([building.latitude, building.longitude], {animate: false});
+      if (building.boundary) {
+        const bounds = L.latLngBounds(boundaryPoints(building.boundary).map(([lat, lon]) => L.latLng(lat, lon)));
+        bounds.extend([building.latitude, building.longitude]);
+        map.fitBounds(bounds, {animate: false, maxZoom: map.getZoom(), padding: [40, 40]});
+      } else map.panTo([building.latitude, building.longitude], {animate: false});
       setEditor({building, point: [building.latitude, building.longitude]});
     } catch (error) {
       if (sequence === selectionRequest.current) {
         setDetailError(error instanceof Error ? error.message : '시설 정보를 불러오지 못했습니다.'); setRetryId(id);
       }
     } finally {if (sequence === selectionRequest.current) setDetailLoading(false);}
-  }, [map, search, category]);
+  }, [map, search, category, boundaryTarget]);
 
   useEffect(() => {
     const group = L.layerGroup().addTo(map);
     const icon = L.divIcon({className: 'building-marker', iconSize: [28, 28], iconAnchor: [14, 14],
       html: '<svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="13" fill="#6941a5" stroke="white" stroke-width="2"/><path d="M8 21V8h12v13M11 11h2m2 0h2m-6 4h2m2 0h2m-4 6v-3h2v3" fill="none" stroke="white" stroke-width="1.6"/></svg>'});
     for (const building of visible) {
+      if (building.boundary) {
+        const polygon = L.polygon(boundaryPoints(building.boundary).map(([lat, lon]) => L.latLng(lat, lon)), {
+          color: '#6941a5', weight: 3, fillOpacity: 0.18, interactive: !boundaryTarget, bubblingMouseEvents: false, className: 'facility-boundary-saved'
+        }).addTo(group).on('click', () => void openBuilding(building.id));
+        const element = polygon.getElement();
+        element?.setAttribute('tabindex', boundaryTarget ? '-1' : '0'); element?.setAttribute('role', 'button');
+        if (boundaryTarget) element?.setAttribute('aria-disabled', 'true');
+        element?.setAttribute('aria-label', `${building.name} 시설 경계 정보 보기`);
+        element?.addEventListener('keydown', event => {
+          const key = (event as KeyboardEvent).key;
+          if (key === 'Enter' || key === ' ') {event.preventDefault(); void openBuilding(building.id);}
+        });
+      }
       const text = document.createElement('span'); text.textContent = building.name;
       const marker = L.marker([building.latitude, building.longitude], {icon, keyboard: true, bubblingMouseEvents: false})
         .bindTooltip(text, {direction: 'top', className: 'building-tooltip'})
@@ -112,7 +138,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed}: Pro
       marker.getElement()?.setAttribute('aria-label', `${building.name} 시설·건물 정보 보기`);
     }
     return () => {group.remove();};
-  }, [map, visible, openBuilding]);
+  }, [map, visible, openBuilding, boundaryTarget]);
 
   function changeFilters(nextSearch: string, nextCategory: BuildingCategory | '') {
     selectionRequest.current++; setDetailLoading(false); setDetailError(''); setRetryId(null);
@@ -138,7 +164,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed}: Pro
   }
 
   return <>
-    <aside className="facility-panel" aria-label="시설 목록">
+    {!boundaryTarget && <aside className="facility-panel" aria-label="시설 목록">
       <button ref={toggle} type="button" className="facility-list-toggle" aria-label="시설 목록" aria-expanded={expanded} aria-controls="facility-list-content"
         onClick={() => setExpanded(value => !value)}>시설 목록 <span aria-hidden="true">{expanded ? '접기' : '펼치기'}{(search.trim() || category) && ' · 조건 적용 중'}</span></button>
       {expanded && <div id="facility-list-content" className="facility-list-content">
@@ -164,22 +190,30 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed}: Pro
             </li>)}</ul>}
         </>}
       </div>}
-    </aside>
+    </aside>}
     {(detailLoading || detailError) && <div className="building-load-error" role="status">
       <span>{detailLoading ? '시설 정보를 불러오는 중…' : detailError}</span>
       {detailError && <button type="button" onClick={retryDetail}>
         {retryId ? '시설 정보 다시 불러오기' : '목록 다시 불러오기'}</button>}
     </div>}
     {editor && <BuildingDialog key={editor.building?.id || 'new'} editor={editor} returnFocus={returnFocus.current}
-      onClose={close} onSaved={saved} onDeleted={deleted}/>}
+      onClose={close} onSaved={saved} onDeleted={deleted} onBoundary={() => {
+        if (!editor.building) return;
+        selectionRequest.current++; setBoundaryTarget(editor.building); setEditor(null); setExpanded(false);
+      }}/>}
+    {boundaryTarget && <FacilityBoundaryEditor key={`${boundaryTarget.id}:${boundaryTarget.version}`} map={map} building={boundaryTarget}
+      onBusy={value => {boundaryBusy.current = value;}} onSaved={building => {setBoundaryTarget(null); saved(building);}}
+      onCancel={() => {if (boundaryBusy.current) return; setBoundaryTarget(null); setEditor(null); map.getContainer().focus();}}/>}
   </>;
 }
 
-function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted}: {
+function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted, onBoundary}: {
   editor: Editor; returnFocus: HTMLElement; onClose: () => void;
-  onSaved: (building: Building) => void; onDeleted: (id: string) => void;
+  onSaved: (building: Building) => void; onDeleted: (id: string) => void; onBoundary: () => void;
 }) {
   const {building, point} = editor;
+  const alive = useRef(false), abort = useRef<AbortController | null>(null);
+  const [confirmBoundary, setConfirmBoundary] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const [input, setInput] = useState({name: building?.name || '', description: building?.description || '',
     category: building?.category || BUILDING_CATEGORIES[0], address: building?.address || '', contact: building?.contact || '', website: building?.website || '',
@@ -187,31 +221,44 @@ function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted}: {
   const [editing, setEditing] = useState(!building);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [confirmDelete, setConfirmDelete] = useState(false);
   useEffect(() => {
+    alive.current = true;
     const element = dialog.current!; element.showModal();
-    return () => {element.close(); returnFocus.focus({preventScroll: true});};
+    return () => {alive.current = false; abort.current?.abort(); element.close(); returnFocus.focus({preventScroll: true});};
   }, [returnFocus]);
   const change = (key: keyof typeof input, value: string) => setInput(previous => ({...previous, [key]: value}));
 
   async function save(event: FormEvent) {
     event.preventDefault(); if (busy) return; setBusy(true); setError('');
+    abort.current = new AbortController();
     const value: BuildingInput = {...input, latitude: Number(input.latitude), longitude: Number(input.longitude)};
     try {
       const response = await fetch(building ? `/api/buildings/${building.id}` : '/api/buildings', {
-        method: building ? 'PUT' : 'POST', headers: {'Content-Type': 'application/json', ...(building ? {'If-Match': `"${building.version}"`} : {})},
+        method: building ? 'PUT' : 'POST', signal: abort.current?.signal, headers: {'Content-Type': 'application/json', ...(building ? {'If-Match': `"${building.version}"`} : {})},
         body: JSON.stringify(value)
       });
-      const body = await responseData(response); onSaved(body.building);
-    } catch (error) {setError(error instanceof Error ? error.message : '저장하지 못했습니다.');}
-    finally {setBusy(false);}
+      const body = await responseData(response); if (alive.current) onSaved(body.building);
+    } catch (error) {if (alive.current) setError(error instanceof Error ? error.message : '저장하지 못했습니다.');}
+    finally {if (alive.current) setBusy(false);}
   }
   async function remove() {
     if (!building || busy) return; setBusy(true); setError('');
+    abort.current = new AbortController();
     try {
-      const response = await fetch(`/api/buildings/${building.id}`, {method: 'DELETE', headers: {'If-Match': `"${building.version}"`}});
+      const response = await fetch(`/api/buildings/${building.id}`, {method: 'DELETE', signal: abort.current?.signal, headers: {'If-Match': `"${building.version}"`}});
       if (!response.ok) await responseData(response);
-      onDeleted(building.id);
-    } catch (error) {setError(error instanceof Error ? error.message : '삭제하지 못했습니다.');}
-    finally {setBusy(false);}
+      if (alive.current) onDeleted(building.id);
+    } catch (error) {if (alive.current) setError(error instanceof Error ? error.message : '삭제하지 못했습니다.');}
+    finally {if (alive.current) setBusy(false);}
+  }
+  async function removeBoundary() {
+    if (!building || busy) return;
+    setBusy(true); setError(''); abort.current = new AbortController();
+    try {
+      const response = await fetch(`/api/buildings/${building.id}`, {method: 'PUT', signal: abort.current.signal,
+        headers: {'Content-Type': 'application/json', 'If-Match': `"${building.version}"`}, body: JSON.stringify({...building, boundary: null})});
+      const body = await responseData(response); if (alive.current) onSaved(body.building);
+    } catch (error) {if (alive.current) setError(`${error instanceof Error ? error.message : '경계 제거 실패'} 저장된 경계는 유지됩니다. 재시도하거나 창을 닫고 시설을 다시 열어 최신 정보를 확인하세요.`);}
+    finally {if (alive.current) setBusy(false);}
   }
   const date = (value: string) => new Intl.DateTimeFormat('ko-KR', {dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Seoul'}).format(new Date(value));
 
@@ -228,10 +275,19 @@ function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted}: {
         <dt>관련 URL</dt><dd>{/^https?:\/\//i.test(building.website) ? <a href={building.website} target="_blank" rel="noopener noreferrer">{building.website}</a> : '—'}</dd>
         <dt>위치</dt><dd>{building.latitude.toFixed(7)}, {building.longitude.toFixed(7)}</dd>
       </dl>
+      <p>{building.boundary ? `저장된 경계 · 면적 ${formatArea(boundaryMetrics(building.boundary).area)} · 둘레 ${formatDistance(boundaryMetrics(building.boundary).perimeter)}` : '저장된 경계 없음'}</p>
+      {error && <p className="building-error" role="alert">{error}</p>}
+      <div className="building-dialog-actions">
+        <button type="button" disabled={busy} onClick={onBoundary}>{building.boundary ? '경계 수정' : '경계 추가'}</button>
+        {building.boundary && <button type="button" disabled={busy} onClick={() => setConfirmBoundary(true)}>경계 제거</button>}
+      </div>
+      {confirmBoundary && <div className="building-delete-confirm"><p>시설 정보는 유지하고 경계만 제거하시겠습니까?</p>
+        <button type="button" disabled={busy} onClick={() => void removeBoundary()}>경계 제거 확인</button>
+        <button type="button" disabled={busy} onClick={() => setConfirmBoundary(false)}>경계 제거 취소</button></div>}
       <p className="building-dates">등록 {date(building.createdAt)} · 수정 {date(building.updatedAt)}</p>
       <div className="building-dialog-actions">
-        <button type="button" onClick={() => setEditing(true)}>수정</button>
-        <button type="button" onClick={onClose}>닫기</button>
+        <button type="button" disabled={busy} onClick={() => setEditing(true)}>수정</button>
+        <button type="button" disabled={busy} onClick={onClose}>닫기</button>
       </div>
     </> : <form onSubmit={save}>
       <fieldset disabled={busy}>

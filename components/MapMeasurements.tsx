@@ -1,12 +1,14 @@
 'use client';
 
-import {useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent} from 'react';
+import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent} from 'react';
 import L from 'leaflet';
 import {areaSquareMeters, distanceMeters, formatArea, formatDistance, isSelfIntersecting, segmentMeters, type Coordinate} from '../lib/map-measure';
 
+import {useMapPointDrawing} from './useMapPointDrawing';
+
 type Kind = 'distance' | 'area';
 type ContextMenu = {point: Coordinate; x: number; y: number};
-export default function MapMeasurements({map, onRegisterBuilding}: {map: L.Map; onRegisterBuilding: (point: Coordinate) => void}) {
+export default function MapMeasurements({map, onRegisterBuilding, disabled = false}: {map: L.Map; disabled?: boolean; onRegisterBuilding: (point: Coordinate) => void}) {
   const [kind, setKind] = useState<Kind | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [selectingFacility, setSelectingFacility] = useState(false);
@@ -21,7 +23,7 @@ export default function MapMeasurements({map, onRegisterBuilding}: {map: L.Map; 
   const ready = kind === 'distance' ? points.length >= 2 : kind === 'area' && points.length >= 3 && !invalid && area > 0;
 
   useEffect(() => {
-    if (!selectingFacility) return;
+    if (!selectingFacility || disabled) return;
     const container = map.getContainer();
     container.classList.add('facility-selecting');
     const select = (event: L.LeafletMouseEvent) => {
@@ -35,7 +37,7 @@ export default function MapMeasurements({map, onRegisterBuilding}: {map: L.Map; 
       map.off('click', select); document.removeEventListener('keydown', escape);
       container.classList.remove('facility-selecting');
     };
-  }, [map, selectingFacility, onRegisterBuilding]);
+  }, [map, selectingFacility, onRegisterBuilding, disabled]);
 
   useEffect(() => {
     const group = L.layerGroup().addTo(map); layer.current = group;
@@ -43,6 +45,7 @@ export default function MapMeasurements({map, onRegisterBuilding}: {map: L.Map; 
   }, [map]);
 
   useEffect(() => {
+    if (disabled) return;
     const open = (event: L.LeafletMouseEvent) => {
       event.originalEvent.preventDefault();
       const rect = map.getContainer().getBoundingClientRect();
@@ -52,7 +55,7 @@ export default function MapMeasurements({map, onRegisterBuilding}: {map: L.Map; 
     const close = () => setMenu(null);
     map.on('contextmenu', open); map.on('movestart zoomstart resize', close);
     return () => {map.off('contextmenu', open); map.off('movestart zoomstart resize', close);};
-  }, [map]);
+  }, [map, disabled]);
 
   useLayoutEffect(() => {
     if (!menu || !menuElement.current) return;
@@ -85,20 +88,11 @@ export default function MapMeasurements({map, onRegisterBuilding}: {map: L.Map; 
     };
   }, [map, menu]);
 
-  useEffect(() => {
-    if (!drawing) return;
-    const container = map.getContainer(), restoreZoom = map.doubleClickZoom.enabled();
-    container.classList.add('measurement-drawing'); map.doubleClickZoom.disable();
-    const add = (event: L.LeafletMouseEvent) => {
-      const point: Coordinate = [event.latlng.lat, event.latlng.lng];
-      setPoints(previous => previous.length && segmentMeters(previous.at(-1)!, point) < 0.01 ? previous : [...previous, point]);
-    };
-    map.on('click', add);
-    return () => {
-      map.off('click', add); container.classList.remove('measurement-drawing');
-      if (restoreZoom) map.doubleClickZoom.enable();
-    };
-  }, [map, drawing]);
+  const addPoint = useCallback((point: Coordinate) => {
+    setPoints(previous => previous.length && segmentMeters(previous.at(-1)!, point) < 0.01 ? previous : [...previous, point]);
+  }, []);
+  useMapPointDrawing(map, drawing && !disabled, addPoint);
+  useEffect(() => {if (disabled) {setDrawing(false); setSelectingFacility(false); setMenu(null);}}, [disabled]);
 
   useEffect(() => {
     const group = layer.current; if (!group) return; group.clearLayers();
@@ -133,7 +127,7 @@ export default function MapMeasurements({map, onRegisterBuilding}: {map: L.Map; 
   }
 
   return <><aside className="map-measurements" aria-label="거리와 면적 측정">
-    <div className="facility-tools">
+    <fieldset disabled={disabled} className="measurement-fieldset"><div className="facility-tools">
       <button type="button" aria-pressed={selectingFacility} onClick={() => {setMenu(null); setDrawing(false); setSelectingFacility(value => !value);}}>시설·건물 추가</button>
       {selectingFacility && <button type="button" onClick={() => setSelectingFacility(false)}>위치 선택 취소</button>}
     </div>
@@ -156,7 +150,7 @@ export default function MapMeasurements({map, onRegisterBuilding}: {map: L.Map; 
       <button type="button" onClick={undo} disabled={!points.length}>마지막 점 취소</button>
       <button type="button" onClick={clear} disabled={!kind}>초기화</button>
     </div>
-  </aside>
+  </fieldset></aside>
     {menu && <div ref={menuElement} role="menu" aria-label="지도 메뉴" className="map-context-menu"
       style={{left: menu.x, top: menu.y, maxWidth: Math.max(0, map.getSize().x - 16)}}
       onKeyDown={navigateMenu} onContextMenu={event => event.preventDefault()}>

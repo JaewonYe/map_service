@@ -34,12 +34,12 @@ export class BuildingStore {
       const file = await lstat(/*turbopackIgnore: true*/ path);
       if (!file.isFile() || file.size > 65536) throw Error('Invalid building data file');
       const value = JSON.parse((await readFile(/*turbopackIgnore: true*/ path, 'utf8')).replace(/^\uFEFF/, ''));
-      const input = parseBuilding(value);
+      const {boundary, ...input} = parseBuilding(value);
       if (value.id !== canonicalId || !Number.isSafeInteger(value.version) || value.version < 1 ||
           ![value.createdAt, value.updatedAt].every(date => typeof date === 'string' && Number.isFinite(Date.parse(date)))) {
         throw Error('Invalid building record metadata');
       }
-      return {...input, id: canonicalId, version: value.version, createdAt: value.createdAt, updatedAt: value.updatedAt};
+      return {...input, ...(boundary ? {boundary} : {}), id: canonicalId, version: value.version, createdAt: value.createdAt, updatedAt: value.updatedAt};
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new BuildingError('건물 정보를 찾을 수 없습니다.', 404);
       throw new BuildingError('등록된 건물 데이터 파일을 읽을 수 없습니다. 서버 로그를 확인하세요.', 503, error);
@@ -55,13 +55,13 @@ export class BuildingStore {
     } finally {await rm(/*turbopackIgnore: true*/ temporary, {force: true});}
   }
   async create(value: unknown): Promise<Building> {
-    const input = parseBuilding(value);
+    const {boundary, ...input} = parseBuilding(value);
     return this.mutate(async () => {
       await mkdir(/*turbopackIgnore: true*/ this.directory, {recursive: true});
       const count = (await readdir(/*turbopackIgnore: true*/ this.directory)).filter(name => RECORD_FILE.test(name)).length;
       if (count >= MAX_RECORDS) throw new BuildingError('최대 10,000개의 건물을 등록할 수 있습니다.', 409);
       const now = new Date().toISOString();
-      const building = {...input, id: randomUUID(), version: 1, createdAt: now, updatedAt: now};
+      const building = {...input, ...(boundary ? {boundary} : {}), id: randomUUID(), version: 1, createdAt: now, updatedAt: now};
       await this.write(building); return building;
     });
   }
@@ -69,7 +69,9 @@ export class BuildingStore {
     buildingId(id); const input = parseBuilding(value);
     return this.mutate(async () => {
       const previous = await this.get(id); this.checkVersion(previous, version);
-      const building = {...input, id: previous.id, version: previous.version + 1, createdAt: previous.createdAt, updatedAt: new Date().toISOString()};
+      const {boundary, ...fields} = input;
+      const keptBoundary = Object.hasOwn(input, 'boundary') ? boundary : previous.boundary;
+      const building = {...fields, ...(keptBoundary ? {boundary: keptBoundary} : {}), id: previous.id, version: previous.version + 1, createdAt: previous.createdAt, updatedAt: new Date().toISOString()};
       await this.write(building); return building;
     });
   }

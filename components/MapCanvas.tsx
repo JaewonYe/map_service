@@ -14,6 +14,7 @@ export default function MapCanvas(){
   const [activeLayer,setActiveLayer]=useState('');
   const [height,setHeight]=useState('');
   const [mapInstance,setMapInstance]=useState<L.Map|null>(null);
+  const [boundaryEditing,setBoundaryEditing]=useState(false);
   const [buildingPoint,setBuildingPoint]=useState<Coordinate|null>(null);
   const [info,setInfo]=useState<Info|null>(null),[message,setMessage]=useState('TPK 메타데이터 확인 중…');
   const [center,setCenter]=useState<[number,number]|null>(null),[zoom,setZoom]=useState<number|null>(null),[clicked,setClicked]=useState<[number,number]|null>(null);
@@ -107,8 +108,8 @@ export default function MapCanvas(){
     </dialog>
     <div className="map-bottom-tools">
       {message&&<p role="status" className="map-status">{message}</p>}
-      {mapInstance&&<MapMeasurements map={mapInstance} onRegisterBuilding={setBuildingPoint}/>}
+      {mapInstance&&<MapMeasurements map={mapInstance} disabled={boundaryEditing} onRegisterBuilding={setBuildingPoint}/>}
     </div>
-    {mapInstance&&<MapBuildings map={mapInstance} requestedPoint={buildingPoint} onRequestClosed={()=>setBuildingPoint(null)}/>}
+    {mapInstance&&<MapBuildings map={mapInstance} onBoundaryEditingChange={setBoundaryEditing} requestedPoint={buildingPoint} onRequestClosed={()=>setBuildingPoint(null)}/>}
   </section>;
 }

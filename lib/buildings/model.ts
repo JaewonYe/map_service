@@ -1,3 +1,4 @@
+import {normalizeBoundary, type Boundary} from './boundary';
 export const BUILDING_CATEGORIES = ['미분류', '주거', '상업', '공공시설', '공장·창고', '교육', '의료', '문화·관광', '기타', '시험장', '주차장', '야외 공간'] as const;
 export type BuildingCategory = typeof BUILDING_CATEGORIES[number];
 export type BuildingInput = {
@@ -9,8 +10,10 @@ export type BuildingInput = {
   website: string;
   latitude: number;
   longitude: number;
+  boundary?: Boundary | null;
 };
-export type Building = BuildingInput & {
+export type Building = Omit<BuildingInput, 'boundary'> & {
+  boundary?: Boundary;
   id: string;
   version: number;
   createdAt: string;
@@ -50,6 +53,11 @@ export function parseBuilding(value: unknown): BuildingInput {
     catch {throw new BuildingError('관련 URL은 http:// 또는 https://로 시작해야 합니다.');}
     if (website.length > FIELD_LIMITS.website) throw new BuildingError('관련 URL은 URL 인코딩 후 최대 2,048자까지 지원합니다.');
   }
-  return {name, description: text('description'), category: category as BuildingCategory,
+  let boundary: Boundary | null | undefined;
+  if (Object.hasOwn(input, 'boundary')) {
+    try {boundary = input.boundary === null ? null : normalizeBoundary(input.boundary);}
+    catch (error) {throw new BuildingError(error instanceof Error ? error.message : '경계 형식이 올바르지 않습니다.');}
+  }
+  return {...(boundary !== undefined ? {boundary} : {}), name, description: text('description'), category: category as BuildingCategory,
     address: text('address'), contact: text('contact'), website, latitude, longitude};
 }
