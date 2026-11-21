@@ -17,9 +17,9 @@ test('a nonzero command keeps its exit code and diagnostic log', async t => {
   assert.equal(result.exitCode, 7); assert.match(await readFile(join(directory, 'failure.log'), 'utf8'), /diagnostic/);
 });
 test('empty and all-skipped Node execution fail the evidence gate', async t => {
-  for (const source of ['', "import test from 'node:test'; test.skip('not implemented',()=>{});"]) {
+  for (const [source, flags] of [["import {run} from 'node:test'; import {tap} from 'node:test/reporters'; run({files:[]}).compose(tap).pipe(process.stdout);", []], ["import test from 'node:test'; test.skip('not implemented',()=>{});", ['--test']]]) {
     const {directory, path} = await fixture(t, source);
-    const result = await runSuite('empty', process.execPath, ['--test', path], directory);
+    const result = await runSuite('empty', process.execPath, [...flags, path], directory);
     assert.equal(result.processExitCode, 0); assert.equal(result.exitCode, 1);
   }
 });
