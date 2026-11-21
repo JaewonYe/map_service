@@ -418,7 +418,7 @@ OSM 검증: Node 렌더링 테스트 **4개**, PBF 변환 테스트 **4개**, �
 
 ## GitHub Actions 회귀 검사
 
-`.github/workflows/map-regression.yml`은 모든 PR과 main push에서 Node.js 24 / Ubuntu 24.04 GitHub runner를 사용합니다. 두 job은 별도 checkout과 작업 공간에서 실행하므로 fixture·캐시·포트가 공유되지 않습니다. 외부 의존성 설치에는 인터넷이 필요하지만 브라우저의 오프라인 회귀 시나리오는 외부 지도 요청을 차단해 별도로 검증합니다. 실제 사용자 TPK·DEM·PBF나 비밀 설정은 필요하지 않습니다.
+`.github/workflows/map-regression.yml`은 모든 PR과 main push에서 Node.js 24 / Ubuntu 24.04 GitHub runner를 사용합니다. Node·브라우저·변환 job은 별도 checkout과 작업 공간에서 실행하므로 fixture·캐시·포트가 공유되지 않습니다. 외부 의존성 설치에는 인터넷이 필요하지만 브라우저의 오프라인 회귀 시나리오는 외부 지도 요청을 차단해 별도로 검증합니다. 실제 사용자 TPK·DEM·PBF나 비밀 설정은 필요하지 않습니다.
 
 - **Node regression and typecheck**: `npm ci` → `npm run typecheck` → `npm run ci:node`. 기존 tiles/buildings/layers/osm/measure/launcher 6개 명령을 모두 실행하며 실패 종료 코드를 유지합니다. 추가 `test:ci-tools`는 집계기의 실패 전달·빈 실행·전체 스킵 처리 등을 검증합니다. 앱 회귀 71개와 도구 검증 5개를 구분합니다.
 - **Playwright regression**: `npm ci` → `npx playwright install --with-deps chromium` → `npm test`. 기존 5개 프로젝트·workers=2를 유지하며 합성 fixture 생성, production build 1회, 서버 5개의 준비/종료를 기존 Playwright 설정이 담당합니다. 별도 build step은 추가하지 않습니다.
@@ -427,6 +427,30 @@ OSM 검증: Node 렌더링 테스트 **4개**, PBF 변환 테스트 **4개**, �
 
 로컬에서는 `npm ci`, `npm run typecheck`, `npm run ci:node`를 실행하고 브라우저는 Chromium 설치 후 `CI=true npm test`로 보고서를 생성합니다. `TYPECHECK_OUTCOME=success node scripts/ci/summary.mjs node`는 실제 typecheck 성공 후에만 사용하며 브라우저 집계는 `node scripts/ci/summary.mjs browser`입니다. npm 기본 캐시가 읽기 전용인 클라우드는 작업 공간 캐시 경로를 지정할 수 있습니다.
 
-관리자는 Actions 사용 허용과 runner 용량을 확인하고, 실제 성공 check가 생성된 뒤 main의 브랜치 보호/Ruleset 필수 검사에 위의 두 job 이름을 등록해야 합니다. 실패 PR의 병합 차단도 별도로 확인해야 하며 이 workflow 추가만으로 보호 설정 완료를 뜻하지 않습니다. 실제 run URL/SHA와 현재 미포함 범위는 [검증 기록](docs/VALIDATION.md)에 기록합니다.
+관리자는 Actions 사용 허용과 runner 용량을 확인하고, 실제 성공 check가 생성된 뒤 main의 브랜치 보호/Ruleset 필수 검사에 `Node regression and typecheck`, `Playwright regression`, `Conversion regression`을 등록해야 합니다. 실패 PR의 병합 차단도 별도로 확인해야 하며 이 workflow 추가만으로 보호 설정 완료를 뜻하지 않습니다. 실제 run URL/SHA와 현재 미포함 범위는 [검증 기록](docs/VALIDATION.md)에 기록합니다.
 
 최초 원격 PR 검증은 [Actions run 44870551061](https://github.com/JaewonYe/map_service/actions/runs/44870551061), head `55bf43827d0c14ab0fb652a939e43abbfca218c2`에서 성공했습니다(앱 71개·도구 5개·브라우저 30개, 실패/스킵 0). 이후 최종 SHA와 main push 실행 결과는 [이슈 #5](https://github.com/JaewonYe/map_service/issues/5)의 완료 기록을 확인하세요.
+
+
+## 합성 DEM·OSM 변환 CI와 로컬 재현
+
+`Conversion regression` job은 PR과 main push에서 production 변환 이미지 두 개를 빌드합니다. 기존 DEM 3개·PBF 4개 테스트의 assertion을 그대로 실행하며, 별도 Python 집계 도구 검사 5개는 import 오류·실제 assertion 실패·0개/전체 스킵·하위 종료 코드 보존을 검증합니다. Node/브라우저 검사와 독립된 runner입니다.
+
+저장소 루트에서 Linux/WSL 또는 Docker가 준비된 환경에서 실행합니다. 아래 명령은 테스트 이미지 태그만 사용하며 사용자 data 폴더를 마운트하지 않습니다.
+
+```sh
+docker build --progress plain -t map-service-elevation-tools:ci scripts/elevation
+docker build --progress plain -t map-service-osm-tools:ci scripts/osm
+bash scripts/ci/conversion-tests.sh
+python3 scripts/ci/conversion.py summary
+```
+
+기존 운영 Compose 빌드는 `docker compose --profile tools build prepare-elevation prepare-osm`으로 유지합니다. CI 테스트 실행은 실제 데이터 폴더가 연결된 Compose 서비스 대신 위 이미지에 저장소 전체를 `/workspace`로 읽기 전용 마운트합니다. 작업 디렉터리는 `/workspace`, 인터프리터는 이미지의 `/usr/bin/python3`입니다. DEM 테스트는 `/workspace/scripts/elevation/prepare.py`를 참조하고, OSM은 기존 `OSM_PREPARE_SCRIPT=/tools/prepare.py`를 사용합니다. 이미지의 production script/schema와 저장소 파일의 SHA256이 일치하는지도 검사해 오래된 이미지 재사용을 거부합니다.
+
+테스트 컨테이너는 비루트·읽기 전용 rootfs·네트워크 없음이며 합성 GeoTIFF/PBF와 결과는 임시 `/tmp`에만 만듭니다. 원본 해시·이전 데이터 보존·OSM 재사용·음수/0m/NoData assertions를 유지합니다. `.cache/ci/conversion/`에는 호스트가 실행 로그만 저장하고, CI summary는 DEM/PBF 수치와 실행 버전을 구분합니다. 누락 결과·import 오류·0개/전체 스킵·예상 수 불일치는 실패입니다. 파이프 로그 기록 중에도 Docker/Python의 실패 종료 코드를 보존합니다.
+
+두 Dockerfile의 기반은 `debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc`(multi-platform index)입니다. Linux amd64 manifest는 `sha256:c67e92c8099ba22853ab4cfda7cfb494d253d6012ca82dee98ba8976772af018`입니다. 로컬 검증에서 Python 3.11.2 / GDAL 3.6.2 / NumPy 1.24.2 / Shapely 1.8.5(OSM)를 확인했습니다. 실행별 정확한 Debian package 버전·GDAL 드라이버·production SHA256은 `dem.log`/`osm.log`, 실제 빌드 image ID는 `images.log`에 기록합니다.
+
+**고정 범위:** 기반 image digest는 고정했지만 APT 저장소·전이 의존성·`docker/dockerfile:1` frontend와 GitHub runner/Docker 버전은 가변입니다. 전체 환경의 byte 단위 재현성을 보장하지 않습니다. 갱신 시 `docker buildx imagetools inspect debian:bookworm-slim`으로 새 digest/아키텍처를 확인하고 두 Dockerfile을 함께 갱신한 뒤 `--pull --no-cache`로 두 이미지를 다시 빌드하고 7개 변환 및 기존 Node/브라우저 CI를 확인합니다. 패키지 버전과 image ID 차이를 검토해 문서를 갱신합니다. APT 서명/체크섬과 registry/TLS 검증은 끄지 않으며 관리 환경의 CA는 기존 선택적 BuildKit `proxy_ca` secret만 사용합니다.
+
+CI는 `conversion-diagnostics-<run_id>-<attempt>`에 빌드·테스트·버전·image ID 로그만 7일 보관합니다. 합성 데이터 전체·원본 사용자 데이터·이미지 tar·환경변수·비밀은 업로드하지 않습니다. 원격 run URL/SHA는 [검증 기록](docs/VALIDATION.md)과 [이슈 #7](https://github.com/JaewonYe/map_service/issues/7) 완료 댓글에서 확인합니다. 새 job의 필수 검사 등록과 실제 병합 차단 확인은 관리자 후속 작업입니다. 실데이터·Windows/Ubuntu 실기·인증/운영·공통 플랫폼 계약 검증은 여전히 미실행입니다.

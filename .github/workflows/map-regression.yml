@@ -88,3 +88,38 @@ jobs:
           include-hidden-files: true
           retention-days: 7
           if-no-files-found: warn
+
+  conversion:
+    name: Conversion regression
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Check conversion reporting gates
+        run: python3 -m unittest discover -s tests/tooling -p conversion_ci_test.py -v
+      - name: Build production conversion images
+        shell: bash
+        run: |
+          mkdir -p .cache/ci/conversion
+          set -o pipefail
+          docker build --progress plain -t map-service-elevation-tools:ci scripts/elevation 2>&1 | tee .cache/ci/conversion/dem-build.log
+          docker build --progress plain -t map-service-osm-tools:ci scripts/osm 2>&1 | tee .cache/ci/conversion/osm-build.log
+          docker image inspect map-service-elevation-tools:ci map-service-osm-tools:ci --format '{{.RepoTags}} {{.Id}}' | tee .cache/ci/conversion/images.log
+      - name: Run synthetic production conversion tests
+        run: bash scripts/ci/conversion-tests.sh
+      - name: Conversion execution summary
+        if: always()
+        run: python3 scripts/ci/conversion.py summary
+      - name: Preserve conversion diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: conversion-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .cache/ci/conversion/*.log
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn

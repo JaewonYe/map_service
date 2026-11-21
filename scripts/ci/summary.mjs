@@ -22,7 +22,7 @@ if (mode === 'node') {
     for (const [name, count] of Object.entries(c.byProject)) text += `| ${name} | ${count.executed} | ${count.skipped} |\n`;
   } catch {text += 'Browser report unavailable: not run or interrupted; no success evidence.\n';}
 } else throw Error('Expected node or browser');
-text += '\nScope: synthetic fixtures and the checked-in public Esri format sample. Python/GDAL/Docker conversion (7 tests), real user TPK/DEM/PBF, Windows/Ubuntu desktop, authentication/operations and approved platform contracts are NOT verified by this CI.\n';
+text += '\nScope: synthetic fixtures and the checked-in public Esri format sample. Production DEM/PBF conversion is checked by the separate Conversion regression job. Real user TPK/DEM/PBF, Windows/Ubuntu desktop, authentication/operations and approved platform contracts are NOT verified by this job.\n';
 text += `\nEvidence gate: ${valid ? 'passed' : 'FAILED (missing/empty/all-skipped/failed execution)'}\n`;
 console.log(text);
 if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, text);

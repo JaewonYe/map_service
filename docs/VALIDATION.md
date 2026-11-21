@@ -71,3 +71,30 @@ Node 테스트 합계 70개, 브라우저 29개다. 합성 V1/V2 TPK와 공식 A
 - 앱 회귀 71개와 도구 검사 5개 통과, 실패/취소/스킵/todo 0. Playwright 30개 통과, 실패/flaky/스킵 0. 기존 다섯 프로젝트 전부 실행됐다.
 - 브라우저 artifact `browser-diagnostics-44870551061-1`(ID `14693518351`)의 업로드 성공 및 7일 만료를 확인했다. 성공 실행이므로 Node 실패 artifact는 생성되지 않았다. 실패 trace 보존은 설정 및 집계 도구의 실패 경로 검증 범위이며 실제 원격 브라우저 실패 artifact를 생성했다고 보고하지 않는다.
 - 이 실행은 위 SHA의 PR 이벤트 증거다. 이후 문서 변경 SHA와 main push 이벤트의 run URL·결과는 [이슈 #5](https://github.com/JaewonYe/map_service/issues/5) 완료 댓글에 별도로 기록한다. 최초 실행의 성공을 다른 SHA나 발생하지 않은 이벤트에 전용하지 않는다.
+
+
+## 이슈 #7 합성 DEM·PBF 변환 CI
+
+2026-11-21. 기존 workflow에 `Conversion regression` 독립 job을 추가했다. 기존 Node/브라우저 job과 테스트를 유지하며 기존 production 변환 테스트 DEM 3개와 PBF 4개의 assertion은 변경하지 않았다. 별도 Python CI 집계/종료 코드 검사는 5개다(앱 변환 테스트 수와 구분).
+
+### 실행 환경과 재현
+
+README의 합성 변환 CI 절차대로 두 production Dockerfile을 `map-service-elevation-tools:ci`, `map-service-osm-tools:ci`로 빌드하고 `bash scripts/ci/conversion-tests.sh`, `python3 scripts/ci/conversion.py summary`를 실행한다. 시스템 Python/GDAL을 호스트에 설치할 필요는 없으며 host summary는 표준 라이브러리만 사용한다.
+
+- 기반 multi-platform digest: `sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc`; linux/amd64 manifest: `sha256:c67e92c8099ba22853ab4cfda7cfb494d253d6012ca82dee98ba8976772af018`.
+- 두 Dockerfile의 `COPY --chmod=0644`로 production script/schema의 읽기 권한을 보장한다. 로컬 최초 비루트 실행에서 읽기 권한 문제로 preflight가 실패(DEM/PBF 실행 0개)했고, 명시적 권한 수정·재빌드 후 3개/4개가 통과했다. 이를 테스트 실행 성공이나 스킵으로 계산하지 않았다.
+- 이미지의 `/usr/bin/python3`와 GDAL·NumPy·OSM driver(및 Shapely)를 실제 import/확인한다. DEM은 읽기 전용 `/workspace` 저장소 상대 경로의 production script, OSM은 `/tools/prepare.py` override를 사용한다. baked script/schema와 소스 SHA256 일치를 확인한다.
+- 컨테이너 rootfs/저장소는 읽기 전용, 실행 사용자는 host UID/GID, network=none, 임시 데이터는 `/tmp` tmpfs다. 사용자 data 마운트·외부 지도 다운로드는 없다. 기존 해시 불변·원자적 게시/실패 보존·재사용·음수/0/NoData 검증을 유지한다.
+- APT 저장소/패키지와 전이 의존성, Dockerfile frontend/runner는 가변이다. 이미지 digest만으로 완전 고정 환경이라고 표현하지 않는다. 갱신 절차와 보안 검증 유지 원칙은 README에 기록했다.
+
+### 로컬 검증
+
+- 실제 production 이미지에서 DEM 3개/PBF 4개 모두 통과, 실패/오류/스킵 0. Python 집계 도구 검사 5개 통과. import 오류·0개·전체 스킵·예상 수 불일치는 실패로 처리한다. shell 검사에서는 첫 하위 명령의 종료 코드 7 보존과 두 번째 suite 시도를 확인했다.
+- 실행 버전: Python 3.11.2, GDAL 3.6.2, NumPy 1.24.2, Shapely 1.8.5(OSM). Debian 패키지: python3=3.11.2-1+b1, python3-gdal/libgdal32=3.6.2+dfsg-1+b2, python3-numpy=1:1.24.2-1+deb12u1, python3-shapely=1.8.5-2+b1. 원격 버전은 각 실행 로그에서 별도로 확인한다.
+- 로컬 built image ID: DEM `sha256:60c0bde27f16ef9a8f033bfe2696153d37ea284564ffcc360ce9561076af7519`, OSM `sha256:8ecec952556164c135d157a04cfca37fb2693638ef95ce5a14d790432b70c881`. 빌드별 ID이며 고정된 배포 이미지 digest로 간주하지 않는다.
+- `conversion-diagnostics-<run_id>-<attempt>` artifact에 build 로그, `images.log`, `dem.log`, `osm.log`만 7일 보관한다. 각 로그의 machine result와 Step summary에 실제 실행 수·실패·오류·스킵·미실행을 구분한다. build/setup 실패로 결과가 없으면 미실행/unknown으로 보고하고 summary도 실패한다.
+- 필수 검사 `Conversion regression` 등록과 병합 차단 검증은 관리자 후속 작업이다. 실제 사용자 지도 데이터, Windows/Ubuntu 실기, 인증/운영, 승인된 플랫폼 공통 계약은 계속 미검증이다. 상위 gitlink는 변경하지 않는다.
+
+### 원격 실행 기록
+
+실제 run/event/SHA/결과는 원격 실행 후 이 절과 이슈 #7 완료 댓글에 기록한다. 로컬 통과를 원격 CI 성공으로 간주하지 않는다.
