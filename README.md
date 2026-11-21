@@ -428,3 +428,5 @@ OSM 검증: Node 렌더링 테스트 **4개**, PBF 변환 테스트 **4개**, �
 로컬에서는 `npm ci`, `npm run typecheck`, `npm run ci:node`를 실행하고 브라우저는 Chromium 설치 후 `CI=true npm test`로 보고서를 생성합니다. `TYPECHECK_OUTCOME=success node scripts/ci/summary.mjs node`는 실제 typecheck 성공 후에만 사용하며 브라우저 집계는 `node scripts/ci/summary.mjs browser`입니다. npm 기본 캐시가 읽기 전용인 클라우드는 작업 공간 캐시 경로를 지정할 수 있습니다.
 
 관리자는 Actions 사용 허용과 runner 용량을 확인하고, 실제 성공 check가 생성된 뒤 main의 브랜치 보호/Ruleset 필수 검사에 위의 두 job 이름을 등록해야 합니다. 실패 PR의 병합 차단도 별도로 확인해야 하며 이 workflow 추가만으로 보호 설정 완료를 뜻하지 않습니다. 실제 run URL/SHA와 현재 미포함 범위는 [검증 기록](docs/VALIDATION.md)에 기록합니다.
+
+최초 원격 PR 검증은 [Actions run 44870551061](https://github.com/JaewonYe/map_service/actions/runs/44870551061), head `55bf43827d0c14ab0fb652a939e43abbfca218c2`에서 성공했습니다(앱 71개·도구 5개·브라우저 30개, 실패/스킵 0). 이후 최종 SHA와 main push 실행 결과는 [이슈 #5](https://github.com/JaewonYe/map_service/issues/5)의 완료 기록을 확인하세요.
