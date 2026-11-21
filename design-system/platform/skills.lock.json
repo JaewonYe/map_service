@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "sources": {
     "ui-ux-pro-max": {
       "repository": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
@@ -18,9 +18,16 @@
       "source_path": "skills/web-design-guidelines",
       "license": "MIT (upstream README)",
       "guidelines_commit": "434b7f91364665f2f733b310ec54809bf8f37937"
+    },
+    "platform-ui-design": {
+      "repository": "https://github.com/JaewonYe/platform_core",
+      "version": "2.0.0",
+      "source_path": ".agents/skills/platform-ui-design",
+      "purpose": "User-requested light/dark visual alignment"
     }
   },
   "files": {
+    ".agents/skills/platform-ui-design/SKILL.md": "1c1d4b69ee3234f6670705ebd60f49ccf761e4004be539d2093c8a3ce204106d",
     ".agents/skills/ui-ux-pro-max/LICENSE": "738f69dfa83db5c347c678fb9d90e560877059f0de93a327c39001bff92dc014",
     ".agents/skills/ui-ux-pro-max/SKILL.md": "530bda61fbbfdcf06fd3b49ec8bb8845f76de7616752568fb1f9c63a2c0446b2",
     ".agents/skills/ui-ux-pro-max/data/app-interface.csv": "331e7cf2c0b222d80c566c5f255c63cb339f65bfd02e471a720f28e4864a9f08",
@@ -105,8 +112,12 @@
     ".agents/skills/web-design-guidelines/SKILL.md": "360b1240acfffa95e76373db9f837a1f28aba8f6d4c361e3d588be0eaefaa070",
     ".agents/skills/web-design-guidelines/UPSTREAM-NOTICE.md": "2423f1ac5a2ee60310b8b2182a1756c7eb1d92e4979d8e9070100a030026b40e",
     ".agents/skills/web-design-guidelines/references/command.md": "d246b026f4f29b5823a9cc857f9edf3d2507002e055e32040cadeaf3b38e0234",
-    "design-system/platform/MASTER.md": "1f41b1ba9751462f2736d2221a8a51e041bf5ab03f6156142be2c02dd4fbbc0f",
-    "design-system/platform/tokens.css": "4c45a769daa22db95c62908c84518514a1f8791e50cb12677c902a8f1a8f822e",
-    "scripts/check_design_skills.py": "f68c7e7e60d02aa05d4b14f4292fe884c58e41ca8cbe9b6ee142f91da23251d1"
+    "design-system/platform/IMPLEMENTATION.md": "d2acef812612682cc6e1edc9002932919d8c4e4bec3aba8e23f4d9af79d713ef",
+    "design-system/platform/MASTER.md": "0e9c59bae2f954cc202314c2993e75183ffdce272218d1ebaa5fbc0ceb6552bc",
+    "design-system/platform/reference.html": "eb54348b10943512313f827766bb9c2151a599005ce339022fb16c88950dcf06",
+    "design-system/platform/themes.json": "9b17d5e4d2527621c0935f357671ebfdaaa8c9b5ebcb830163ab1bc3b1a68c30",
+    "design-system/platform/tokens.css": "4223b451bc315c5f77aecc9b0dd48d1ec68f5bd6530404123adbe8a42686d965",
+    "scripts/check_design_skills.py": "64c56738b655391cfeb799c162ea64928fc96ad77720e8207d9ecf72a22a46a9",
+    "scripts/render_design_tokens.py": "025fddd60ce860e7083f696cd5a18f46e05cd5cdec131d376a5250f9a71e6f7d"
   }
 }
