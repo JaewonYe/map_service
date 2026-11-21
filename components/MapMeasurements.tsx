@@ -98,7 +98,7 @@ export default function MapMeasurements({map, onRegisterBuilding, disabled = fal
     const group = layer.current; if (!group) return; group.clearLayers();
     const coordinates = points.map(point => L.latLng(point[0], point[1]));
     if (coordinates.length >= 2) {
-      const options = {color: invalid ? '#b91c1c' : '#087f8c', weight: 3, interactive: false};
+      const options = {color: invalid ? '#b91c1c' : '#087f8c', weight: 3, dashArray: '3 4', interactive: false};
       if (kind === 'area' && coordinates.length >= 3) {
         L.polygon(coordinates, {...options, fillOpacity: 0.2, className: 'measurement-polygon'}).addTo(group);
       } else L.polyline(coordinates, {...options, className: 'measurement-line'}).addTo(group);

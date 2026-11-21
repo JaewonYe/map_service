@@ -50,7 +50,7 @@ export default function FacilityBoundaryEditor({map, building, onSaved, onCancel
       if (coordinates.length >= 3) L.polygon(coordinates, {...options, fillOpacity: 0.12}).addTo(group);
       else L.polyline(coordinates, options).addTo(group);
     }
-    coordinates.forEach((point, index) => L.circleMarker(point, {radius: 5, color, fillColor: '#fff', fillOpacity: 1,
+    coordinates.forEach((point, index) => L.circleMarker(point, {radius: 5, color, fillColor: 'var(--color-surface)', fillOpacity: 1,
       interactive: false, className: 'facility-boundary-vertex'}).bindTooltip(String(index + 1), {permanent: true, direction: 'top'}).addTo(group));
     return () => {group.remove();};
   }, [map, points]);
@@ -74,7 +74,7 @@ export default function FacilityBoundaryEditor({map, building, onSaved, onCancel
   }
   return <section ref={panel} tabIndex={-1} className="facility-boundary-editor" aria-label="시설 경계 편집" aria-busy={busy}>
     <h2>{building.name} · 경계 편집</h2>
-    <p>지도에서 경계를 따라 점을 선택하세요. 붉은 점선은 미저장 편집, 보라 실선은 저장된 경계입니다.</p>
+    <p>지도에서 경계를 따라 점을 선택하세요. 붉은 점선은 미저장 편집, 청록 실선은 저장된 경계입니다.</p>
     <p role="status" data-testid="boundary-point-count">정점 {points.length} / {MAX_BOUNDARY_VERTICES}개</p>
     <output aria-live="polite">{preview.metrics ? `면적 ${formatArea(preview.metrics.area)} · 둘레 ${formatDistance(preview.metrics.perimeter)}` : preview.error}</output>
     {error && <p ref={errorElement} tabIndex={-1} role="alert" className="building-error">{error}</p>}

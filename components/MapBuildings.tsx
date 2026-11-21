@@ -116,11 +116,11 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
   useEffect(() => {
     const group = L.layerGroup().addTo(map);
     const icon = L.divIcon({className: 'building-marker', iconSize: [28, 28], iconAnchor: [14, 14],
-      html: '<svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="13" fill="#6941a5" stroke="white" stroke-width="2"/><path d="M8 21V8h12v13M11 11h2m2 0h2m-6 4h2m2 0h2m-4 6v-3h2v3" fill="none" stroke="white" stroke-width="1.6"/></svg>'});
+      html: '<svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="13" fill="var(--color-accent)" stroke="var(--color-surface)" stroke-width="2"/><path d="M8 21V8h12v13M11 11h2m2 0h2m-6 4h2m2 0h2m-4 6v-3h2v3" fill="none" stroke="var(--color-surface)" stroke-width="1.6"/></svg>'});
     for (const building of visible) {
       if (building.boundary) {
         const polygon = L.polygon(boundaryPoints(building.boundary).map(([lat, lon]) => L.latLng(lat, lon)), {
-          color: '#6941a5', weight: 3, fillOpacity: 0.18, interactive: !boundaryTarget, bubblingMouseEvents: false, className: 'facility-boundary-saved'
+          color: 'var(--map-selection-stroke)', weight: 3, fillOpacity: 0.18, interactive: !boundaryTarget, bubblingMouseEvents: false, className: 'facility-boundary-saved'
         }).addTo(group).on('click', () => void openBuilding(building.id));
         const element = polygon.getElement();
         element?.setAttribute('tabindex', boundaryTarget ? '-1' : '0'); element?.setAttribute('role', 'button');

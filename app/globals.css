@@ -105,7 +105,7 @@ main { flex: 1; min-height: 240px; position: relative; display: flex; }
 @media(max-width:600px){.facility-boundary-editor{top:185px;max-height:min(285px,calc(100% - 440px));}.map-measurements:has(fieldset:disabled){max-height:110px;overflow:auto;}}
 
 .facility-boundary-editor {right:max(12px,env(safe-area-inset-right));scroll-padding:12px;}
-.facility-boundary-editor input {min-height:var(--control-min-height);font-size:16px;color:var(--color-foreground);}
+.facility-boundary-editor input {min-height:var(--control-min-height);font-size:16px;color:var(--color-foreground);background:var(--color-surface-raised);}
 .facility-boundary-editor button {color:var(--color-foreground);touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 .facility-boundary-editor button:enabled:hover,.facility-boundary-editor button:enabled:active {background:var(--color-primary-subtle);}
 .facility-boundary-editor .boundary-save {background:var(--color-primary);color:var(--color-on-primary);border-color:var(--color-primary);}
@@ -120,3 +120,14 @@ main { flex: 1; min-height: 240px; position: relative; display: flex; }
 .building-dialog .boundary-remove {color:var(--color-danger);border-color:var(--color-danger);}
 .building-dialog :focus-visible {outline-color:var(--color-focus);}
 .building-dialog input,.building-dialog textarea,.building-dialog select {border-color:var(--color-control-border);background:var(--color-surface);color:var(--color-foreground);min-height:var(--control-min-height);}
+
+/* Keep legacy overlays readable while the assigned boundary/detail UI follows theme tokens. */
+body {background:#fff;color:#172b4d;}
+.building-dialog {background:var(--color-surface);}
+.building-dialog button {background:var(--color-surface);color:var(--color-foreground);}
+.building-dialog button[type="submit"],.building-dialog .boundary-start {background:var(--color-primary);color:var(--color-on-primary);}
+.building-dialog .boundary-remove {background:var(--color-danger);color:var(--color-on-danger);}
+.building-dialog .boundary-remove:enabled:hover,.building-dialog .boundary-remove:enabled:active {background:var(--color-danger);color:var(--color-on-danger);box-shadow:inset 0 0 0 2px var(--color-on-danger);}
+.building-dialog .building-dates {color:var(--color-muted-foreground);}
+.building-dialog .building-error,.facility-boundary-editor .building-error {padding:8px;background:var(--color-danger);color:var(--color-on-danger);border-radius:var(--radius-control);}
+.building-tooltip {background:var(--color-surface);color:var(--color-foreground);border-color:var(--color-control-border);}

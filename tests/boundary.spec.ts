@@ -37,6 +37,7 @@ async function triangle(editor:Locator) {
 test('drawn boundary persists on reload; measurement reset leaves it and marker; saved polygon opens detail', async({page,request},testInfo)=>{
   const a=await create(request);
   try {
+    await page.setViewportSize({width:1440,height:900});
     await isolate(page,[a.id]);await page.goto('/');const editor=await edit(page,a);
     // Real map clicks use the shared measurement drawing lifecycle.
     for(const pos of [{x:440,y:260},{x:610,y:260},{x:510,y:360}]) await page.locator('.leaflet-container').click({position:pos});
@@ -44,6 +45,11 @@ test('drawn boundary persists on reload; measurement reset leaves it and marker;
     await expect(editor.locator('output')).toContainText('면적');
     await expect(page.locator('.facility-boundary-draft')).toHaveCount(1);
     await page.screenshot({path:testInfo.outputPath('facility-boundary-editor-desktop.png')});
+    await page.emulateMedia({colorScheme:'dark'});
+    await expect(editor).toHaveCSS('background-color','rgb(17, 28, 46)');
+    await expect(editor.getByTestId('boundary-point-count')).toContainText('정점 3');
+    await page.screenshot({path:testInfo.outputPath('facility-boundary-editor-desktop-dark.png')});
+    await page.emulateMedia({colorScheme:'light'});
     await editor.getByRole('button',{name:'경계 저장',exact:true}).click();await expect(editor).toHaveCount(0);
     const stored=await get(request,a.id);expect(stored.boundary.coordinates[0]).toHaveLength(4);expect(stored.version).toBe(2);
     await page.reload();await expect(page.locator('.facility-boundary-saved')).toHaveCount(1);
@@ -153,12 +159,18 @@ test('filters synchronize polygons and markers; mobile keyboard adds modifies sa
     expect(await editor.getByRole('button',{name:'정점 추가',exact:true}).evaluate(el=>el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
     const bounds=(await editor.boundingBox())!;expect(bounds.x).toBeGreaterThanOrEqual(0);expect(bounds.x+bounds.width).toBeLessThanOrEqual(390);
     await page.screenshot({path:testInfo.outputPath('facility-boundary-editor-mobile.png')});
+    await page.emulateMedia({colorScheme:'dark'});
+    await expect(editor).toHaveCSS('background-color','rgb(17, 28, 46)');
+    await expect(editor.getByLabel('정점 위도',{exact:true})).toHaveValue('36.6012');
+    await page.screenshot({path:testInfo.outputPath('facility-boundary-editor-mobile-dark.png')});
+    await page.emulateMedia({colorScheme:'light'});
     await editor.getByRole('button',{name:'경계 저장',exact:true}).focus();await page.keyboard.press('Enter');await expect(editor).toHaveCount(0);
     await page.screenshot({path:testInfo.outputPath('facility-boundary-mobile.png')});
     await page.getByRole('button',{name:'시설 목록',exact:true}).click();await page.getByRole('searchbox',{name:'시설명 검색'}).fill(b.name);
     await expect(page.getByRole('button',{name:`${a.name} 시설 경계 정보 보기`,exact:true})).toHaveCount(0);await expect(page.locator('.building-marker')).toHaveCount(1);
     await page.getByRole('button',{name:'검색·분류 초기화'}).click();await expect(page.locator('.facility-boundary-saved')).toHaveCount(2);
     await page.getByRole('button',{name:'시설 목록',exact:true}).click();const dialog=await show(page,a);
+    await page.emulateMedia({colorScheme:'dark'});await expect(dialog).toHaveCSS('background-color','rgb(17, 28, 46)');
     await dialog.getByRole('button',{name:'경계 제거',exact:true}).focus();await page.keyboard.press('Enter');await dialog.getByRole('button',{name:'경계 제거 확인'}).focus();await page.keyboard.press('Enter');await expect(dialog).toHaveCount(0);
     await page.getByRole('button',{name:'면적',exact:true}).click();await page.locator('.leaflet-container').click({position:{x:300,y:280}});
     await expect(page.getByTestId('measurement-points')).toContainText('1개');expect(await get(request,b.id)).toEqual(b);

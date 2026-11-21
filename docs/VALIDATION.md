@@ -184,3 +184,14 @@ PR #12 생성 후 최신 main의 `5f365d30f4967eb6a23a9c37d6b77be5ba96b091`에�
 변경한 경계/상세 UI에 공통 토큰과 44px 조작 높이·hover/focus·입력 metadata·초안 이탈 경고를 적용했다. 기존 지도 레이어 색상/도형 구분과 작업 공간은 유지한다. 공통 스냅샷과 lock은 수정하지 않았고 `python3 scripts/check_design_skills.py`가 통과했다. main 반영 후 최종 SHA에 대해 기존 3개 회귀 job과 추가된 Design skill integrity 결과도 확인한다.
 
 main 디자인 기준 반영 후 로컬 typecheck, Node 앱 83개/집계 도구 5개, CI 모드 Playwright 전체 43개 재실행 통과(실패/취소/flaky/스킵 0). 데스크톱/모바일 편집 스크린샷을 직접 검토했다. 변환 코드는 추가 변경하지 않았다.
+
+
+### 추가된 Light/Dark 기준 반영
+
+이어 main의 `cf1b07d3f733dd2ac8e1142e0a75149b037ce4ed`가 프로젝트 전용 디자인 스킬과 양 테마 기준을 추가했다. 최신 문서를 읽고 병합해 변경한 경계/상세 UI에서 같은 토큰을 적용했다. 저장 경계/마커는 accent 계열, 측정은 짧은 점선, 초안은 붉은 긴 점선으로 구분한다. 실제 타일 픽셀/지도 데이터는 바꾸지 않는다. 참고 HTML을 localhost로 열어 양 테마/크기를 비교했으며, 앱 편집 화면의 light/dark × 1440×900/390×844 스크린샷과 OS 테마 변경 시 입력 보존·다크 상세도 기존 회귀 시나리오에 추가했다. 전체 화면 리디자인이나 사용자 테마 선택·보관 기능의 구현 완료를 뜻하지 않는다. 자세한 범위/미검증 항목은 UI 검토 문서에 기록한다.
+
+최초 원격 PR 검증은 [run 44895519259](https://github.com/JaewonYe/map_service/actions/runs/44895519259), head `a6a8cad20c1dea3d91f54ea18bf75ac0cea2f19f`에서 Map regression의 세 job이 모두 통과했다. 이 실행 이후 main의 Light/Dark 기준을 추가 반영했으므로 이 과거 SHA의 성공을 최종 SHA 결과로 전용하지 않는다. 최종 SHA의 PR/main push 검사 결과는 이슈 #11 완료 댓글에 별도로 기록한다.
+
+추가 기준 반영 후 로컬 typecheck·Node 앱 83/도구 5·전체 Playwright 43개가 모두 통과했다(실패/취소/flaky/스킵 0). 참고 화면과 실제 앱의 양 테마·두 화면 크기 스크린샷을 비교했다. 최종 무결성 검사는 92개 locked asset/세 스킬·토큰/명암비를 통과했다.
+
+마지막 좌표 입력의 테마 배경 보완 후 관련 데스크톱/모바일 경계 시나리오 2개를 다시 실행해 모두 통과했다. 최종 CI는 전체 43개를 다시 실행한다.
