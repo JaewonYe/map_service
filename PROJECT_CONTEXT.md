@@ -56,3 +56,7 @@
 ## 공통 디자인 스킬 설치
 
 UI UX Pro Max와 Web Design Guidelines를 `.agents/skills/`에 설치하고 AGENTS.md에 UI 작업 시 사용 절차를 연결했다. 공통 기준은 [MASTER.md](design-system/platform/MASTER.md)와 tokens.css이며 upstream 커밋/파일 해시는 skills.lock.json에 기록한다. 실제 화면을 일괄 변경하지 않았고 기존 업무·API·기술 승인 상태를 유지한다.
+
+## Light/Dark 시안 구현 스킬
+
+사용자 요청에 따라 프로젝트 전용 `platform-ui-design`과 두 테마 토큰·시안 구현 규칙·로컬 참고 화면을 공통 버전 2.0.0으로 연결한다. 모듈 UI 구현은 같은 기준을 참조하며 실제 앱 리디자인/테마 전환 완료 여부는 별도 구현·검증으로 보고한다.
