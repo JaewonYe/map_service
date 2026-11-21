@@ -51,7 +51,7 @@
 
 - `app/layout.tsx:13` / `lib/theme.ts:6`: 저장 선호를 정적 head bootstrap에서 첫 paint 전에 적용. 접근 오류/잘못된 값은 System. root의 예상된 data-theme 속성 변경만 hydration 경고 억제하며 서버/클라이언트 자식 마크업은 동일하다.
 - `components/ThemeControl.tsx:10`: Light/Dark/System 선택, platform.theme 저장 예외 처리, 같은 탭/다른 탭 동기화. System에서만 CSS OS 설정을 추종. 사용자 선택 변경은 지도/시설/입력 컴포넌트를 재생성하지 않는다. 네이티브 모달 안에도 동일 도구를 제공한다.
-- `components/MapCanvas.tsx:95`: 키보드 가능한 Leaflet map region·줌, 실제 크기 변화 감지/정확한 카메라 복원, reduced-motion 초기 설정, source/DEM/원본 타일 규칙 유지.
+- `components/MapCanvas.tsx:100`: 키보드 가능한 Leaflet map region·줌, 실제 크기 변화 감지/정확한 카메라 복원, reduced-motion 초기 설정, source/DEM/원본 타일 규칙 유지.
 - `components/MapBuildings.tsx:175`: label/name/autocomplete·안전한 텍스트, 목록 선택·native dialog/Esc/초점 복귀, 저장 실패 입력 유지/오류 초점. 선택 카드는 지도/줌을 가리지 않는 크기와 위치를 사용한다.
 - `components/FacilityBoundaryEditor.tsx:75`: 필수 조작의 좌표/버튼 대안, 초안 유지, 편집 본문 스크롤과 저장/취소 분리. 경계/측정/소스 경계는 색상과 선 형태·문구로 구분.
 - `app/globals.css:27`: legacy 흰색/보라 primary 충돌을 누적 override 대신 재구성. 전체 토큰·safe-area·focus/hover/active·내부 스크롤, 장식 경계와 입력 식별 경계를 분리. 일반/위험/포커스 대비는 잠금된 토큰 검사와 실제 화면 확인을 함께 사용한다.
@@ -61,3 +61,8 @@
 합성 fixture를 생성한 뒤 README의 테스트 설정을 사용해 별도 `BUILDINGS_DIR=.cache/ui-13-data`와 catalog TPK로 localhost:3120 production 서버를 시작한다. `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium node scripts/capture-ui-review.mjs after`가 세 시설을 격리된 서버에 준비하고 12장과 manifest를 갱신한다. 합성 catalog와 예상 시설명/설명을 검사하며 예상하지 못한 데이터가 있으면 촬영을 거부한다. 기준 전/후를 재현할 때는 각 앱 소스/build를 사용해야 하며 stage 인자만 바꾼다고 이전 코드가 실행되는 것은 아니다. 서버 종료 후 원본 reference/공통 토큰은 수정하지 않는다.
 
 실제 사용자 지도/시설 데이터, Windows/Ubuntu 실기, 실제 터치 기기/스크린 리더, 외부 접근성 인증·모든 글꼴 확대/회전·대규모 시설 성능·인증/운영·승인된 플랫폼 계약은 미검증이다. 무결성 검사만을 시각 검증으로 사용하지 않았다. 실제 테스트 수·최종 SHA·PR/main run·artifact 보관은 [VALIDATION](VALIDATION.md)와 이슈 #13 완료 댓글에서 확인한다.
+
+
+## 반응형 전환 보완
+
+초기 main CI에서 화면 전환 직후 목록을 늦게 닫는 경합 1건을 확인했다. breakpoint를 React 외부 store로 구독하고 desktop/mobile의 열림 선택을 분리했다. 화면 크기 변경으로 사용자 열림 선택을 초기화하는 effect를 제거했고 data-layout이 실제 반영된 후 테스트를 조작한다. 각 기기의 열린/닫힌 상태와 지도·측정·편집은 독립적으로 보존한다. 양 테마/배치/공통 기준과 사진의 촬영 조건은 유지하며 원격 실패/보완 검증은 VALIDATION과 이슈 완료 댓글에서 구분한다.

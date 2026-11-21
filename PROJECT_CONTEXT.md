@@ -80,3 +80,5 @@ UI UX Pro Max와 Web Design Guidelines를 `.agents/skills/`에 설치하고 AGEN
 - 공통 skill/lock/themes/reference를 수정하거나 새 API/데이터/예약/로그인을 도입하지 않는다. API·UUID·boundary·저장 방식과 오프라인 제한은 유지한다. ResizeObserver는 실제 지도 크기 변경만 처리하고 카메라를 보존한다.
 - 실제 변경 전/참고/후 캡처와 기준별 일치/의도적 차이는 [UI_REDESIGN_REVIEW](docs/UI_REDESIGN_REVIEW.md)에 남긴다. 이미지와 manifest를 저장소에 보관하여 PR에서 직접 조회할 수 있다. 합성 fixture이며 실데이터/OS 실기/접근성 인증은 미검증이다.
 - 테마/전체 배치 브라우저 검사 7개를 추가해 기존 43 → 50개, 기존 5개 프로젝트와 Node 앱 83/도구 5·변환 7/도구 5를 유지한다. 최종 SHA·PR/main CI 증거는 검증 문서 및 이슈 #13 완료 댓글에 기록한다. 검증된 모듈 SHA를 상위 별도 gitlink 통합용으로 보고하며 포인터는 직접 바꾸지 않는다.
+
+- #13 최초 PR CI는 통과했으나 main에서 반응형 목록 초기화 경합 1건이 발생해 보완했다. 데스크톱/모바일 상태를 분리하고 breakpoint를 useSyncExternalStore로 구독하며 최종 보완 SHA의 전체 PR/main 증거를 따로 기록한다.

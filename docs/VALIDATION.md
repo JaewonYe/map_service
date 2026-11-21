@@ -229,3 +229,14 @@ main 디자인 기준 반영 후 로컬 typecheck, Node 앱 83개/집계 도구 
 마지막 모바일 경계 본문/저장 영역 분리 후 typecheck와 buildings 프로젝트 26개를 재실행하여 모두 통과했다(실패/flaky/스킵 0). 저장 버튼이 스크롤 전에 viewport 안에 있고 초점을 받아도 줌/하단 좌표를 가리지 않는 검사도 포함한다. 최종 코드의 직접 캡처와 문서 링크/diff 검사를 마치고 원격 최종 SHA에서는 전체 50개를 실행한다.
 
 최종 production build 후 캡처 도구를 실제 localhost 앱에 실행해 12장 전체를 갱신했다. before/after의 각 12장·양 크기/테마/세 상태·PNG 존재와 문서 로컬 링크/diff 검사가 통과했다. 최종 화면에서 저장/취소 분리와 source/원본 픽셀 구분을 직접 확인했다.
+
+
+### 최초 원격 main 실패와 반응형 상태 보완
+
+구현 PR #14의 [PR run 44936400096](https://github.com/JaewonYe/map_service/actions/runs/44936400096), head `cfc4a36b00ec43cb162e7549c6bc1b9371ee0e01`에서 typecheck·Node/변환/디자인 검사와 Playwright 50개가 모두 통과했다. 같은 SHA의 [main push run 44936595555](https://github.com/JaewonYe/map_service/actions/runs/44936595555)는 브라우저 49 통과/1 실패였다. 이를 최종 성공으로 보고하지 않았고 이슈 #13을 다시 열어 보완했다.
+
+실패는 `mobile drawer long names...resize` 시나리오의 두 번째 모바일 복귀 직후 목록 조회 단계다. 비동기 matchMedia change effect가 사용자 열림 상태를 늦게 초기화해 닫을 수 있었다. `useSyncExternalStore`로 CSS breakpoint를 구독하고 데스크톱/모바일 목록 상태를 따로 보관하도록 변경했다. 테스트는 실제 data-layout 상태를 확인한 후 조작하며 열린 목록의 크기 전환을 3회 더 반복한다. timeout/worker/retry/skip은 늘리지 않았다.
+
+보완 후 로컬 typecheck와 해당 시나리오 10회 반복(각 3회 추가 크기 전환) 모두 통과했다. 이 반복 수는 앱 기본 회귀 50개와 별도로 기록한다. 이후 전체 회귀와 새 최종 SHA의 PR/main 결과를 완료 댓글에 기록한다. 최초 실패 artifact `browser-diagnostics-44936595555-1`(ID 14718974548) 및 conversion artifact(ID 14720125082)의 업로드/7일 만료를 확인했다. 실패 원인은 job 로그로 확인했으며 원격 trace 파일을 내려받아 검토했다고 주장하지 않는다.
+
+반응형 상태 보완 후 전체 Playwright 50개도 로컬에서 다시 통과했다(실패/flaky/스킵 0). 같은 촬영 도구로 변경 후 12장을 다시 캡처했다. 시각/테마/기본 배치는 유지되며 최초 원격 main 실패 이력과 수정 SHA의 결과를 구분한다.

@@ -1,5 +1,5 @@
 'use client';
-import {useCallback,useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import L from 'leaflet';
 import MapMeasurements from './MapMeasurements';
 import DetailLocations from './DetailLocations';
@@ -8,20 +8,25 @@ import type {Coordinate} from '../lib/map-measure';
 import type {CatalogInfo} from '../lib/tiles/catalog';
 import type {LayerId,LayerInfo} from '../lib/maps/types';
 type Info=Pick<CatalogInfo,'center'|'zoom'|'minZoom'|'maxZoom'|'sources'|'warnings'>&{mode:'single'|'multi'|'layers';layers:Record<LayerId,LayerInfo>;osm:{mode:string;url:string|null;attribution:string;reason?:string}};
+const desktopQuery='(min-width:801px)';
+function subscribeLayout(notify:()=>void){
+  const media=matchMedia(desktopQuery);media.addEventListener('change',notify);
+  return()=>media.removeEventListener('change',notify);
+}
+const desktopLayout=()=>matchMedia(desktopQuery).matches;
+const serverLayout=()=>false;
 export default function MapCanvas(){
+  const desktop=useSyncExternalStore(subscribeLayout,desktopLayout,serverLayout);
   const container=useRef<HTMLDivElement>(null);
   const help=useRef<HTMLDialogElement>(null);
   const [sidebarHost,setSidebarHost]=useState<HTMLDivElement|null>(null);
-  const [facilitiesExpanded,setFacilitiesExpanded]=useState(false);
+  const [desktopFacilitiesExpanded,setDesktopFacilitiesExpanded]=useState(true);
+  const [mobileFacilitiesExpanded,setMobileFacilitiesExpanded]=useState(false);
+  const facilitiesExpanded=desktop?desktopFacilitiesExpanded:mobileFacilitiesExpanded;
   const [mapAction,setMapAction]=useState(0);
   const [infoOpen,setInfoOpen]=useState(false);
-  const expandFacilities=useCallback((value: boolean | ((previous: boolean)=>boolean))=>{setFacilitiesExpanded(value);setInfoOpen(false);},[]);
-  const startMapAction=()=>{setMapAction(value=>value+1);if(matchMedia('(max-width:800px)').matches)setFacilitiesExpanded(false);setInfoOpen(false);};
-  useEffect(()=>{
-    const media=matchMedia('(min-width:801px)');
-    const resize=()=>setFacilitiesExpanded(media.matches);resize();
-    media.addEventListener('change',resize);return()=>media.removeEventListener('change',resize);
-  },[]);
+  const expandFacilities=useCallback((value: boolean | ((previous: boolean)=>boolean))=>{if(desktopLayout())setDesktopFacilitiesExpanded(value);else setMobileFacilitiesExpanded(value);setInfoOpen(false);},[]);
+  const startMapAction=()=>{setMapAction(value=>value+1);if(matchMedia('(max-width:800px)').matches)setMobileFacilitiesExpanded(false);setInfoOpen(false);};
   const [activeLayer,setActiveLayer]=useState('');
   const [height,setHeight]=useState('');
   const [mapInstance,setMapInstance]=useState<L.Map|null>(null);
@@ -103,14 +108,14 @@ export default function MapCanvas(){
     observer.observe(container.current);
     return()=>{observer.disconnect();cancelAnimationFrame(frame);};
   },[mapInstance]);
-  return <section className="map-workspace" data-boundary-editing={boundaryEditing || undefined}>
+  return <section className="map-workspace" data-layout={desktop?'desktop':'mobile'} data-boundary-editing={boundaryEditing || undefined}>
     <div className="facility-sidebar-slot" ref={setSidebarHost}/>
     <section className="map-panel" aria-label="지도 작업 영역"><div className="map-stage">
     <div className="map-canvas" ref={container} role="region" aria-label="오프라인 지도"/>
     <div className="map-toolbar">
       {mapInstance&&<MapMeasurements map={mapInstance} disabled={boundaryEditing} onStartAction={startMapAction} onRegisterBuilding={setBuildingPoint}/>}
       <button type="button" className="map-info-toggle" disabled={boundaryEditing} aria-controls="map-data-panel" aria-expanded={infoOpen}
-        onClick={()=>{if(!infoOpen)setMapAction(value=>value+1);setInfoOpen(value=>!value);if(matchMedia('(max-width:800px)').matches)setFacilitiesExpanded(false);}}>지도 정보</button>
+        onClick={()=>{if(!infoOpen)setMapAction(value=>value+1);setInfoOpen(value=>!value);if(matchMedia('(max-width:800px)').matches)setMobileFacilitiesExpanded(false);}}>지도 정보</button>
     </div>
     <section id="map-data-panel" className="map-data-panel" aria-label="지도 데이터 정보" hidden={!infoOpen}>
       <div className="panel-heading"><h2>지도 정보</h2><button type="button" onClick={()=>setInfoOpen(false)} aria-label="지도 정보 닫기">닫기</button></div>

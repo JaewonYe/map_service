@@ -84,14 +84,15 @@ test('switching themes preserves search selection map coordinates form input and
 test('mobile drawer long names and keyboard focus leave controls and map usable through resize',async({page})=>{
  const long={...a,name:'야외 시설과 건물 사이의 긴 이름을 가진 시험 공간 '.repeat(3)};await page.setViewportSize({width:390,height:844});await fixtures(page,[long]);
  await page.emulateMedia({reducedMotion:'reduce'});
- await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.fallback():route.abort());await page.goto('/');await openList(page);
+ await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.fallback():route.abort());await page.goto('/');await expect(page.locator('.map-workspace')).toHaveAttribute('data-layout','mobile');await openList(page);
  const panel=page.getByRole('complementary',{name:'시설 목록'}),row=panel.getByRole('list',{name:'시설 검색 결과'}).getByRole('button');
  await row.focus();await expect(row).toBeFocused();const bounds=(await row.boundingBox())!;expect(bounds.x).toBeGreaterThanOrEqual(0);expect(bounds.x+bounds.width).toBeLessThanOrEqual(390);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(390);await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'시설 목록',exact:true})).toBeFocused();
  await page.getByRole('button',{name:'거리',exact:true}).click();await page.locator('.leaflet-container').click({position:{x:300,y:260}});await expect(page.getByTestId('measurement-points')).toContainText('1개');
- const center=await page.getByTestId('map-center').innerText();await page.setViewportSize({width:1440,height:900});await expect(page.locator('.leaflet-container')).toHaveCSS('width','1120px');
+ const center=await page.getByTestId('map-center').innerText();await page.setViewportSize({width:1440,height:900});await expect(page.locator('.map-workspace')).toHaveAttribute('data-layout','desktop');await expect(page.locator('.leaflet-container')).toHaveCSS('width','1120px');
  await expect(page.getByTestId('measurement-points')).toContainText('1개');await expect(page.getByTestId('map-center')).toHaveText(center);
- await page.setViewportSize({width:390,height:844});await openList(page);
+ await page.setViewportSize({width:390,height:844});await expect(page.locator('.map-workspace')).toHaveAttribute('data-layout','mobile');
+ await expect(page.getByRole('button',{name:'시설 목록',exact:true})).toHaveAttribute('aria-expanded','false');await openList(page);
  await page.getByRole('list',{name:'시설 검색 결과'}).getByRole('button').click();await page.getByRole('button',{name:'경계 수정',exact:true}).click();
  const editor=page.getByRole('region',{name:'시설 경계 편집'});await expect(page.locator('.map-workspace')).toHaveAttribute('data-boundary-editing','true');
  const eb=(await editor.boundingBox())!,zb=(await page.locator('.leaflet-control-zoom').boundingBox())!,fb=(await page.getByRole('complementary',{name:'지도 좌표 정보'}).boundingBox())!;
@@ -99,6 +100,13 @@ test('mobile drawer long names and keyboard focus leave controls and map usable 
  const save=editor.getByRole('button',{name:'경계 저장',exact:true});await expect(save).toBeInViewport();await save.focus();await expect(save).toBeFocused();
  const bb=(await save.boundingBox())!;expect(bb.y).toBeGreaterThanOrEqual(eb.y);expect(bb.y+bb.height).toBeLessThanOrEqual(eb.y+eb.height);
  await page.keyboard.press('Escape');await expect(editor).toHaveCount(0);
+ await openList(page);
+ for(let i=0;i<3;i++){
+  await page.setViewportSize({width:1440,height:900});await expect(page.locator('.map-workspace')).toHaveAttribute('data-layout','desktop');
+  await page.setViewportSize({width:390,height:844});await expect(page.locator('.map-workspace')).toHaveAttribute('data-layout','mobile');
+  await expect(page.getByRole('button',{name:'시설 목록',exact:true})).toHaveAttribute('aria-expanded','true');
+  await expect(page.getByRole('list',{name:'시설 검색 결과'})).toBeVisible();
+ }
 });
 
 test('theme preference synchronizes across tabs while retaining map state',async({page,context})=>{
