@@ -17,7 +17,9 @@
     "test:tiles": "tsx --test tests/tpk.test.ts tests/catalog.test.ts",
     "test:layers": "tsx --test tests/elevation.test.ts",
     "test:osm": "tsx --test tests/osm.test.ts",
-    "predev": "node scripts/prepare-osm.mjs"
+    "predev": "node scripts/prepare-osm.mjs",
+    "ci:node": "node scripts/ci/node-tests.mjs",
+    "test:ci-tools": "node --test tests/tooling/ci.test.mjs"
   },
   "dependencies": {
     "next": "16.4.5",

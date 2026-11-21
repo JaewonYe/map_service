@@ -1,8 +1,10 @@
 import {defineConfig} from '@playwright/test';
 import {resolve} from 'node:path';
 export default defineConfig({
+  forbidOnly:!!process.env.CI,
+  reporter:process.env.CI ? [['line'],['json',{outputFile:'.cache/ci/playwright.json'}],['html',{outputFolder:'playwright-report',open:'never'}]] : 'list',
   testDir:'./tests',testMatch:'**/*.spec.ts',fullyParallel:true,workers:2,
-  use:{baseURL:'http://127.0.0.1:3100',headless:true,launchOptions:{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH||undefined}},
+  use:{baseURL:'http://127.0.0.1:3100',headless:true,trace:process.env.CI?'retain-on-failure':'off',screenshot:'only-on-failure',launchOptions:{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH||undefined}},
   projects:[
     {name:'single',testMatch:'map.spec.ts',use:{baseURL:'http://127.0.0.1:3100'}},
     {name:'multi',testMatch:['catalog.spec.ts','measure.spec.ts'],use:{baseURL:'http://127.0.0.1:3101'}},
@@ -12,18 +14,18 @@ export default defineConfig({
   ],
   webServer:[
     {command:'npx tsx scripts/create-test-tpk.ts && npx tsx scripts/create-test-catalog.ts && node scripts/create-test-buildings.mjs && npx tsx scripts/create-test-layers.ts && npx tsx scripts/create-test-osm.ts && npm run build && npm run start -- --port 3100',url:'http://127.0.0.1:3100',timeout:180000,
-      env:{BUILDINGS_DIR:resolve('.cache/test-building-data/single'),MAP_CONFIG_FILE:'maps.json',TPK_PATH:resolve('.cache/test-tpk/synthetic-v2.tpk'),TPK_USAGE_CONFIRMED:'true',TPK_CACHE_DIR:resolve('.cache/test-bundles'),MAP_MODE:'offline',OSM_USAGE_CONFIRMED:'false',NEXT_TELEMETRY_DISABLED:'1'},reuseExistingServer:false},
+      env:{BUILDINGS_DIR:resolve('.cache/test-building-data/single'),MAP_CONFIG_FILE:'maps.json',TPK_PATH:resolve('.cache/test-tpk/synthetic-v2.tpk'),TPK_USAGE_CONFIRMED:'true',TPK_CACHE_DIR:resolve('.cache/test-bundles'),MAP_MODE:'offline',OSM_USAGE_CONFIRMED:'false',NEXT_TELEMETRY_DISABLED:'1'},reuseExistingServer:false,stdout:process.env.CI?'pipe':'ignore',stderr:'pipe'},
     {command:'npm run start -- --port 3101',url:'http://127.0.0.1:3101',timeout:60000,
-      env:{BUILDINGS_DIR:resolve('.cache/test-building-data/multi'),MAP_CONFIG_FILE:'maps.json',TPK_PATH:resolve('.cache/test-catalog/map.tpk'),TPK_USAGE_CONFIRMED:'false',TPK_CACHE_DIR:resolve('.cache/test-catalog-bundles'),MAP_MODE:'offline',OSM_USAGE_CONFIRMED:'false',NEXT_TELEMETRY_DISABLED:'1'},reuseExistingServer:false},
+      env:{BUILDINGS_DIR:resolve('.cache/test-building-data/multi'),MAP_CONFIG_FILE:'maps.json',TPK_PATH:resolve('.cache/test-catalog/map.tpk'),TPK_USAGE_CONFIRMED:'false',TPK_CACHE_DIR:resolve('.cache/test-catalog-bundles'),MAP_MODE:'offline',OSM_USAGE_CONFIRMED:'false',NEXT_TELEMETRY_DISABLED:'1'},reuseExistingServer:false,stdout:process.env.CI?'pipe':'ignore',stderr:'pipe'},
     {command:'npm run start -- --port 3102',url:'http://127.0.0.1:3102',timeout:60000,
-      env:{BUILDINGS_DIR:resolve('.cache/test-building-data/buildings'),MAP_CONFIG_FILE:'maps.json',TPK_PATH:resolve('.cache/test-catalog/map.tpk'),TPK_USAGE_CONFIRMED:'false',TPK_CACHE_DIR:resolve('.cache/test-catalog-bundles'),MAP_MODE:'offline',OSM_USAGE_CONFIRMED:'false',NEXT_TELEMETRY_DISABLED:'1'},reuseExistingServer:false},
+      env:{BUILDINGS_DIR:resolve('.cache/test-building-data/buildings'),MAP_CONFIG_FILE:'maps.json',TPK_PATH:resolve('.cache/test-catalog/map.tpk'),TPK_USAGE_CONFIRMED:'false',TPK_CACHE_DIR:resolve('.cache/test-catalog-bundles'),MAP_MODE:'offline',OSM_USAGE_CONFIRMED:'false',NEXT_TELEMETRY_DISABLED:'1'},reuseExistingServer:false,stdout:process.env.CI?'pipe':'ignore',stderr:'pipe'},
     {command:'npm run start -- --port 3103',url:'http://127.0.0.1:3103',timeout:60000,
       env:{BUILDINGS_DIR:resolve('.cache/test-building-data/layers'),MAP_CONFIG_FILE:'maps.json',TPK_PATH:resolve('.cache/test-catalog/map.tpk'),TPK_CACHE_DIR:resolve('.cache/test-layers/bundles'),
         STREET_TPK_DIR:resolve('.cache/test-layers/street'),STREET_USAGE_CONFIRMED:'true',ELEVATION_DIR:resolve('.cache/test-layers/elevation'),
-        MAP_MODE:'offline',OSM_USAGE_CONFIRMED:'false',NEXT_TELEMETRY_DISABLED:'1'},reuseExistingServer:false},
+        MAP_MODE:'offline',OSM_USAGE_CONFIRMED:'false',NEXT_TELEMETRY_DISABLED:'1'},reuseExistingServer:false,stdout:process.env.CI?'pipe':'ignore',stderr:'pipe'},
     {command:'npm run start -- --port 3104',url:'http://127.0.0.1:3104',timeout:60000,
       env:{BUILDINGS_DIR:resolve('.cache/test-building-data/osm'),TPK_PATH:resolve('.cache/no-tpk/map.tpk'),MAP_CONFIG_FILE:'maps.json',
         STREET_TPK_DIR:resolve('.cache/no-street'),ELEVATION_DIR:resolve('.cache/no-dem'),OSM_TILE_DIR:resolve('.cache/test-osm'),
-        MAP_MODE:'offline',OSM_USAGE_CONFIRMED:'false',NEXT_TELEMETRY_DISABLED:'1'},reuseExistingServer:false}
+        MAP_MODE:'offline',OSM_USAGE_CONFIRMED:'false',NEXT_TELEMETRY_DISABLED:'1'},reuseExistingServer:false,stdout:process.env.CI?'pipe':'ignore',stderr:'pipe'}
   ]
 });

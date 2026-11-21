@@ -1,0 +1,90 @@
+name: Map regression
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: map-regression-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  node:
+    name: Node regression and typecheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - id: typecheck
+        run: npm run typecheck
+      - if: ${{ !cancelled() && steps.typecheck.outcome != 'skipped' }}
+        run: npm run ci:node
+      - name: Node execution summary
+        if: always()
+        env:
+          TYPECHECK_OUTCOME: ${{ steps.typecheck.outcome }}
+        run: node scripts/ci/summary.mjs node
+      - name: Preserve Node diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: node-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .cache/ci/node/*.log
+            .cache/ci/node-results.json
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
+
+  browser:
+    name: Playwright regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # Existing configuration creates synthetic fixtures, builds once, and manages five servers.
+      - name: Run all Playwright projects
+        shell: bash
+        run: |
+          mkdir -p .cache/ci
+          set -o pipefail
+          npm test 2>&1 | tee .cache/ci/browser.log
+      - name: Browser execution summary
+        if: always()
+        run: node scripts/ci/summary.mjs browser
+      - name: Preserve browser diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: browser-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .cache/ci/browser.log
+            .cache/ci/playwright.json
+            playwright-report/
+            test-results/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
