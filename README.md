@@ -424,7 +424,7 @@ OSM 검증: Node 렌더링 테스트 **4개**, PBF 변환 테스트 **4개**, �
 
 `.github/workflows/map-regression.yml`은 모든 PR과 main push에서 Node.js 24 / Ubuntu 24.04 GitHub runner를 사용합니다. Node·브라우저·변환 job은 별도 checkout과 작업 공간에서 실행하므로 fixture·캐시·포트가 공유되지 않습니다. 외부 의존성 설치에는 인터넷이 필요하지만 브라우저의 오프라인 회귀 시나리오는 외부 지도 요청을 차단해 별도로 검증합니다. 실제 사용자 TPK·DEM·PBF나 비밀 설정은 필요하지 않습니다.
 
-- **Node regression and typecheck**: `npm ci` → `npm run typecheck` → `npm run ci:node`. 기존 tiles/buildings/layers/osm/measure/launcher 6개 명령을 모두 실행하며 실패 종료 코드를 유지합니다. 추가 `test:ci-tools`는 집계기의 실패 전달·빈 실행·전체 스킵 처리 등을 검증합니다. 현재 앱 회귀 74개(이슈 #9 검색 검사 3개 추가)와 도구 검증 5개를 구분합니다.
+- **Node regression and typecheck**: `npm ci` → `npm run typecheck` → `npm run ci:node`. 기존 tiles/buildings/layers/osm/measure/launcher 6개 명령을 모두 실행하며 실패 종료 코드를 유지합니다. 추가 `test:ci-tools`는 집계기의 실패 전달·빈 실행·전체 스킵 처리 등을 검증합니다. 현재 앱 회귀 75개(이슈 #9 검색·지연 목록 병합 검사 4개 추가)와 도구 검증 5개를 구분합니다.
 - **Playwright regression**: `npm ci` → `npx playwright install --with-deps chromium` → `npm test`. 기존 5개 프로젝트·workers=2를 유지하며 합성 fixture 생성, production build 1회, 서버 5개의 준비/종료를 기존 Playwright 설정이 담당합니다. 별도 build step은 추가하지 않습니다.
 - 각 job의 Step summary에서 총수·통과·실패·스킵·미실행을 확인합니다. 0개/전체 스킵, 누락된 결과, 실행되지 않은 브라우저 프로젝트는 성공 증거로 취급하지 않습니다. 자동 재시도·timeout 증가는 추가하지 않았습니다.
 - 브라우저 HTML/JSON 보고서와 build/서버/테스트 로그는 `browser-diagnostics-<run_id>-<attempt>`에 7일 보관합니다. 실패한 테스트에는 trace·스크린샷·error context를 포함합니다. Node 실패 로그/집계 JSON은 `node-diagnostics-<run_id>-<attempt>`에 7일 보관합니다. 업로드 대상은 보고서 경로만 지정하며 원본 데이터·.env·전체 환경변수·fixture 캐시는 포함하지 않습니다. setup 실패 등으로 파일이 없으면 해당 step 로그를 확인합니다.

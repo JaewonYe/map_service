@@ -3,7 +3,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState, type FormEvent} from 'react';
 import L from 'leaflet';
 import {BUILDING_CATEGORIES, FIELD_LIMITS, type Building, type BuildingCategory, type BuildingInput} from '../lib/buildings/model';
-import {filterBuildings, matchesBuilding} from '../lib/buildings/search';
+import {filterBuildings, matchesBuilding, mergeBuildingSnapshot} from '../lib/buildings/search';
 import type {Coordinate} from '../lib/map-measure';
 
 async function responseData(response: Response) {
@@ -28,17 +28,22 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed}: Pro
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectionRequest = useRef(0);
   const listRequest = useRef(0);
+  const revision = useRef(0);
+  const changes = useRef(new Map<string, {revision: number; building: Building | null}>());
   const toggle = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement>(map.getContainer());
   const visible = useMemo(() => filterBuildings(buildings, search, category), [buildings, search, category]);
 
   async function load(signal?: AbortSignal) {
-    const sequence = ++listRequest.current;
+    const sequence = ++listRequest.current, startedAt = revision.current;
     setListStatus('loading'); setListError(''); setDetailError(''); setRetryId(null);
     try {
       const body = await responseData(await fetch('/api/buildings', {signal, cache: 'no-store'}));
       if (!signal?.aborted && sequence === listRequest.current) {
-        setBuildings(body.buildings); setListStatus('ready');
+        const updates = [...changes.current].filter(([, change]) => change.revision > startedAt)
+          .map(([id, change]) => ({id, building: change.building}));
+        setBuildings(mergeBuildingSnapshot(body.buildings, updates)); setListStatus('ready');
+        for (const [id, change] of changes.current) if (change.revision <= startedAt) changes.current.delete(id);
       }
     } catch (error) {
       if (!signal?.aborted && sequence === listRequest.current) {
@@ -73,16 +78,15 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed}: Pro
       const response = await fetch(`/api/buildings/${id}`, {cache: 'no-store'});
       if (sequence !== selectionRequest.current) return;
       if (response.status === 404) {
-        listRequest.current++; setBuildings(previous => previous.filter(item => item.id !== id));
-        setListStatus('ready'); setListError('');
+        changes.current.set(id, {revision: ++revision.current, building: null});
+        setBuildings(previous => previous.filter(item => item.id !== id));
         setSelectedId(null); setEditor(null); setDetailError('시설이 삭제되었습니다. 목록을 다시 불러와 확인하세요.');
         return;
       }
       const {building}: {building: Building} = await responseData(response);
       if (sequence !== selectionRequest.current) return;
-      listRequest.current++;
+      changes.current.set(id, {revision: ++revision.current, building});
       setBuildings(previous => previous.map(item => item.id === id ? building : item));
-      setListStatus('ready'); setListError('');
       if (!matchesBuilding(building, search, category)) {
         setSelectedId(null); setEditor(null); setDetailError('변경된 시설이 현재 검색 조건에서 제외되었습니다.'); return;
       }
@@ -116,15 +120,16 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed}: Pro
   }
   function close() {selectionRequest.current++; setDetailLoading(false); setEditor(null); onRequestClosed();}
   function saved(building: Building) {
-    listRequest.current++;
+    changes.current.set(building.id, {revision: ++revision.current, building});
     setBuildings(previous => [building, ...previous.filter(item => item.id !== building.id)]);
     setSelectedId(matchesBuilding(building, search, category) ? building.id : null);
-    setListStatus('ready'); setListError(''); setDetailError(''); close();
+    setDetailError(''); close();
   }
   function deleted(id: string) {
-    listRequest.current++; setBuildings(previous => previous.filter(building => building.id !== id));
+    changes.current.set(id, {revision: ++revision.current, building: null});
+    setBuildings(previous => previous.filter(building => building.id !== id));
     setSelectedId(previous => previous === id ? null : previous);
-    setListStatus('ready'); setListError(''); setDetailError(''); close();
+    setDetailError(''); close();
   }
 
   function retryDetail() {

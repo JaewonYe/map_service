@@ -4,7 +4,7 @@ import {cp, mkdtemp, readFile, readdir, rm, symlink, writeFile} from 'node:fs/pr
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {filterBuildings} from '../lib/buildings/search';
+import {filterBuildings, mergeBuildingSnapshot} from '../lib/buildings/search';
 import {BuildingStore} from '../lib/buildings/store';
 import {BuildingError, parseBuilding} from '../lib/buildings/model';
 import {buildingBody, buildingVersion, checkBuildingOrigin} from '../lib/buildings/http';
@@ -127,4 +127,18 @@ test('filtering never mutates or removes the stored source records', async t => 
   assert.equal(JSON.stringify(records), before);
   assert.deepEqual(await store.get(building.id), building);
   assert.equal(filterBuildings(records, '', '')[0], records[0]);
+});
+
+
+test('a delayed list snapshot retains unrelated rows and overlays later create, update and delete results', async t => {
+  const {store} = await fixture(t);
+  const kept = await store.create({...input, name: '기존 시설'});
+  const removed = await store.create({...input, name: '삭제할 시설'});
+  const changed = {...kept, name: '수정된 시설', version: 2};
+  const added = await store.create({...input, name: '새 시설'});
+  const snapshot = [kept, removed], before = JSON.stringify(snapshot);
+  const result = mergeBuildingSnapshot(snapshot, [{id: kept.id, building: changed}, {id: added.id, building: added}, {id: removed.id, building: null}]);
+  assert.deepEqual(result, [changed, added]);
+  assert.equal(JSON.stringify(snapshot), before);
+  assert.deepEqual(mergeBuildingSnapshot([kept], [{id: added.id, building: added}]), [kept, added]);
 });

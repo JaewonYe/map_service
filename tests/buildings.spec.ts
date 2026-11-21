@@ -110,11 +110,12 @@ test('building labels render as plain text and the editor fits a narrow screen',
 
 test('a delayed initial list cannot remove a newly saved building marker', async ({page, request}) => {
   const name = `지연 응답 ${randomUUID().slice(0, 8)}`;
+  const existing = facility('처음부터 있던 시설', '주차장', 36.597, 126.244);
   let release!: () => void, held = false, id: string | undefined;
   const gate = new Promise<void>(resolve => {release = resolve;});
   await page.route('**/api/buildings', async route => {
     if (route.request().method() === 'GET' && !held) {
-      held = true; await gate; await route.fulfill({json: {buildings: []}});
+      held = true; await gate; await route.fulfill({json: {buildings: [existing]}});
     } else await route.continue();
   });
   try {
@@ -134,6 +135,9 @@ test('a delayed initial list cannot remove a newly saved building marker', async
     release(); await (await stale).finished();
     await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
     await expect(marker).toBeVisible();
+    const panel = await expandFacilities(page);
+    await expect(panel.getByTestId('facility-result-count')).toHaveText('검색 결과 2개 / 전체 2개');
+    await expect(panel.getByRole('button', {name: /처음부터 있던 시설/})).toBeVisible();
   } finally {release(); if (id) await remove(request, id);}
 });
 
@@ -375,7 +379,8 @@ test('mobile and keyboard facility selection leaves map measurement and registra
   const panel = await expandFacilities(page), search = panel.getByRole('searchbox', {name: '시설명 검색'});
   await search.focus(); await search.fill('west'); await search.press('Tab');
   const category = panel.getByRole('combobox', {name: '시설 분류'});
-  await expect(category).toBeFocused(); await category.press('End'); await category.press('Tab');
+  await expect(category).toBeFocused(); await category.press('End');
+  await expect(category).toHaveValue('야외 공간'); await category.press('Tab');
   await expect(panel.getByRole('button', {name: '검색·분류 초기화'})).toBeFocused();
   await page.keyboard.press('Tab'); await expect(panel.getByRole('button', {name: '시설 목록 다시 불러오기'})).toBeFocused();
   await page.keyboard.press('Tab'); await expect(panel.getByRole('button', {name: /West Field/})).toBeFocused();
