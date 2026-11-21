@@ -460,3 +460,7 @@ python3 scripts/ci/conversion.py summary
 CI는 `conversion-diagnostics-<run_id>-<attempt>`에 빌드·테스트·버전·image ID 로그만 7일 보관합니다. 합성 데이터 전체·원본 사용자 데이터·이미지 tar·환경변수·비밀은 업로드하지 않습니다. 원격 run URL/SHA는 [검증 기록](docs/VALIDATION.md)과 [이슈 #7](https://github.com/JaewonYe/map_service/issues/7) 완료 댓글에서 확인합니다. 새 job의 필수 검사 등록과 실제 병합 차단 확인은 관리자 후속 작업입니다. 실데이터·Windows/Ubuntu 실기·인증/운영·공통 플랫폼 계약 검증은 여전히 미실행입니다.
 
 수정 후 최초 원격 변환 검증은 [run 44874199867](https://github.com/JaewonYe/map_service/actions/runs/44874199867), PR head `fd3a1beed3cadb3cfdde50e39ad8c3b81fa4aaae`에서 세 job 모두 성공했습니다. 변환 7개·Python 도구 5개와 기존 앱 71개·Node 도구 5개·브라우저 30개가 통과했습니다. 최초 guard 실패 원인·수정·실행별 버전/image ID는 검증 기록에, 최종 SHA의 두 이벤트 결과는 이슈 #7에 기록합니다.
+
+## 공통 UI 디자인 스킬
+
+[공통 디자인 기준](design-system/platform/MASTER.md)을 읽고 `.agents/skills/ui-ux-pro-max`로 디자인 권고를 검색한 뒤 `.agents/skills/web-design-guidelines`로 UI를 검토합니다. `python3 scripts/check_design_skills.py`로 설치를 검증합니다. Python 3 표준 라이브러리만 필요하며 런타임 웹 의존성은 추가하지 않습니다.

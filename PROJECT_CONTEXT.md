@@ -52,3 +52,7 @@
 - 초기 로딩·실제 등록 0개·검색 결과 0개·오류/재시도를 구분한다. 변경·재조회 후 조건을 유지하고 삭제/필터 이탈 선택 및 지연 응답을 처리한다.
 - 새 서버 검색/페이지 API, ID·분류·스키마·저장 형식·모듈 책임 변경과 예약 연계는 없다. 상위 gitlink는 별도 통합 범위다.
 - 검증에 검색·지연 목록 병합 단위 4개와 브라우저 7개를 추가한다. 실제 실행 수·최종 SHA/run URL은 검증 문서와 이슈 #9 완료 댓글에 기록한다.
+
+## 공통 디자인 스킬 설치
+
+UI UX Pro Max와 Web Design Guidelines를 `.agents/skills/`에 설치하고 AGENTS.md에 UI 작업 시 사용 절차를 연결했다. 공통 기준은 [MASTER.md](design-system/platform/MASTER.md)와 tokens.css이며 upstream 커밋/파일 해시는 skills.lock.json에 기록한다. 실제 화면을 일괄 변경하지 않았고 기존 업무·API·기술 승인 상태를 유지한다.
