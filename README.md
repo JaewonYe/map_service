@@ -454,3 +454,5 @@ python3 scripts/ci/conversion.py summary
 **고정 범위:** 기반 image digest는 고정했지만 APT 저장소·전이 의존성·`docker/dockerfile:1` frontend와 GitHub runner/Docker 버전은 가변입니다. 전체 환경의 byte 단위 재현성을 보장하지 않습니다. 갱신 시 `docker buildx imagetools inspect debian:bookworm-slim`으로 새 digest/아키텍처를 확인하고 두 Dockerfile을 함께 갱신한 뒤 `--pull --no-cache`로 두 이미지를 다시 빌드하고 7개 변환 및 기존 Node/브라우저 CI를 확인합니다. 패키지 버전과 image ID 차이를 검토해 문서를 갱신합니다. APT 서명/체크섬과 registry/TLS 검증은 끄지 않으며 관리 환경의 CA는 기존 선택적 BuildKit `proxy_ca` secret만 사용합니다.
 
 CI는 `conversion-diagnostics-<run_id>-<attempt>`에 빌드·테스트·버전·image ID 로그만 7일 보관합니다. 합성 데이터 전체·원본 사용자 데이터·이미지 tar·환경변수·비밀은 업로드하지 않습니다. 원격 run URL/SHA는 [검증 기록](docs/VALIDATION.md)과 [이슈 #7](https://github.com/JaewonYe/map_service/issues/7) 완료 댓글에서 확인합니다. 새 job의 필수 검사 등록과 실제 병합 차단 확인은 관리자 후속 작업입니다. 실데이터·Windows/Ubuntu 실기·인증/운영·공통 플랫폼 계약 검증은 여전히 미실행입니다.
+
+수정 후 최초 원격 변환 검증은 [run 44874199867](https://github.com/JaewonYe/map_service/actions/runs/44874199867), PR head `fd3a1beed3cadb3cfdde50e39ad8c3b81fa4aaae`에서 세 job 모두 성공했습니다. 변환 7개·Python 도구 5개와 기존 앱 71개·Node 도구 5개·브라우저 30개가 통과했습니다. 최초 guard 실패 원인·수정·실행별 버전/image ID는 검증 기록에, 최종 SHA의 두 이벤트 결과는 이슈 #7에 기록합니다.

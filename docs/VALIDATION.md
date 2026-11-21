@@ -101,3 +101,14 @@ README의 합성 변환 CI 절차대로 두 production Dockerfile을 `map-servic
 
 
 최초 PR run [44874055430](https://github.com/JaewonYe/map_service/actions/runs/44874055430), head `08428451a6d7073a6e0068a838eb1618d62e3c23`에서 conversion 도구 검사의 임시 폴더 탐색이 실패했다. runner Python의 바깥 unittest discover가 default loader에 남긴 top-level 경로를 재사용한 원인이며 fresh `TestLoader`로 격리했다. 이 실행에서는 DEM/PBF 변환 7개가 미실행이며, 성공으로 계산하지 않는다. 초기 실패는 Actions job 로그에 남아 있고, 초기 guard 단계부터 `reporting-gates.log` artifact를 보존하도록 보완했다. 수정 SHA의 재실행 결과는 실제 완료 후 기록한다.
+
+### 수정 후 실제 원격 PR 검증
+
+- Run: https://github.com/JaewonYe/map_service/actions/runs/44874199867
+- 이벤트 `pull_request`, head SHA `fd3a1beed3cadb3cfdde50e39ad8c3b81fa4aaae`, 세 job 모두 success. PR: https://github.com/JaewonYe/map_service/pull/8
+- Conversion regression: 실제 production DEM 3개/PBF 4개와 Python 집계 도구 5개 통과. 오류/실패/스킵 0. `/usr/bin/python3`와 GDAL 실제 import/GTiff·PNG·OSM driver, source/baked script SHA256 일치 확인.
+- 기존 앱 회귀 71개와 Node 집계 도구 5개, typecheck 및 Playwright 5개 프로젝트 30개도 성공. 기존 테스트 수·assertion·worker·timeout은 변경하지 않았다.
+- 원격 변환 버전/패키지 버전은 위 로컬 기록과 일치했다. 원격 built image ID: DEM `sha256:43f632879738a5dae8931e1996bb42a5db97300042b9599452fe5633ce4edd53`, OSM `sha256:6484aeaa9a3826c7202d6efa6a66d5761c5865aa7999b14a66b4bfa345a159df`. 로컬/원격 image ID가 같다고 주장하지 않는다.
+- `conversion-diagnostics-44874199867-1` artifact(ID `14694923723`, 약 21KB) 업로드와 7일 만료를 확인했다. reporting-gates/build/test/version/image ID 로그만 대상으로 하며 실제 원본/결과 데이터는 제외한다. 브라우저 artifact `browser-diagnostics-44874199867-1`도 업로드됐다.
+- 최초 실패 run과 수정 후 성공 run을 구분했다. 실패 artifact의 업로드/내용은 검증했다고 주장하지 않으며, 실패 원인은 최초 Actions step 로그로 확인했다.
+- 이 기록 이후 문서 변경을 포함한 최종 SHA의 PR/main push 실행 결과는 [이슈 #7](https://github.com/JaewonYe/map_service/issues/7) 완료 댓글에서 이벤트별로 확인한다.

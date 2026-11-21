@@ -42,3 +42,4 @@
 - 기반 Debian multi-platform image digest를 고정하고 실제 Python/GDAL/NumPy/Shapely·패키지 버전과 이미지 ID를 기록한다. APT 저장소/전이 의존성/빌드 frontend는 가변이므로 완전 고정 환경으로 표현하지 않는다.
 - `/usr/bin/python3`, 읽기 전용 저장소/컨테이너, 비루트, 네트워크 없는 실행과 `/tmp` 합성 데이터만 사용한다. 0개/전체 스킵/import 오류를 거부하고 실패 코드와 소규모 진단 로그를 보존한다.
 - 실제 run/event/SHA/테스트 수는 [검증 기록](docs/VALIDATION.md)과 [이슈 #7](https://github.com/JaewonYe/map_service/issues/7) 완료 댓글을 확인한다. 필수 검사 등록은 관리자 작업이며 실데이터·OS 실기·인증/운영·공통 계약 검증과 상위 gitlink 갱신은 별도 범위다.
+- 수정 후 원격 PR 검증: [run 44874199867](https://github.com/JaewonYe/map_service/actions/runs/44874199867), head `fd3a1beed3cadb3cfdde50e39ad8c3b81fa4aaae`, 세 job 성공. DEM 3/PBF 4/Python 도구 5, 기존 앱 71/Node 도구 5/브라우저 30 통과. 최초 guard 실패와 수정 내역은 검증 문서에 기록했으며 최종 SHA/main push 증거는 이슈 #7 완료 댓글에 남긴다.
