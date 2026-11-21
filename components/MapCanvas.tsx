@@ -78,7 +78,7 @@ export default function MapCanvas(){
   },[clicked,info]);
   return <section className="map-panel"><div className="map-canvas" ref={container} aria-label="오프라인 지도"/>
     <aside className="map-info" aria-label="지도 좌표 정보">
-      <div>중심: {center?`${center[0].toFixed(6)}, ${center[1].toFixed(6)}`:'—'}</div>
+      <div data-testid="map-center">중심: {center?`${center[0].toFixed(6)}, ${center[1].toFixed(6)}`:'—'}</div>
       <div>Zoom: <span data-testid="zoom">{zoom??'—'}</span></div>
       <div data-testid="clicked">클릭: {clicked?`${clicked[0].toFixed(6)}, ${clicked[1].toFixed(6)}`:'지도를 클릭하세요'}</div>
       {info?.layers.elevation.available&&<div data-testid="elevation-value">고도: {height||'지도를 클릭하세요'}</div>}

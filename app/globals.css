@@ -68,3 +68,19 @@ main { flex: 1; min-height: 240px; position: relative; display: flex; }
 .facility-details {display:grid;grid-template-columns:85px minmax(0,1fr);gap:10px;}
 .facility-details dt {font-weight:600;}
 .facility-details dd {margin:0;white-space:pre-wrap;overflow-wrap:anywhere;}
+
+.facility-panel {position:absolute;top:190px;right:10px;z-index:600;box-sizing:border-box;width:290px;max-width:calc(100% - 24px);max-height:min(390px,calc(100% - 215px));display:flex;flex-direction:column;border:1px solid #cbd5e1;border-radius:6px;background:#fff;box-shadow:0 1px 5px #0002;font-size:13px;color:#1e293b;}
+.facility-list-toggle {flex-shrink:0;display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;min-height:40px;border:0;border-radius:6px;background:#fff;padding:8px 10px;color:#1e293b;font:inherit;font-weight:600;cursor:pointer;}
+.facility-list-toggle span {font-size:11px;font-weight:400;color:#52616b;}
+.facility-list-content {min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 10px 10px;}
+.facility-list-content label {display:grid;gap:4px;margin-bottom:8px;}
+.facility-list-content input,.facility-list-content select {box-sizing:border-box;width:100%;min-width:0;padding:7px;border:1px solid #aab7c4;border-radius:4px;font:inherit;}
+.facility-list-actions {display:flex;gap:5px;flex-wrap:wrap;}
+.facility-list-actions button,.facility-results button {padding:7px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;font:inherit;color:#1e293b;cursor:pointer;}
+.facility-list-actions button:disabled {opacity:.5;cursor:default;}
+.facility-panel :focus-visible {outline:2px solid #6941a5;outline-offset:-2px;}
+.facility-results {padding:0;margin:0;list-style:none;display:grid;gap:5px;}
+.facility-results button {display:block;width:100%;text-align:left;overflow-wrap:anywhere;}
+.facility-results button small {display:block;margin-top:3px;color:#52616b;}
+.facility-results button:hover,.facility-results button[aria-current="location"] {background:#f4effa;border-color:#6941a5;}
+@media(max-width:600px){.facility-panel{width:280px;max-height:min(260px,max(80px,calc(100% - 530px)));}.facility-list-toggle{min-height:40px;}}

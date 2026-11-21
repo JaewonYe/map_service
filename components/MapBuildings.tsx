@@ -1,8 +1,9 @@
 'use client';
 
-import {useEffect, useRef, useState, type FormEvent} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState, type FormEvent} from 'react';
 import L from 'leaflet';
-import {BUILDING_CATEGORIES, FIELD_LIMITS, type Building, type BuildingInput} from '../lib/buildings/model';
+import {BUILDING_CATEGORIES, FIELD_LIMITS, type Building, type BuildingCategory, type BuildingInput} from '../lib/buildings/model';
+import {filterBuildings, matchesBuilding} from '../lib/buildings/search';
 import type {Coordinate} from '../lib/map-measure';
 
 async function responseData(response: Response) {
@@ -16,38 +17,90 @@ type Props = {map: L.Map; requestedPoint: Coordinate | null; onRequestClosed: ()
 export default function MapBuildings({map, requestedPoint, onRequestClosed}: Props) {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [editor, setEditor] = useState<Editor | null>(null);
-  const [error, setError] = useState('');
+  const [listStatus, setListStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [listError, setListError] = useState('');
+  const [detailError, setDetailError] = useState('');
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [retryId, setRetryId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState<BuildingCategory | ''>('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectionRequest = useRef(0);
   const listRequest = useRef(0);
+  const toggle = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef<HTMLElement>(map.getContainer());
+  const visible = useMemo(() => filterBuildings(buildings, search, category), [buildings, search, category]);
 
   async function load(signal?: AbortSignal) {
     const sequence = ++listRequest.current;
+    setListStatus('loading'); setListError(''); setDetailError(''); setRetryId(null);
     try {
       const body = await responseData(await fetch('/api/buildings', {signal, cache: 'no-store'}));
-      if (!signal?.aborted && sequence === listRequest.current) {setBuildings(body.buildings); setError('');}
-    } catch (error) {if (!signal?.aborted && sequence === listRequest.current) setError(error instanceof Error ? error.message : '시설·건물 정보를 불러오지 못했습니다.');}
+      if (!signal?.aborted && sequence === listRequest.current) {
+        setBuildings(body.buildings); setListStatus('ready');
+      }
+    } catch (error) {
+      if (!signal?.aborted && sequence === listRequest.current) {
+        setListStatus('error'); setListError(error instanceof Error ? error.message : '시설 목록을 불러오지 못했습니다.');
+      }
+    }
   }
-  useEffect(() => {const abort = new AbortController(); void load(abort.signal); return () => abort.abort();}, []);
   useEffect(() => {
-    if (requestedPoint) {selectionRequest.current++; setEditor({building: null, point: requestedPoint});}
-  }, [requestedPoint]);
+    const abort = new AbortController(); void load(abort.signal);
+    return () => {abort.abort(); selectionRequest.current++;};
+  }, []);
+  useEffect(() => {
+    if (requestedPoint) {
+      selectionRequest.current++; setDetailLoading(false); setDetailError(''); setRetryId(null);
+      setSelectedId(null); setExpanded(false); returnFocus.current = map.getContainer();
+      setEditor({building: null, point: requestedPoint});
+    }
+  }, [requestedPoint, map]);
+  // A refreshed record may have been deleted or moved outside the current filters.
+  useEffect(() => {
+    if (selectedId && !visible.some(building => building.id === selectedId)) {
+      selectionRequest.current++; setSelectedId(null); setDetailLoading(false);
+      if (editor?.building?.id === selectedId) {setEditor(null); onRequestClosed();}
+    }
+  }, [visible, selectedId, editor, onRequestClosed]);
 
-  async function openBuilding(id: string) {
+  const openBuilding = useCallback(async (id: string, fromList = false) => {
     const sequence = ++selectionRequest.current;
+    returnFocus.current = fromList && toggle.current ? toggle.current : map.getContainer();
+    setExpanded(false); setDetailLoading(true); setDetailError(''); setRetryId(null);
     try {
-      const {building} = await responseData(await fetch(`/api/buildings/${id}`, {cache: 'no-store'}));
+      const response = await fetch(`/api/buildings/${id}`, {cache: 'no-store'});
+      if (sequence !== selectionRequest.current) return;
+      if (response.status === 404) {
+        listRequest.current++; setBuildings(previous => previous.filter(item => item.id !== id));
+        setListStatus('ready'); setListError('');
+        setSelectedId(null); setEditor(null); setDetailError('시설이 삭제되었습니다. 목록을 다시 불러와 확인하세요.');
+        return;
+      }
+      const {building}: {building: Building} = await responseData(response);
       if (sequence !== selectionRequest.current) return;
       listRequest.current++;
       setBuildings(previous => previous.map(item => item.id === id ? building : item));
-      setEditor({building, point: [building.latitude, building.longitude]}); setError('');
-    } catch (error) {if (sequence === selectionRequest.current) setError(error instanceof Error ? error.message : '시설·건물 정보를 불러오지 못했습니다.');}
-  }
+      setListStatus('ready'); setListError('');
+      if (!matchesBuilding(building, search, category)) {
+        setSelectedId(null); setEditor(null); setDetailError('변경된 시설이 현재 검색 조건에서 제외되었습니다.'); return;
+      }
+      setSelectedId(id);
+      map.panTo([building.latitude, building.longitude], {animate: false});
+      setEditor({building, point: [building.latitude, building.longitude]});
+    } catch (error) {
+      if (sequence === selectionRequest.current) {
+        setDetailError(error instanceof Error ? error.message : '시설 정보를 불러오지 못했습니다.'); setRetryId(id);
+      }
+    } finally {if (sequence === selectionRequest.current) setDetailLoading(false);}
+  }, [map, search, category]);
 
   useEffect(() => {
     const group = L.layerGroup().addTo(map);
     const icon = L.divIcon({className: 'building-marker', iconSize: [28, 28], iconAnchor: [14, 14],
       html: '<svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="13" fill="#6941a5" stroke="white" stroke-width="2"/><path d="M8 21V8h12v13M11 11h2m2 0h2m-6 4h2m2 0h2m-4 6v-3h2v3" fill="none" stroke="white" stroke-width="1.6"/></svg>'});
-    for (const building of buildings) {
+    for (const building of visible) {
       const text = document.createElement('span'); text.textContent = building.name;
       const marker = L.marker([building.latitude, building.longitude], {icon, keyboard: true, bubblingMouseEvents: false})
         .bindTooltip(text, {direction: 'top', className: 'building-tooltip'})
@@ -55,18 +108,64 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed}: Pro
       marker.getElement()?.setAttribute('aria-label', `${building.name} 시설·건물 정보 보기`);
     }
     return () => {group.remove();};
-  }, [map, buildings]);
+  }, [map, visible, openBuilding]);
 
-  function close() {selectionRequest.current++; setEditor(null); onRequestClosed();}
+  function changeFilters(nextSearch: string, nextCategory: BuildingCategory | '') {
+    selectionRequest.current++; setDetailLoading(false); setDetailError(''); setRetryId(null);
+    setSelectedId(null); setSearch(nextSearch); setCategory(nextCategory);
+  }
+  function close() {selectionRequest.current++; setDetailLoading(false); setEditor(null); onRequestClosed();}
   function saved(building: Building) {
     listRequest.current++;
-    setBuildings(previous => [building, ...previous.filter(item => item.id !== building.id)]); setError(''); close();
+    setBuildings(previous => [building, ...previous.filter(item => item.id !== building.id)]);
+    setSelectedId(matchesBuilding(building, search, category) ? building.id : null);
+    setListStatus('ready'); setListError(''); setDetailError(''); close();
   }
-  function deleted(id: string) {listRequest.current++; setBuildings(previous => previous.filter(building => building.id !== id)); close();}
+  function deleted(id: string) {
+    listRequest.current++; setBuildings(previous => previous.filter(building => building.id !== id));
+    setSelectedId(previous => previous === id ? null : previous);
+    setListStatus('ready'); setListError(''); setDetailError(''); close();
+  }
+
+  function retryDetail() {
+    if (retryId) void openBuilding(retryId, true);
+    else {setExpanded(true); void load();}
+  }
 
   return <>
-    {error && <div className="building-load-error" role="status">{error}<button type="button" onClick={() => void load()}>건물 다시 불러오기</button></div>}
-    {editor && <BuildingDialog key={editor.building?.id || 'new'} editor={editor} returnFocus={map.getContainer()}
+    <aside className="facility-panel" aria-label="시설 목록">
+      <button ref={toggle} type="button" className="facility-list-toggle" aria-label="시설 목록" aria-expanded={expanded} aria-controls="facility-list-content"
+        onClick={() => setExpanded(value => !value)}>시설 목록 <span aria-hidden="true">{expanded ? '접기' : '펼치기'}{(search.trim() || category) && ' · 조건 적용 중'}</span></button>
+      {expanded && <div id="facility-list-content" className="facility-list-content">
+        <label>시설명 검색<input type="search" value={search} onChange={event => changeFilters(event.target.value, category)} placeholder="시설명으로 찾기"/></label>
+        <label>시설 분류<select value={category} onChange={event => changeFilters(search, event.target.value as BuildingCategory | '')}>
+          <option value="">전체</option>{BUILDING_CATEGORIES.map(value => <option key={value} value={value}>{value}</option>)}
+        </select></label>
+        <div className="facility-list-actions">
+          <button type="button" onClick={() => changeFilters('', '')}>검색·분류 초기화</button>
+          <button type="button" disabled={listStatus === 'loading'} onClick={() => void load()}>시설 목록 다시 불러오기</button>
+        </div>
+        {listStatus === 'loading' && <p role="status">시설 목록을 불러오는 중…</p>}
+        {listStatus === 'error' && <p role="alert">시설 목록 조회 실패: {listError}{buildings.length > 0 && ' 이전 조회 결과를 표시합니다.'}</p>}
+        {(listStatus === 'ready' || buildings.length > 0) && <>
+          <p role="status" data-testid="facility-result-count">검색 결과 {visible.length}개 / 전체 {buildings.length}개</p>
+          {buildings.length === 0 ? <p>등록된 시설이 없습니다. 지도에서 시설·건물을 추가하세요.</p>
+            : visible.length === 0 ? <p>조건에 맞는 시설이 없습니다. 검색어나 분류를 바꾸세요.</p>
+            : <ul className="facility-results" aria-label="시설 검색 결과">{visible.map(building => <li key={building.id}>
+              <button type="button" aria-current={selectedId === building.id ? 'location' : undefined}
+                onClick={() => void openBuilding(building.id, true)}>
+                <span>{building.name}</span><small>{building.category}</small>
+              </button>
+            </li>)}</ul>}
+        </>}
+      </div>}
+    </aside>
+    {(detailLoading || detailError) && <div className="building-load-error" role="status">
+      <span>{detailLoading ? '시설 정보를 불러오는 중…' : detailError}</span>
+      {detailError && <button type="button" onClick={retryDetail}>
+        {retryId ? '시설 정보 다시 불러오기' : '목록 다시 불러오기'}</button>}
+    </div>}
+    {editor && <BuildingDialog key={editor.building?.id || 'new'} editor={editor} returnFocus={returnFocus.current}
       onClose={close} onSaved={saved} onDeleted={deleted}/>}
   </>;
 }

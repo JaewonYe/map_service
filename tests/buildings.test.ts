@@ -4,6 +4,7 @@ import {cp, mkdtemp, readFile, readdir, rm, symlink, writeFile} from 'node:fs/pr
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
+import {filterBuildings} from '../lib/buildings/search';
 import {BuildingStore} from '../lib/buildings/store';
 import {BuildingError, parseBuilding} from '../lib/buildings/model';
 import {buildingBody, buildingVersion, checkBuildingOrigin} from '../lib/buildings/http';
@@ -97,4 +98,33 @@ test('outdoor facilities persist alongside existing buildings without a supplied
   }
   assert.equal((await new BuildingStore(directory).list()).length, 4);
   assert.deepEqual(await store.get(legacy.id), legacy);
+});
+
+
+test('facility name search trims whitespace and matches Korean substrings and English case', async t => {
+  const {store} = await fixture(t);
+  const a = await store.create({...input, name: '태안 내구 시험장', category: '시험장'});
+  const b = await store.create({...input, name: 'West DEPOT', category: '주차장'});
+  const all = [a, b];
+  assert.deepEqual(filterBuildings(all, '  내구  ', '').map(item => item.id), [a.id]);
+  assert.deepEqual(filterBuildings(all, 'dEpOt', '').map(item => item.id), [b.id]);
+  assert.deepEqual(filterBuildings(all, '  ', ''), all);
+});
+test('facility category and name conditions compose and clearing restores every record', async t => {
+  const {store} = await fixture(t);
+  const a = await store.create({...input, name: '공통 시험 시설', category: '시험장'});
+  const b = await store.create({...input, name: '공통 주차 시설', category: '주차장'});
+  const all = [a, b];
+  assert.deepEqual(filterBuildings(all, '', '주차장'), [b]);
+  assert.deepEqual(filterBuildings(all, '공통', '시험장'), [a]);
+  assert.deepEqual(filterBuildings(all, '주차', '시험장'), []);
+  assert.deepEqual(filterBuildings(all, '', ''), all);
+});
+test('filtering never mutates or removes the stored source records', async t => {
+  const {store} = await fixture(t), building = await store.create(input);
+  const records = await store.list(), before = JSON.stringify(records);
+  assert.deepEqual(filterBuildings(records, '일치하지 않음', '야외 공간'), []);
+  assert.equal(JSON.stringify(records), before);
+  assert.deepEqual(await store.get(building.id), building);
+  assert.equal(filterBuildings(records, '', '')[0], records[0]);
 });
