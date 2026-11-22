@@ -106,6 +106,11 @@ class Network:
             raw=r.read(1024*1024+1)
             if len(raw)>1024*1024:raise WorkError('Provider JSON exceeds 1MiB')
             return json.loads(raw)
+    def document(self,url):
+        with self.open(url) as r:
+            raw=r.read(1024*1024+1)
+            if len(raw)>1024*1024:raise WorkError('ArcGIS export 파일 목록이 1MiB를 초과합니다.')
+            return raw
     def download(self,url,target,check,progress,maximum=MAX_FILE,checksum=None,algorithm='sha256'):
         target=Path(target);target.parent.mkdir(parents=True,exist_ok=True);part=target.with_suffix(target.suffix+'.part');part.unlink(missing_ok=True)
         start=time.monotonic();received=0;expected=None

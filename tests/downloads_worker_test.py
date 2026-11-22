@@ -6,6 +6,7 @@ sys.path.insert(0,str(ROOT/'scripts/downloads'));sys.path.insert(0,str(ROOT/'tes
 from common import *
 from worker import Worker
 from providers import validate_tpk, secret
+import export_result
 import package as portable
 from osm_fixture import write_fixture
 from osgeo import gdal,osr
@@ -17,11 +18,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         name=self.path.split('?')[0]
         self.server.seen_headers.append((name,self.headers.get('Referer')))
-        if self.server.required_referer and (name.startswith('/arcgis/') or name.endswith('.tpk')) and self.headers.get('Referer')!=self.server.required_referer:data=b'{"error":{"code":498}}'
+        self.server.seen_queries.append((name,urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)))
+        if self.server.required_export_token and (name==self.server.export_directory or name.endswith('.tpk')) and urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('token')!=[self.server.required_export_token]:data=b'{"error":{"code":499}}'
+        elif self.server.required_referer and (name.startswith('/arcgis/') or name.endswith('.tpk')) and self.headers.get('Referer')!=self.server.required_referer:data=b'{"error":{"code":498}}'
         elif self.server.export_enabled and name.endswith('/MapServer'):data=json.dumps({'exportTilesAllowed':True,'maxExportTilesCount':1000,'tileInfo':{'rows':256,'cols':256,'spatialReference':{'wkid':3857},'lods':[{'level':0,'resolution':156543.03392804097/2**16}]}}).encode()
         elif self.server.export_enabled and name.endswith('/exportTiles'):data=b'{"jobId":"fixture-job","jobStatus":"esriJobSubmitted"}'
-        elif self.server.export_enabled and name.endswith('/jobs/fixture-job'):data=b'{"jobStatus":"esriJobSucceeded","results":{"out":{"paramUrl":"results/out"}}}'
-        elif self.server.export_enabled and name.endswith('/results/out'):data=json.dumps({'value':{'url':'https://tiledbasemaps.arcgis.com/export/map.'+self.server.export_extension}}).encode()
+        elif self.server.export_enabled and name.endswith('/jobs/fixture-job'):data=json.dumps({'jobStatus':'esriJobSucceeded','results':self.server.export_results}).encode()
+        elif self.server.export_enabled and name.endswith('/results/out'):data=json.dumps({'value':self.server.export_value or {'url':'https://tiledbasemaps.arcgis.com/export/map.'+self.server.export_extension}}).encode()
+        elif name==self.server.export_directory:data=self.server.export_listing
         elif name.endswith('.tpk'):data=self.server.tpk
         elif name.endswith('.md5'):data=(self.server.checksum+'  region.osm.pbf\n').encode()
         elif name.endswith('.osm.pbf'):data=self.server.pbf
@@ -59,12 +63,17 @@ class DownloadsWorker(unittest.TestCase):
         xml='<CacheInfo><TileCacheInfo><SpatialReference><WKID>3857</WKID></SpatialReference><TileCols>256</TileCols><TileRows>256</TileRows><TileOrigin><X>-20037508.342789244</X><Y>20037508.342789244</Y></TileOrigin><LODInfos><LODInfo><LevelID>0</LevelID><Resolution>'+str(156543.03392804097/2**16)+'</Resolution></LODInfo></LODInfos></TileCacheInfo><StorageFormat>esriMapCacheStorageModeCompactV2</StorageFormat><PacketSize>128</PacketSize></CacheInfo>'
         tpk=io.BytesIO()
         with zipfile.ZipFile(tpk,'w') as z:z.writestr('Layers/conf.xml',xml);z.writestr('Layers/conf.cdi','<EnvelopeN><WKID>4326</WKID><XMin>126.22</XMin><XMax>126.26</XMax><YMin>36.58</YMin><YMax>36.62</YMax></EnvelopeN>');z.writestr(f'Layers/_alllayers/L00/R{y//128*128:04x}C{x//128*128:04x}.bundle',bundle)
-        cls.server=socketserver.TCPServer(('127.0.0.1',0),Handler);cls.server.pbf=cls.pbf;cls.server.dem=dem.read_bytes();cls.server.tpk=tpk.getvalue();cls.server.export_enabled=False;cls.server.required_referer=None;cls.server.seen_headers=[];cls.server.export_extension='tpk';cls.server.checksum=hashlib.md5(cls.pbf).hexdigest();cls.server.truncate=False;cls.thread=threading.Thread(target=cls.server.serve_forever,daemon=True);cls.thread.start()
+        cls.server=socketserver.TCPServer(('127.0.0.1',0),Handler);cls.server.pbf=cls.pbf;cls.server.dem=dem.read_bytes();cls.server.tpk=tpk.getvalue();cls.server.export_enabled=False;cls.server.required_referer=None;cls.server.seen_headers=[];cls.server.export_extension='tpk';cls.server.checksum=hashlib.md5(cls.pbf).hexdigest();cls.server.truncate=False
+        cls.server.export_value=None;cls.server.export_directory='/arcgis/rest/directories/arcgisoutput/World_Imagery_MapServer/_agsfixture';cls.server.export_listing=b'';cls.server.required_export_token=None;cls.server.seen_queries=[]
+        cls.server.export_results={'out':{'paramUrl':'results/out'}}
+        cls.thread=threading.Thread(target=cls.server.serve_forever,daemon=True);cls.thread.start()
     @classmethod
     def tearDownClass(cls):cls.server.shutdown();cls.server.server_close();cls.tmp.cleanup()
     def setUp(self):
         secrets_patch=patch.dict(os.environ,{'ARCGIS_TOKEN':'','OPENTOPOGRAPHY_API_KEY':'','MAP_DOWNLOAD_ARCGIS_TOKEN_FILE':'','MAP_DOWNLOAD_OPENTOPOGRAPHY_KEY_FILE':'','ARCGIS_REFERER':''});secrets_patch.start();self.addCleanup(secrets_patch.stop)
         self.temp=tempfile.TemporaryDirectory();self.root=pathlib.Path(self.temp.name);self.addCleanup(self.temp.cleanup);self.worker=Worker(self.root/'downloads',ROOT,Transport(self.server));self.server.checksum=hashlib.md5(self.pbf).hexdigest();self.server.truncate=False;self.server.export_enabled=False;self.server.required_referer=None;self.server.seen_headers=[];self.server.export_extension='tpk'
+        self.server.export_value=None;self.server.export_directory='/arcgis/rest/directories/arcgisoutput/World_Imagery_MapServer/_agsfixture';self.server.export_listing=b'';self.server.required_export_token=None;self.server.seen_queries=[]
+        self.server.export_results={'out':{'paramUrl':'results/out'}}
     def request(self,kinds=('osm','elevation'),**extra):
         return {'version':1,'type':'download','id':str(uuid.uuid4()),'createdAt':now(),'name':'CC0 다운로드 검사','bounds':{'west':126.23,'south':36.59,'east':126.25,'north':36.61},'kinds':list(kinds),'region':'south-korea','demProvider':'aws','levels':{'satellite':{'min':0,'max':13},'elevation':{'min':12,'max':13}},'accepted':dict.fromkeys(kinds,True),'registryRevision':0,**extra}
     def status(self,request):return read_json(self.worker.root/'jobs'/(request['id']+'.state.json'))
@@ -214,5 +223,69 @@ class DownloadsWorker(unittest.TestCase):
                 target=Redirect().redirect_request(initial,None,302,'',{},'https://download.geofabrik.de/a');self.assertIsNone(target.get_header('Referer'))
             for invalid in ('https://user:fixture@host','https://host/?token=fixture','https://host/\r\nInjected:yes','https://host/\x7f','file:///private'):
                 with patch.dict(os.environ,{'ARCGIS_REFERER':invalid}),self.assertRaises(Blocked):provider_headers('https://tiledbasemaps.arcgis.com/a')
+
+    def test_20_json_export_directory_downloads_real_tpk_with_auth_and_offline_reuse(self):
+        self.server.export_enabled=True;self.server.export_value='https://tiledbasemaps.arcgis.com'+self.server.export_directory
+        self.server.export_results={'other':{'paramUrl':'results/ignored'},'out_service_url':{'paramUrl':'results/out'}}
+        self.server.export_listing=json.dumps({'files':[{'name':'layer.tpk','url':self.server.export_value+'/layer.tpk'}],'folders':[]}).encode()
+        self.server.required_export_token='fixture-directory-token';self.server.required_referer='https://fixture-app.example'
+        r=self.request(('satellite',),levels={'satellite':{'min':16,'max':16},'elevation':{'min':8,'max':13}})
+        with patch.dict(os.environ,{'ARCGIS_TOKEN':self.server.required_export_token,'ARCGIS_REFERER':self.server.required_referer}):state=self.run_job(r)
+        self.assertEqual(state['state'],'completed',state);self.assertEqual(state['items']['satellite']['result']['download']['bytes'],len(self.server.tpk))
+        for path in (self.server.export_directory,self.server.export_directory+'/layer.tpk'):
+            self.assertIn((path,self.server.required_referer),self.server.seen_headers)
+            self.assertIn((path,{'f':['json'],'token':[self.server.required_export_token]}) if path==self.server.export_directory else (path,{'token':[self.server.required_export_token]}),self.server.seen_queries)
+        portable.validate(self.worker.root/'packages'/r['id'],Context())
+        for file in self.worker.root.rglob('*.json'):self.assertNotIn(self.server.required_export_token,file.read_text())
+        other=Worker(self.worker.root,ROOT,NoNetwork());q={**r,'id':str(uuid.uuid4()),'registryRevision':1};other.process(q);again=self.status(q)
+        self.assertEqual(again['state'],'completed',again);self.assertEqual(again['items']['satellite']['result']['download']['networkBytes'],0)
+
+    def test_21_html_export_directory_relative_links_and_existing_signed_token(self):
+        self.server.export_enabled=True;self.server.export_value='https://tiledbasemaps.arcgis.com'+self.server.export_directory+'/'
+        self.server.export_listing=b'<!DOCTYPE html><html><body><a href="../">Parent</a><a href="layer.tpk?token=fixture-signed&amp;x=1">TPK</a><a href="layer.tpk?token=fixture-signed&amp;x=1">Download</a></body></html>'
+        r=self.request(('satellite',),levels={'satellite':{'min':16,'max':16},'elevation':{'min':8,'max':13}})
+        # The directory may have a trailing slash; both variants are served here.
+        self.server.export_directory+='/'
+        with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-current-token'}):state=self.run_job(r)
+        self.assertEqual(state['state'],'completed',state)
+        self.assertIn((self.server.export_directory+'layer.tpk',{'token':['fixture-signed'],'x':['1']}),self.server.seen_queries)
+        for file in self.worker.root.rglob('*.json'):
+            self.assertNotIn('fixture-signed',file.read_text());self.assertNotIn('fixture-current-token',file.read_text())
+
+    def test_22_export_directory_rejects_outside_host_path_and_ambiguous_files(self):
+        directory='https://tiledbasemaps.arcgis.com'+self.server.export_directory
+        self.server.export_value=directory
+        invalid=[['https://download.geofabrik.de/layer.tpk'],['https://evil.example/layer.tpk'],['../layer.tpk'],['sub/../layer.tpk'],['%2e%2e/layer.tpk'],['%252e%252e/layer.tpk'],['/other/layer.tpk'],['sub/layer.tpk'],['layer.tpk#fragment'],['a.tpk','b.tpk'],['layer.tpk?token=first','layer.tpk?token=second'],['https://tiledbasemaps.arcgis.com:444/a.tpk'],['https://user:secret@tiledbasemaps.arcgis.com/a.tpk']]
+        for files in invalid:
+            with self.subTest(files=files):
+                self.server.export_listing=json.dumps({'files':files}).encode();before=len(self.server.seen_queries)
+                with self.assertRaises(WorkError):export_result.resolve(Transport(self.server),directory,'fixture-token')
+                self.assertEqual(len(self.server.seen_queries),before+1)
+        for url in ('https://download.geofabrik.de/a.tpk','https://evil.example/a.tpk','https://tiledbasemaps.arcgis.com/export/other','https://tiledbasemaps.arcgis.com/arcgis/rest/directories/arcgisoutput/','https://tiledbasemaps.arcgis.com/a/../b.tpk'):
+            with self.subTest(url=url),self.assertRaises(WorkError):export_result.resolve(NoNetwork(),url,'fixture-token')
+
+    def test_23_export_directory_missing_tpk_tpkx_malformed_and_auth_failures(self):
+        directory='https://tiledbasemaps.arcgis.com'+self.server.export_directory
+        cases=[({'files':[]},WorkError,'TPK 파일이 없습니다'),({'files':['layer.tpkx']},WorkError,'TPKX'),({'files':['readme.txt']},WorkError,'TPK 파일이 없습니다'),({'files':[{}]},WorkError,'항목'),({'other':[]},WorkError,'형식'),({'error':{'code':498,'message':'fixture-private-message'}},Blocked,'인증'),({'files':['a.tpk']*257},WorkError,'256')]
+        for listing,error,message in cases:
+            with self.subTest(listing=str(listing)[:60]):
+                self.server.export_listing=json.dumps(listing).encode()
+                with self.assertRaises(error) as raised:export_result.resolve(Transport(self.server),directory,'fixture-token')
+                self.assertIn(message,str(raised.exception));self.assertNotIn('fixture-private',str(raised.exception))
+        for raw in (b'{malformed',b'not a listing',b'\xff',b'<html><body>'+b'<a href="a.tpk">x</a>'*257+b'</body></html>'):
+            self.server.export_listing=raw
+            with self.assertRaises(WorkError):export_result.resolve(Transport(self.server),directory,'fixture-token')
+
+    def test_24_export_listing_response_bound_and_cancellation_before_download(self):
+        directory='https://tiledbasemaps.arcgis.com'+self.server.export_directory
+        self.server.export_listing=b' '*((1024*1024)+1)
+        with self.assertRaisesRegex(WorkError,'1MiB'):export_result.resolve(Transport(self.server),directory,'fixture-token')
+        def cancel():raise Cancelled('fixture-cancelled')
+        with self.assertRaises(Cancelled):export_result.resolve(NoNetwork(),directory,'fixture-token',cancel)
+        self.server.export_enabled=True;self.server.export_value=directory;self.server.export_listing=b'{"files":["layer.tpkx"]}'
+        r=self.request(('satellite',),levels={'satellite':{'min':16,'max':16},'elevation':{'min':8,'max':13}})
+        with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-token'}):state=self.run_job(r)
+        self.assertEqual(state['state'],'failed');self.assertIn('TPKX',state['items']['satellite']['reason']);self.assertEqual(self.worker.registry()['layers'],{})
+        self.assertTrue(any(path.endswith('/jobs/fixture-job/cancel') for path,_ in self.server.seen_queries));self.assertFalse(list(self.worker.root.rglob('*.tpk')))
 
 if __name__=='__main__':unittest.main()

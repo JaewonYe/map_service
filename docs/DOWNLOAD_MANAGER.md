@@ -74,6 +74,10 @@ True면 현재 창에 토큰이 없으므로 같은 창에서 다시 발급하�
 
 ArcGIS는 실제 exportTilesAllowed, 좌표계/타일 크기, LOD, maxExportTilesCount를 검사한다. 비동기 job/result/cancel을 처리하고 하나의 지원 TPK만 받는다. TPKX/JSON-only 패키지, 알 수 없는 결과 호스트, 지원하지 않는 좌표계/Compact header/offset/실제 요청 LOD 누락은 실패로 남긴다. 확장자만 바꾸거나 공개 타일 대량 수집으로 대체하지 않는다. 기본 허용 결과 호스트와 다른 공식 export 호스트가 실제로 반환되면 별도 검토 후 코드/환경 허용 목록을 갱신해야 한다.
 
+공식 [Map Service Result 명세](https://developers.arcgis.com/rest/services-reference/enterprise/map-service-result/)의 `out_service_url.value`는 파일 대신 결과 디렉터리 URL일 수 있다. 직접 TPK URL 또는 같은 `tiledbasemaps.arcgis.com`의 `arcgisoutput`/`arcgisjobs` 결과 디렉터리를 처리한다. 디렉터리의 JSON 파일 목록 또는 정적 HTML 링크에서 **바로 아래의 단일 TPK**를 선택하며 재귀 탐색하지 않는다. 목록은 1MiB/256링크 한도로 읽고, 외부 호스트·경로 이동·다중 TPK·파일 누락·실제 TPKX를 구분해 중단한다. `공식 export 결과 파일 목록 확인` 다음에 `위성 TPK 다운로드` 단계가 표시된다. 필요한 토큰과 Referer는 메모리 내 요청에만 전달하고 결과 URL은 상태/manifest/ZIP에 저장하지 않는다.
+
+이전 버전의 `현재 리더가 지원하지 않는 TPKX/기타 형식` 오류는 URL 확장자 검사만으로도 발생했으므로 실제 파일이 TPKX였다는 증거가 아니다. 최신 코드를 `git pull --ff-only origin main`으로 받은 뒤 **토큰을 설정한 같은 PowerShell 창**에서 기존 CLI를 다시 실행한다. CLI가 worker 이미지를 자동 빌드하며 `--refresh` 없이 검증된 고도 원본을 재사용한다. 기존 ZIP/원본은 삭제하거나 확장자를 바꾸지 않는다. 수정 지원과 합성 테스트 통과는 실제 공식 TPK 다운로드·앱 표시 성공과 구분한다.
+
 DEM은 단일 수치 밴드 GTiff인지 검사하며 RGB/Byte 영상을 받지 않는다. GDAL child에서 EPSG:4326 1 arc-second Float32 mosaic/clip, NoData −32767 후 기존 준비 절차의 EPSG:3857 Terrarium height/color 타일을 만든다. source의 vertical datum을 변환한 것으로 보고하지 않는다. NoData는 투명/유효 높이 없음으로 유지한다.
 
 ## 저장·재사용·복구

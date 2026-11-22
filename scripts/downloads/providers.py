@@ -3,6 +3,7 @@ import json, math, os, re, shutil, sqlite3, struct, time, urllib.parse, zipfile,
 from pathlib import Path
 from common import *
 import originals
+import export_result
 OPENTOPO='https://portal.opentopography.org/API/globaldem'
 ARCGIS='https://tiledbasemaps.arcgis.com/arcgis/rest/services/World_Imagery/MapServer'
 DEM_ROOT='https://copernicus-dem-30m.s3.amazonaws.com'
@@ -233,13 +234,15 @@ def satellite(ctx,out):
             if state=='esriJobSucceeded':break
             if state in ('esriJobFailed','esriJobCancelled','esriJobTimedOut'):raise WorkError('공식 위성 export 실패/취소. 권한·제공처 한도를 확인하세요.')
             ctx.sleep(2)
-        results=result.get('results',{});parameter=next((v.get('paramUrl') for v in results.values() if isinstance(v,dict) and v.get('paramUrl')),None)
+        results=result.get('results',{})
+        if not isinstance(results,dict):raise WorkError('지원하지 않는 export 결과 형식')
+        entry=results.get('out_service_url') if 'out_service_url' in results else next(iter(results.values())) if len(results)==1 else None
+        parameter=entry.get('paramUrl') if isinstance(entry,dict) else None
         if not isinstance(parameter,str) or not re.fullmatch(r'results/[A-Za-z0-9_]+',parameter):raise WorkError('지원하지 않는 export 결과 형식')
-        value=arc(ctx.net,'/jobs/'+job+'/'+parameter,token=token).get('value');values=value if isinstance(value,list) else [value]
-        urls=[v.get('url') if isinstance(v,dict) else v for v in values]
-        if len(urls)!=1 or not isinstance(urls[0],str):raise WorkError('한 개 TPK가 아닌 export 결과는 지원하지 않습니다.')
-        url=safe_url(urls[0])
-        if not urllib.parse.urlsplit(url).path.lower().endswith('.tpk'):raise WorkError('현재 리더가 지원하지 않는 TPKX/기타 형식입니다. 확장자를 바꾸지 않고 중단합니다.')
+        value=arc(ctx.net,'/jobs/'+job+'/'+parameter,token=token).get('value')
+        ctx.stage('verify','공식 export 결과 파일 목록 확인')
+        url=export_result.resolve(ctx.net,value,token,ctx.check)
+        ctx.stage('download','위성 TPK 다운로드')
         out.mkdir(parents=True);file=out/'map.tpk'
         info=ctx.net.download(url,file,ctx.check,ctx.progress,maximum=min(MAX_FILE,MAX_BYTES-ctx.received));ctx.received+=info['bytes'];ctx.stage('verify','위성 TPK 형식·실제 bundle 검사');metadata=validate_tpk(file,ctx.check)
         if any(z not in metadata['zoomLevels'] for z in selected):raise WorkError('export 결과에 요청한 실제 LOD가 누락됐습니다. 등록하지 않았습니다.')

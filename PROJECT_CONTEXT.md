@@ -114,3 +114,5 @@ UI UX Pro Max와 Web Design Guidelines를 `.agents/skills/`에 설치하고 AGEN
 - 인증 전달 보완: Compose의 기본 *_FILE 경로를 비우고 명시 파일+마운트만 사용한다. 기존 환경변수 우선순위를 문서와 일치시키고, CLI는 인증 설정 유무만 출력한다. ArcGIS 누락은 네트워크 전 안내하며 기존 정상 원본/고도 ZIP/시설/OSM 수정은 보존한다. 회귀 worker18, Node 앱105+도구5, 실제 network:none Compose4경우와 최종 PR/main CI 증거는 이슈 #20 후속 댓글에 기록한다.
 
 - #20 추가 인증 진단에서 사용자 PC의 community/self는 signedIn=true/organizationMember=true이나 World Imagery 직접 요청은 POST 및 Authorization+Referer GET 모두498이었다. 전역 토큰 만료/개인 공개계정/Docker만의 오류로 단정하지 않는다. 공식 조직 URL/client=referer 발급과 일치하는 ARCGIS_REFERER 전달을 지원하고, read-only 조직 조회 CLI는 공식 URL만 반환한다. 비밀번호는 사용자 PC의 수동 공식 HTTPS POST에만 사용하며 실제 export 성공은 별도 검증을 유지한다.
+
+- #20 조직 토큰의 사용자 PC 검사에서 tokenIssued=True/exportTilesAllowed=True가 보고됐고, 이후 실제 CLI는 export 결과 URL 검사에서 실패해 고도 재사용/등록만 성공했다(partial, ZIP ID90509ec5-93f7-4ba2-a1e6-08802b1ccbe7). 공식 결과가 디렉터리 URL일 수 있는데 직접 .tpk만 허용한 누락을 보완했다. 같은 공식 호스트/결과 디렉터리의 제한된 JSON/HTML 목록에서 단일 TPK를 선택하고 기존 형식·LOD·CRC·해시 검사를 유지한다. worker24/Compose4와 PR/main CI 증거는 이슈 댓글에 기록한다. 실제 사용자 결과의 URL/파일 형식은 수집하지 않았으므로 TPKX였다고 단정하지 않으며 공식 TPK 수신·앱 표시는 아직 확인이 필요하다.

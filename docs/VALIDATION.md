@@ -423,3 +423,13 @@ ARCGIS_REFERER는 worker 환경변수로만 전달하고 공식 imagery 호스�
 회귀: worker18→19(실제 localhost HTTP Referer 필수 export 실패→성공·TPK 다운로드·다른host/redirect 헤더제거·잘못된설정), Node다운로드8→9(조직조회4가지와 비밀/개인정보 제외)로 앱106+도구5가 된다. transport fixture가 production Network의 URL/headers/errors를 거친 뒤 socket만 localhost로 대체하도록 강화했다. production image Compose4경우에서도 ARCGIS_REFERER 전달/다른provider제외를 확인한다. UI·공통API·기존 source/고도 패키지/상위 gitlink/클라우드 허용 목록은 변경하지 않는다. 실제 서비스 인증/원본 다운로드/표시는 계속 사용자 PC에서 확인할 미완료 조건이며 최종 SHA·PR/main CI 증거는 #20 댓글에 기록한다.
 
 로컬 실행: 다운로드Node9·worker19(실패/오류/스킵0)·production Compose4·typecheck·디자인92자산/3skills 통과. 신규 worker 테스트의 첫 실행은 환경변수에 NUL을 주입하려다 OS의 embedded null byte 거부로1오류가 발생했다. 실제 환경변수로 표현 가능한 DEL 제어문자 거부 검사로 수정해 같은19개를 재실행했고, production의 제어문자 거부 검증은 유지했다. Windows 수동 로그인 블록의 실제 계정/서비스 실기는 사용자 PC의 결과가 필요하며 로컬 합성 성공으로 대신하지 않는다.
+
+### #20 후속: ArcGIS export 결과 디렉터리
+
+사용자 PC에서 새 조직 토큰의 tokenIssued=True/exportTilesAllowed=True가 보고됐다. 다음 CLI는 export 결과 URL 검사에서 `현재 리더가 지원하지 않는 TPKX/기타 형식`으로 실패했으며 고도는 동일 원본을 재사용해 등록됐다(partial, ZIP ID90509ec5-93f7-4ba2-a1e6-08802b1ccbe7). 현재 코드의 오류 위치는 esriJobSucceeded 및 result parameter 조회 이후다. 실제 반환 URL/파일은 수집하지 않았으므로 실제 TPKX라고 단정하지 않는다.
+
+공식 [Map Service Result](https://developers.arcgis.com/rest/services-reference/enterprise/map-service-result/) 예제는 GPString value에 결과 디렉터리를 반환한다. 이 유효한 형태를 누락한 직접 .tpk 검사에 디렉터리 해석을 추가했다. out_service_url을 우선하고, 하나의 이전 형식 parameter도 지원한다. 같은 공식 호스트/arcgisoutput 또는 arcgisjobs의 1MiB/256링크 제한 JSON/정적 HTML 목록에서 바로 아래의 단일 TPK를 선택한다. 기존 직접 URL·POST3857·Compact 요청·TPK CRC/실제 bundle/LOD/해시 검사는 유지한다. 실제 TPKX/다중 파일/없음/인증 오류는 구분하고, 임의 호스트·경로 이동·결과 URL/인증값 영구 저장은 허용하지 않는다.
+
+로컬 검증: production 도구 이미지에서 worker19→24 전부 통과(실패/오류/스킵0, exact-count gate24). 새 회귀는 JSON/HTML 디렉터리→실제 합성 TPK 수신/검사/등록/오프라인 재사용, 토큰/Referer 범위와 기존 파일 URL 토큰 유지, host/path/다중 파일/중복 URL/TPKX/JSON 오류/인증/1MiB/256링크/취소를 검사한다. 첫 실행의 신규 테스트1건은 최종 상태에서 유지되지 않는 received 필드를 assertion해 KeyError가 발생했다. 실제 수신 검사를 최종 result.download.bytes와 합성 파일 길이의 정확한 비교로 수정했고 모든 검사를 다시 실행했다. product 검사를 완화하거나 skip/재시도 설정을 바꾸지 않았다. build·Compose4·Node111·typecheck·디자인92자산/3스킬·Compose config·diff 검증과 최종 PR/main SHA/실행 증거는 이슈 댓글에 기록한다.
+
+UI/API/상태 스키마·시설/OSM 수정·공통 디자인·상위 gitlink·클라우드 허용 목록은 변경하지 않았다. 실제 공식 TPK 수신·원본/앱 표시 검증은 사용자 PC의 후속 결과가 필요하며 #20은 OPEN으로 유지한다.
