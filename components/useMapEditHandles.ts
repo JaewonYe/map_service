@@ -3,7 +3,7 @@ import {useEffect, useRef} from 'react';
 import L from 'leaflet';
 import type {Coordinate} from '../lib/map-measure';
 
-type Options = {points: Coordinate[]; selected: number | null; disabled: boolean; insert?: (after: number, point: Coordinate) => void;
+type Options = {scope?: 'osm'; points: Coordinate[]; selected: number | null; disabled: boolean; insert?: (after: number, point: Coordinate) => void;
   select: (index: number) => void; start: (index: number) => void; move: (index: number, point: Coordinate) => void; end: (index: number, point: Coordinate) => void; position?: boolean};
 /** Keep Leaflet marker instances alive while React updates the live drag preview. */
 export function useMapEditHandles(map: L.Map, options: Options) {
@@ -21,7 +21,7 @@ export function useMapEditHandles(map: L.Map, options: Options) {
       marker.on('dragstart', () => latest.current.start(index));
       marker.on('drag', () => {const p=marker.getLatLng();latest.current.move(index,[p.lat,p.lng]);});
       marker.on('dragend', () => {const p=marker.getLatLng();latest.current.end(index,[p.lat,p.lng]);});
-      const element=marker.getElement()!;element.setAttribute('aria-label',options.position?'미저장 시설 지점 이동':`${index+1}번 경계 정점 선택·이동`);
+      const element=marker.getElement()!;element.setAttribute('aria-label',options.position?(options.scope==='osm'?'미저장 지도 지점 이동':'미저장 시설 지점 이동'):`${index+1}번 ${options.scope==='osm'?'지도':'경계'} 정점 선택·이동`);
       element.addEventListener('keydown', event=>{if(event.key===' '){event.preventDefault();event.stopPropagation();latest.current.select(index);}});
       return marker;
     });
@@ -30,13 +30,13 @@ export function useMapEditHandles(map: L.Map, options: Options) {
       const marker=L.marker([(point[0]+next[0])/2,(point[1]+next[1])/2],{icon:L.divIcon({className:'facility-boundary-insert',iconSize:[44,44],iconAnchor:[22,22],html:'<span aria-hidden="true">+</span>'}),bubblingMouseEvents:false,keyboard:true,autoPanOnFocus:false}).addTo(group);
       const insert=()=>{const p=marker.getLatLng();latest.current.insert?.(index,[p.lat,p.lng]);};
       marker.on('click',insert);
-      const element=marker.getElement()!;element.setAttribute('aria-label',`${index+1}번 변에 정점 삽입`);
+      const element=marker.getElement()!;element.setAttribute('aria-label',`${index+1}번 ${options.scope==='osm'?'지도 변':'변'}에 정점 삽입`);
       element.addEventListener('keydown',event=>{if(event.key===' '){event.preventDefault();event.stopPropagation();insert();}});
       return marker;
     });
     return()=>{group.remove();handles.current=[];inserts.current=[];};
   // Coordinates/selection are reconciled below, without destroying a dragging marker.
-  },[map,options.points.length,options.disabled,options.position,canInsert]);
+  },[map,options.points.length,options.disabled,options.position,options.scope,canInsert]);
   useEffect(()=>{
     handles.current.forEach((marker,index)=>{
       const p=options.points[index];if(p)marker.setLatLng([p[0],p[1]]);

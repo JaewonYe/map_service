@@ -18,9 +18,9 @@ async function responseData(response: Response) {
   return body;
 }
 type Editor = {building: Building | null; point: Coordinate};
-type Props = {mapAction: number; sidebarHost: HTMLElement; expanded: boolean; setExpanded: (value: boolean | ((previous: boolean)=>boolean))=>void; map: L.Map; requestedPoint: Coordinate | null; onRequestClosed: () => void; onBoundaryEditingChange: (editing: boolean) => void};
+type Props = {inactive?: boolean; mapAction: number; sidebarHost: HTMLElement; expanded: boolean; setExpanded: (value: boolean | ((previous: boolean)=>boolean))=>void; map: L.Map; requestedPoint: Coordinate | null; onRequestClosed: () => void; onBoundaryEditingChange: (editing: boolean) => void};
 
-export default function MapBuildings({map, requestedPoint, onRequestClosed, onBoundaryEditingChange, sidebarHost, expanded, setExpanded, mapAction}: Props) {
+export default function MapBuildings({inactive=false,map, requestedPoint, onRequestClosed, onBoundaryEditingChange, sidebarHost, expanded, setExpanded, mapAction}: Props) {
   const [boundaryTarget, setBoundaryTarget] = useState<Building | null>(null);
   const [positionTarget, setPositionTarget] = useState<Building | null>(null);
   const boundaryBusy = useRef(false);
@@ -88,7 +88,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
   }, [visible, selectedId, editor, onRequestClosed]);
 
   const openBuilding = useCallback(async (id: string, fromList = false) => {
-    if (boundaryBusy.current || boundaryTarget?.id === id || positionTarget?.id === id) return;
+    if (inactive || boundaryBusy.current || boundaryTarget?.id === id || positionTarget?.id === id) return;
     setBoundaryTarget(null); setPositionTarget(null); setEditor(null);
     const sequence = ++selectionRequest.current;
     returnFocus.current = fromList && toggle.current ? toggle.current : map.getContainer();
@@ -121,9 +121,10 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
         setDetailError(error instanceof Error ? error.message : '시설 정보를 불러오지 못했습니다.'); setRetryId(id);
       }
     } finally {if (sequence === selectionRequest.current) setDetailLoading(false);}
-  }, [map, search, category, boundaryTarget, positionTarget, collapseForMap]);
+  }, [map, search, category, boundaryTarget, positionTarget, collapseForMap,inactive]);
 
   useEffect(() => {
+    if(inactive)return;
     const group = L.layerGroup().addTo(map);
     const icon = L.divIcon({className: 'building-marker', iconSize: [28, 28], iconAnchor: [14, 14],
       html: '<svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="13" fill="var(--color-accent)" stroke="var(--color-surface)" stroke-width="2"/><path d="M8 21V8h12v13M11 11h2m2 0h2m-6 4h2m2 0h2m-4 6v-3h2v3" fill="none" stroke="var(--color-surface)" stroke-width="1.6"/></svg>'});
@@ -149,7 +150,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
       marker.getElement()?.setAttribute('aria-label', `${building.name} 시설·건물 정보 보기`);
     }
     return () => {group.remove();};
-  }, [map, visible, openBuilding, boundaryTarget, positionTarget]);
+  }, [map, visible, openBuilding, boundaryTarget, positionTarget,inactive]);
 
   function changeFilters(nextSearch: string, nextCategory: BuildingCategory | '') {
     selectionRequest.current++; setDetailLoading(false); setDetailError(''); setRetryId(null);
@@ -175,7 +176,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
   }
 
   return <>
-    {!boundaryTarget && !positionTarget && createPortal(<aside className="facility-panel" data-expanded={expanded} aria-label="시설 목록">
+    {!inactive && !boundaryTarget && !positionTarget && createPortal(<aside className="facility-panel" data-expanded={expanded} aria-label="시설 목록">
       <div className="facility-panel-heading"><h2>시설 찾기</h2><button ref={toggle} type="button" className="facility-list-toggle" aria-label="시설 목록" aria-expanded={expanded} aria-controls="facility-list-content"
         onClick={() => setExpanded(value => !value)}><span aria-hidden="true">{expanded ? '접기' : '펼치기'}{(search.trim() || category) && ' · 조건 적용 중'}</span></button></div>
       {expanded && <div id="facility-list-content" className="facility-list-content">

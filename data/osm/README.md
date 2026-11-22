@@ -22,3 +22,5 @@ Next.js가 색인에서 필요한 도형을 조회해 EPSG:3857 / 256px PNG를 �
 이 폴더 전체를 백업·이전하세요. 건물 등록 정보는 별도의 data/buildings에 보관되어 PBF 갱신의 영향을 받지 않습니다. 원본과 색인 DB는 Docker 이미지에 포함하지 않습니다. DB를 직접 수정하지 마세요.
 
 OSM은 [ODbL](https://www.openstreetmap.org/copyright)로 제공됩니다. 화면에 © OpenStreetMap contributors 출처 링크를 표시합니다. 기존 OSM_USAGE_CONFIRMED는 직접 준비한 XYZ 이미지 타일에 적용되며 이 변환 도구의 OSM 데이터는 생성 메타데이터를 사용합니다.
+
+일반 지도 편집에는 source ID/fingerprint를 보존하는 schema2가 필요합니다. 구형 schema1은 그대로 조회할 수 있고 메뉴 7 또는 `prepare-osm --force`로 명시적으로 재준비합니다. 로컬 수정은 별도 `data/osm-edits`에 저장하므로 이 폴더와 함께 백업하세요. PBF/DB를 직접 고치거나 재준비 시 수정 폴더를 지우지 마세요. 원본 변경 충돌/복원과 내부 API는 [OSM_EDITING](../../docs/OSM_EDITING.md)을 참조합니다.

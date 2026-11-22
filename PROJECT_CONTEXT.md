@@ -91,3 +91,12 @@ UI UX Pro Max와 Web Design Guidelines를 `.agents/skills/`에 설치하고 AGEN
 - Leaflet 마커 인스턴스를 드래그 중 유지해 미리보기와 계산을 갱신한다. 정점/삽입 핸들은 모드 안에서만 표시하고 클릭 전파·중복 추가를 막는다. 선택 정점 삭제는 최소 3개/삽입 최대 128개, 기존 좌표 검증과 정규화는 유지한다. 최근 100회 UI 이력/선택 정보는 저장 스키마에 추가하지 않는다.
 - 숫자 좌표/선택 상자/버튼 대안, 모바일 터치·키보드·테마·크기 전환을 지원한다. #13의 56px/320px 골격·drawer·스크롤과 항상 보이는 저장/취소를 재사용한다. 시설 삭제 확인은 레코드·대표 마커·경계를 함께 지운다고 안내하며 기존 DELETE/If-Match를 호출한다.
 - API·UUID·boundary 스키마·파일 저장·타 DB·예약 규칙·공통 디자인/lock·상위 gitlink는 변경하지 않는다. 단위/API·실제 저장소 실패·브라우저 회귀 및 [시각 검토](docs/DIRECT_EDIT_REVIEW.md)를 별도로 기록하며 최종 SHA/PR/main 증거는 이슈 완료 댓글로 보고한다. 실제 사용자 데이터/OS 실기/법적 측량 정확도는 미검증이다.
+
+## 이슈 #18 오프라인 OSM 일반 지도 편집
+
+- 지도 정보의 명시적 모드에서 prepared SQLite 객체를 viewport/줌별로 선택·조회한다. Point/도로 LineString/구멍 없는 단일 건물 Polygon의 이름·닫힌 목록 표시 분류·형상을 수정하고 새 객체 추가/로컬 삭제/취소/원본 복원/충돌 재적용을 제공한다. 시설/측정 상태와 저장 대상은 분리하며 기존 지도/테마 골격을 유지한다.
+- importer schema2는 실제 node/way/relation source key와 canonical fingerprint를 보존한다. features.id 순번으로 재연결하지 않는다. schema1 렌더/조회는 유지하고 편집에는 메뉴 7/--force 명시 재준비를 안내한다. 실제 관계/MultiPolygon/해안선·파생·분할·대형 객체는 평탄화하지 않고 읽기 전용이다.
+- 원본 PBF/base SQLite와 시설 UUID/boundary/파일을 보존하며 별도 OSM_EDITS_DIR의 version1 edits.json에 add/update/hide를 원자 저장한다. 글로벌 If-Match revision/dataset/source fingerprint 검사, 단일 프로세스 경로별 queue, 쓰기 실패/손상 보존을 제공한다. Compose에는 별도 영속 쓰기 bind mount를 연결하며 다중 서버/인증 정책은 확정하지 않는다.
+- 원본 key+fingerprint 일치 수정만 base에서 제외/합성해 실제 PNG에 반영한다. source 변경/삭제·지원 불가는 conflict로 기록을 보존하고 최신 원본을 표시한다. 메모리/pending/base/store revision, ETag/no-cache, Leaflet URL 갱신으로 이전 위치·라벨 잔상을 처리한다. 다른 탭의 변경은 재조회/지도 이동/새로고침으로 가져온다.
+- 새 모듈 내부 /api/osm/objects 목록/상세/수정 인터페이스, 좌표·geometry·요청/응답/저장 한도와 호환성은 [OSM_EDITING](docs/OSM_EDITING.md)에 기록한다. 구현 전 변경안은 이슈 댓글에 남겼다. 공통 OpenAPI·타 DB·상위 gitlink·공개 OSM 전송은 변경하지 않는다.
+- Node 앱97+도구5, 브라우저67(기존59+신규8), 변환DEM3/PBF7+Python도구5, 디자인 무결성과 실제 합성 PBF 앱20PNG를 검증한다. 실제 실행/최초 실패 보완/서버 재시작/원본 해시/최종 SHA PR·main CI 증거는 [VALIDATION](docs/VALIDATION.md#이슈-18-오프라인-osm-일반-지도-편집)과 이슈 완료 댓글에 기록한다. 실데이터·OS 실기·다중 서버/인증 운영·법적 측량 정확도는 미검증이다.

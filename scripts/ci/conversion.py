@@ -9,7 +9,7 @@ import sys
 import traceback
 import unittest
 
-SUITES = {'dem': ('elevation_prepare_test.py', 3), 'osm': ('osm_prepare_test.py', 4)}
+SUITES = {'dem': ('elevation_prepare_test.py', 3), 'osm': ('osm_prepare_test.py', 7)}
 MARKER = 'CONVERSION_RESULT '
 
 

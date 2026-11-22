@@ -13,6 +13,7 @@ services:
       OSM_PBF_FILE: ${OSM_PBF_FILE:-south-korea.osm.pbf}
       OSM_USAGE_CONFIRMED: ${OSM_USAGE_CONFIRMED:-false}
       BUILDINGS_DIR: /data/buildings
+      OSM_EDITS_DIR: /data/osm-edits
       STREET_TPK_DIR: /data/street
       STREET_USAGE_CONFIRMED: ${STREET_USAGE_CONFIRMED:-false}
       ELEVATION_DIR: /data/elevation
@@ -43,6 +44,11 @@ services:
       - type: bind
         source: ${BUILDINGS_HOST_DIR:-./data/buildings}
         target: /data/buildings
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${OSM_EDITS_HOST_DIR:-./data/osm-edits}
+        target: /data/osm-edits
         bind:
           create_host_path: false
     ports:

@@ -79,13 +79,15 @@ class Index:
         self.coast = []
         self.kinds = {}
 
-    def add(self,geometry,kind,category,name,minzoom):
+    def add(self,geometry,kind,category,name,minzoom,source_key=None,reason=None):
         if geometry.is_empty:
             return
         if geometry.geom_type in ('Polygon','MultiPolygon') and not geometry.is_valid:
+            reason = reason or '원본의 유효하지 않은 형상은 읽기 전용입니다.'
             geometry = geometry.buffer(0)
         if geometry.is_empty:
             return
+        fingerprint = hashlib.sha256(json.dumps(dict(kind=kind,category=category,name=name[:160],geometry=mapping(geometry)),sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest()
         minx,miny,maxx,maxy = geometry.bounds
         if not all(math.isfinite(n) and abs(n) <= WORLD+1 for n in geometry.bounds):
             return
@@ -98,11 +100,11 @@ class Index:
                     if part.geom_type=='GeometryCollection':
                         part = unary_union([g for g in part.geoms if g.geom_type in ('Polygon','MultiPolygon')])
                     if not part.is_empty and part.area>0:
-                        self.insert(part,kind,category,name,minzoom)
+                        self.insert(part,kind,category,name,minzoom,source_key,fingerprint,'분할된 대형 객체는 읽기 전용입니다.')
         else:
-            self.insert(geometry,kind,category,name,minzoom)
+            self.insert(geometry,kind,category,name,minzoom,source_key,fingerprint,reason)
 
-    def insert(self,geometry,kind,category,name,minzoom):
+    def insert(self,geometry,kind,category,name,minzoom,source_key=None,fingerprint=None,reason=None):
         self.count += 1
         values = []
         for tolerance,maximum_zoom in zip((1500,150,12,0),(7,10,13,19)):
@@ -111,7 +113,7 @@ class Index:
                 continue
             simplified = geometry.simplify(tolerance,preserve_topology=True) if tolerance else geometry
             values.append(json.dumps(mapping(simplified),separators=(',',':'),ensure_ascii=False))
-        self.db.execute('INSERT INTO features VALUES(?,?,?,?,?,?,?,?,?)',(self.count,kind,category,name[:160],minzoom,*values))
+        self.db.execute('INSERT INTO features VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',(self.count,kind,category,name[:160],minzoom,*values,source_key,fingerprint,reason))
         a,b,c,d = geometry.bounds
         self.db.execute('INSERT INTO feature_index VALUES(?,?,?,?,?,?,?)',(self.count,a,c,b,d,minzoom,19))
         self.kinds[kind] = self.kinds.get(kind,0)+1
@@ -219,7 +221,23 @@ def prepare(args):
                     # GDAL exposes closed coastline ways as polygons and may normalize ring order.
                     rings = [LineString(orient(p,sign=1).exterior.coords) for p in polygons]
                     geometry = rings[0] if len(rings)==1 else MultiLineString(rings)
-                index.add(geometry,kind,subcategory,name,minzoom)
+                source_key = None
+                layer_name = layer.GetName()
+                osm_id, way_id = tags.get('osm_id',''), tags.get('osm_way_id','')
+                if layer_name == 'points' and osm_id.isdigit():
+                    source_key = f'node:{osm_id}'
+                elif layer_name == 'lines' and osm_id.isdigit():
+                    source_key = f'way:{osm_id}'
+                elif layer_name == 'multipolygons':
+                    if way_id.isdigit():
+                        source_key = f'way:{way_id}'
+                        # OGR wraps an actual single closed way in MultiPolygon; never flatten relations.
+                        if geometry.geom_type == 'MultiPolygon' and len(geometry.geoms) == 1:
+                            geometry = geometry.geoms[0]
+                    elif osm_id.isdigit():
+                        source_key = f'relation:{osm_id}'
+                reason = '관계 객체는 읽기 전용입니다.' if source_key and source_key.startswith('relation:') else None
+                index.add(geometry,kind,subcategory,name,minzoom,source_key,reason)
                 if kind=='coastline':
                     index.coast.extend([geometry] if geometry.geom_type=='LineString' else list(geometry.geoms))
             scanned += 1
@@ -240,7 +258,7 @@ def prepare(args):
         after = source.stat()
         if (after.st_size,after.st_mtime_ns)!=(details.st_size,details.st_mtime_ns):
             raise ValueError('PBF changed while preparing. Keep the file unchanged and retry.')
-        metadata = dict(version=1,type='osm-sqlite',database=f'sets/{dataset.name}/map.sqlite',bounds=bounds,
+        metadata = dict(version=1,indexVersion=2,type='osm-sqlite',database=f'sets/{dataset.name}/map.sqlite',bounds=bounds,
                         minZoom=0,maxZoom=19,usageConfirmed=True,source='OpenStreetMap',license='ODbL-1.0',
                         attribution='© OpenStreetMap contributors',sourceSha256=digest,featureCount=index.count,
                         kinds=index.kinds,coastlineFill=coast,coastlineEdgeConnections=connections,**stamp)

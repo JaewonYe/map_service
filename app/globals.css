@@ -163,6 +163,14 @@ label {font-size:12px;padding:2px 4px;}
 .facility-boundary-editor select {max-width:100%;margin:8px;}
 .position-editor-form {display:flex;flex-direction:column;flex:1;min-height:0;}
 .position-warning {padding:8px;background:var(--color-warning-subtle);color:var(--color-warning);border-radius:var(--radius-control);}
+.osm-editor label {display:grid;gap:4px;margin:12px 0;}
+.osm-editor input,.osm-editor select {width:100%;margin:0;}
+.osm-editor dd {margin:0;overflow-wrap:anywhere;}
+.osm-object-list {list-style:none;padding:0;max-height:240px;overflow:auto;overscroll-behavior:contain;}
+.osm-object-list li {content-visibility:auto;contain-intrinsic-size:auto 64px;margin:4px 0;}
+.osm-object-list button {width:100%;text-align:left;overflow-wrap:anywhere;}
+.map-workspace[data-osm-editing] .leaflet-control-layers {visibility:hidden;}
+.osm-geometry {font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;}
 @media(max-width:800px) {
   .app-header {padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right));gap:12px;}
   .app-brand {gap:8px;}.app-brand h1 {font-size:16px;}.app-brand svg {width:20px;height:20px;}

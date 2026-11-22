@@ -1,0 +1,249 @@
+{
+  "baseURL": "http://127.0.0.1:3120",
+  "fixture": "Generated CC0 PBF through production prepare.py/schema2; isolated edits/facilities; copied published set only for source-change conflict",
+  "pbfSha256": "eccc5bddd45f31710c04a5d13f878a7dbcdf5d97e3aa38dfc61f1a1fb6e7cb19",
+  "originalBaseSha256": "0e6f885e693a20a4abd6aeb8583352bb4cb958759050553c77d58f42eb082923",
+  "captures": [
+    {
+      "file": "desktop-light-selected.png",
+      "device": "desktop",
+      "theme": "light",
+      "state": "selected",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "camera": "중심: 36.597889, 126.240136",
+      "zoom": "16"
+    },
+    {
+      "file": "desktop-light-editing.png",
+      "device": "desktop",
+      "theme": "light",
+      "state": "editing",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "camera": "중심: 36.597889, 126.240136",
+      "zoom": "16"
+    },
+    {
+      "file": "desktop-light-delete-confirm.png",
+      "device": "desktop",
+      "theme": "light",
+      "state": "delete-confirm",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "camera": "중심: 36.597889, 126.240136",
+      "zoom": "16"
+    },
+    {
+      "file": "desktop-dark-selected.png",
+      "device": "desktop",
+      "theme": "dark",
+      "state": "selected",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "camera": "중심: 36.597889, 126.240136",
+      "zoom": "16"
+    },
+    {
+      "file": "desktop-dark-editing.png",
+      "device": "desktop",
+      "theme": "dark",
+      "state": "editing",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "camera": "중심: 36.597889, 126.240136",
+      "zoom": "16"
+    },
+    {
+      "file": "desktop-dark-delete-confirm.png",
+      "device": "desktop",
+      "theme": "dark",
+      "state": "delete-confirm",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "camera": "중심: 36.597889, 126.240136",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-light-selected.png",
+      "device": "mobile",
+      "theme": "light",
+      "state": "selected",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "camera": "중심: 36.595133, 126.240141",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-light-editing.png",
+      "device": "mobile",
+      "theme": "light",
+      "state": "editing",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "camera": "중심: 36.595133, 126.240141",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-light-editing-fields.png",
+      "device": "mobile",
+      "theme": "light",
+      "state": "editing-fields",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "camera": "중심: 36.595133, 126.240141",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-light-delete-confirm.png",
+      "device": "mobile",
+      "theme": "light",
+      "state": "delete-confirm",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "camera": "중심: 36.595133, 126.240141",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-dark-selected.png",
+      "device": "mobile",
+      "theme": "dark",
+      "state": "selected",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "camera": "중심: 36.595133, 126.240141",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-dark-editing.png",
+      "device": "mobile",
+      "theme": "dark",
+      "state": "editing",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "camera": "중심: 36.595133, 126.240141",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-dark-editing-fields.png",
+      "device": "mobile",
+      "theme": "dark",
+      "state": "editing-fields",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "camera": "중심: 36.595133, 126.240141",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-dark-delete-confirm.png",
+      "device": "mobile",
+      "theme": "dark",
+      "state": "delete-confirm",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "camera": "중심: 36.595133, 126.240141",
+      "zoom": "16"
+    },
+    {
+      "file": "desktop-light-conflict.png",
+      "device": "desktop",
+      "theme": "light",
+      "state": "conflict",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "camera": "중심: 36.597889, 126.240136",
+      "zoom": "16"
+    },
+    {
+      "file": "desktop-dark-conflict.png",
+      "device": "desktop",
+      "theme": "dark",
+      "state": "conflict",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "camera": "중심: 36.597889, 126.240136",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-light-conflict.png",
+      "device": "mobile",
+      "theme": "light",
+      "state": "conflict",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "camera": "중심: 36.595133, 126.240141",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-light-conflict-actions.png",
+      "device": "mobile",
+      "theme": "light",
+      "state": "conflict-actions",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "camera": "중심: 36.595133, 126.240141",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-dark-conflict.png",
+      "device": "mobile",
+      "theme": "dark",
+      "state": "conflict",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "camera": "중심: 36.595133, 126.240141",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-dark-conflict-actions.png",
+      "device": "mobile",
+      "theme": "dark",
+      "state": "conflict-actions",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "camera": "중심: 36.595133, 126.240141",
+      "zoom": "16"
+    }
+  ],
+  "finalOriginalHashesPreserved": true
+}

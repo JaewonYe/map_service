@@ -2,6 +2,7 @@
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
+import {createHash} from 'node:crypto';
 import {WORLD} from '../../lib/osm/render';
 export const osmBounds={south:36.57,west:126.20,north:36.63,east:126.28};
 export function mercator(lon:number,lat:number){return [lon/180*WORLD,Math.log(Math.tan(Math.PI/4+lat*Math.PI/360))*WORLD/Math.PI];}
@@ -18,7 +19,7 @@ export async function makeOsmIndex(directory:string){
     {kind:'place',class:'town',name:'CC0 태안 시험지명',minzoom:10,g:{type:'Point',coordinates:mercator(126.240136,36.597889)}}
   ];
   for(const [i,item] of items.entries()){
-    const raw=JSON.stringify(item.g);db.prepare('INSERT INTO features VALUES(?,?,?,?,?,?,?,?,?)').run(i+1,item.kind,item.class,item.name,item.minzoom,raw,raw,raw,raw);
+    const raw=JSON.stringify(item.g);db.prepare('INSERT INTO features(id,kind,class,name,minzoom,g0,g1,g2,g3,source_key,fingerprint) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(i+1,item.kind,item.class,item.name,item.minzoom,raw,raw,raw,raw,`${item.kind==='place'?'node':'way'}:${i+1}`,createHash('sha256').update(raw+item.name+item.class).digest('hex'));
     const p0=mercator(osmBounds.west,osmBounds.south),p1=mercator(osmBounds.east,osmBounds.north);
     db.prepare('INSERT INTO feature_index VALUES(?,?,?,?,?,?,?)').run(i+1,p0[0],p1[0],p0[1],p1[1],item.minzoom,19);
   }

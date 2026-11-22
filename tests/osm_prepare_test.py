@@ -69,4 +69,43 @@ class OsmPreparation(unittest.TestCase):
             self.args.file=name
             with self.assertRaises(ValueError):module.prepare(self.args)
 
+    def test_source_keys_and_fingerprints_survive_reimport_order_and_detect_changed_or_deleted_source(self):
+        module.prepare(self.args)
+        def sources():
+            m=json.loads((self.root/'metadata.json').read_text())
+            with sqlite3.connect(self.root/m['database']) as db:
+                self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0],2)
+                rows={r[0]:r[1:] for r in db.execute("SELECT source_key,fingerprint,g3 FROM features WHERE source_key IS NOT NULL")}
+                self.assertTrue(any(k.startswith('node:') for k in rows))
+                self.assertEqual(json.loads(rows['way:103'][1])['type'],'Polygon')
+                return rows
+        initial=sources();self.args.force=True
+        write_fixture(self.source,reverse=True);module.prepare(self.args)
+        self.assertEqual(sources()['way:101'][0],initial['way:101'][0])
+        write_fixture(self.source,road_name='원본 변경');module.prepare(self.args)
+        self.assertNotEqual(sources()['way:101'][0],initial['way:101'][0])
+        write_fixture(self.source,drop_road=True);module.prepare(self.args)
+        self.assertNotIn('way:101',sources())
+
+    def test_complex_relation_and_chunk_sources_are_not_flattened_and_keep_identity(self):
+        from shapely.geometry import MultiPolygon
+        index=module.Index(self.root/'complex.sqlite');self.addCleanup(index.db.close)
+        geometry=MultiPolygon([Polygon([(0,0),(10,0),(10,10),(0,0)]),Polygon([(20,20),(30,20),(30,30),(20,20)])])
+        index.add(geometry,'building','yes','복합',15,'relation:1','관계 객체는 읽기 전용입니다.')
+        row=index.db.execute('SELECT source_key,g3,readonly_reason FROM features').fetchone()
+        self.assertEqual(row[0],'relation:1');self.assertEqual(json.loads(row[1])['type'],'MultiPolygon');self.assertIn('읽기 전용',row[2])
+        index.add(Polygon([(0,0),(80000,0),(80000,80000),(0,0)]),'building','yes','대형',15,'way:99')
+        rows=index.db.execute("SELECT source_key,readonly_reason FROM features WHERE source_key='way:99'").fetchall()
+        self.assertGreater(len(rows),1);self.assertTrue(all('분할' in r[1] for r in rows))
+
+    def test_preparation_failure_keeps_local_edits_and_base_database_bytes(self):
+        module.prepare(self.args);metadata=(self.root/'metadata.json').read_bytes();m=json.loads(metadata)
+        original=hashlib.sha256((self.root/m['database']).read_bytes()).hexdigest()
+        edits=self.root/'separate-edits';edits.mkdir();record=b'{"version":1,"revision":42,"edits":[]}'
+        (edits/'edits.json').write_bytes(record);self.source.write_bytes(b'invalid replacement')
+        with self.assertRaises((ValueError,RuntimeError)):module.prepare(self.args)
+        self.assertEqual((self.root/'metadata.json').read_bytes(),metadata)
+        self.assertEqual(hashlib.sha256((self.root/m['database']).read_bytes()).hexdigest(),original)
+        self.assertEqual((edits/'edits.json').read_bytes(),record)
+
 if __name__=='__main__':unittest.main()

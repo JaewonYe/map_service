@@ -4,10 +4,12 @@ import L from 'leaflet';
 import MapMeasurements from './MapMeasurements';
 import DetailLocations from './DetailLocations';
 import MapBuildings from './MapBuildings';
+import MapOsmEditor from './MapOsmEditor';
+import {createPortal} from 'react-dom';
 import type {Coordinate} from '../lib/map-measure';
 import type {CatalogInfo} from '../lib/tiles/catalog';
 import type {LayerId,LayerInfo} from '../lib/maps/types';
-type Info=Pick<CatalogInfo,'center'|'zoom'|'minZoom'|'maxZoom'|'sources'|'warnings'>&{mode:'single'|'multi'|'layers';layers:Record<LayerId,LayerInfo>;osm:{mode:string;url:string|null;attribution:string;reason?:string}};
+type Info=Pick<CatalogInfo,'center'|'zoom'|'minZoom'|'maxZoom'|'sources'|'warnings'>&{mode:'single'|'multi'|'layers';layers:Record<LayerId,LayerInfo>;osm:{mode:string;url:string|null;attribution:string;reason?:string;prepared?:boolean;bounds?:{south:number;north:number;west:number;east:number}}};
 const desktopQuery='(min-width:801px)';
 function subscribeLayout(notify:()=>void){
   const media=matchMedia(desktopQuery);media.addEventListener('change',notify);
@@ -31,6 +33,9 @@ export default function MapCanvas(){
   const [height,setHeight]=useState('');
   const [mapInstance,setMapInstance]=useState<L.Map|null>(null);
   const [boundaryEditing,setBoundaryEditing]=useState(false);
+  const [osmEditing,setOsmEditing]=useState(false);
+  const osmLayer=useRef<L.TileLayer|null>(null),baseLayers=useRef<L.TileLayer[]>([]),priorLayer=useRef<L.TileLayer|null>(null);
+  const refreshOsm=useCallback(()=>{if(osmLayer.current)osmLayer.current.setUrl('/api/osm/{z}/{x}/{y}?edit='+Date.now());},[]);
   const [buildingPoint,setBuildingPoint]=useState<Coordinate|null>(null);
   const [info,setInfo]=useState<Info|null>(null),[message,setMessage]=useState('TPK 메타데이터 확인 중…');
   const [center,setCenter]=useState<[number,number]|null>(null),[zoom,setZoom]=useState<number|null>(null),[clicked,setClicked]=useState<[number,number]|null>(null);
@@ -65,11 +70,14 @@ export default function MapCanvas(){
           tile.on('tileerror',()=>{failed=true;setMessage('일부 타일이 없습니다. 데이터 범위와 서버 로그를 확인하세요.');});
           tile.on('loading',()=>{failed=false;setMessage('타일을 불러오는 중…');});
           tile.on('load',()=>{if(!failed)setMessage('');});
+          baseLayers.current.push(tile);
+          if(source.url==='/api/osm/{z}/{x}/{y}'&&metadata.osm.prepared)osmLayer.current=tile;
           layers[names[id]]=tile;
           if(Object.keys(layers).length===1){tile.addTo(map);setActiveLayer(names[id]);}
           if(id!=='satellite'&&b)L.rectangle([[b.south,b.west],[b.north,b.east]],{
             color:id==='street'?'#087f8c':'#a855f7',weight:2,fill:false,interactive:false}).addTo(boundary);
         }
+        if(metadata.osm.prepared&&!osmLayer.current){const b=metadata.osm.bounds;const tile=L.tileLayer('/api/osm/{z}/{x}/{y}',{maxZoom:19,minZoom:0,noWrap:true,attribution:'© OpenStreetMap contributors',bounds:b?[[b.south,b.west],[b.north,b.east]]:undefined});osmLayer.current=tile;baseLayers.current.push(tile);layers['OSM 로컬 일반 지도']=tile;}
         setMessage(Object.keys(layers).length?'':'사용 가능한 지도 데이터가 없습니다. 지도 정보의 데이터 준비를 확인하세요.');
         L.control.layers(layers,{'데이터 경계':boundary},{collapsed:matchMedia('(max-width:800px)').matches}).addTo(map);
         map.on('baselayerchange',(event:L.LayersControlEvent)=>{
@@ -108,13 +116,13 @@ export default function MapCanvas(){
     observer.observe(container.current);
     return()=>{observer.disconnect();cancelAnimationFrame(frame);};
   },[mapInstance]);
-  return <section className="map-workspace" data-layout={desktop?'desktop':'mobile'} data-boundary-editing={boundaryEditing || undefined}>
+  return <section className="map-workspace" data-osm-editing={osmEditing||undefined} data-layout={desktop?'desktop':'mobile'} data-boundary-editing={boundaryEditing || osmEditing || undefined}>
     <div className="facility-sidebar-slot" ref={setSidebarHost}/>
     <section className="map-panel" aria-label="지도 작업 영역"><div className="map-stage">
     <div className="map-canvas" ref={container} role="region" aria-label="오프라인 지도"/>
     <div className="map-toolbar">
-      {mapInstance&&<MapMeasurements map={mapInstance} disabled={boundaryEditing} onStartAction={startMapAction} onRegisterBuilding={setBuildingPoint}/>}
-      <button type="button" className="map-info-toggle" disabled={boundaryEditing} aria-controls="map-data-panel" aria-expanded={infoOpen}
+      {mapInstance&&<MapMeasurements map={mapInstance} disabled={boundaryEditing||osmEditing} onStartAction={startMapAction} onRegisterBuilding={setBuildingPoint}/>}
+      <button type="button" className="map-info-toggle" disabled={boundaryEditing||osmEditing} aria-controls="map-data-panel" aria-expanded={infoOpen}
         onClick={()=>{if(!infoOpen)setMapAction(value=>value+1);setInfoOpen(value=>!value);if(matchMedia('(max-width:800px)').matches)setMobileFacilitiesExpanded(false);}}>지도 정보</button>
     </div>
     <section id="map-data-panel" className="map-data-panel" aria-label="지도 데이터 정보" hidden={!infoOpen}>
@@ -129,6 +137,8 @@ export default function MapCanvas(){
         {info.warnings.map((warning,index)=><small key={index}>{warning}</small>)}
       </details>}
       {info&&!info.layers.street.available&&<><small>일반 지도 데이터가 준비되지 않았습니다.</small>{info.osm.reason&&<small>{info.osm.reason}</small>}</>}
+    <button type="button" className="primary" disabled={boundaryEditing} onClick={()=>{startMapAction();setInfoOpen(false);priorLayer.current=baseLayers.current.find(layer=>mapInstance?.hasLayer(layer))||null;if(osmLayer.current&&mapInstance){baseLayers.current.forEach(layer=>{if(mapInstance.hasLayer(layer))mapInstance.removeLayer(layer);});osmLayer.current.addTo(mapInstance);setActiveLayer('OSM 로컬 일반 지도');}setOsmEditing(true);}}>일반 지도 편집</button>
+    <p>준비된 로컬 OSM 전용입니다. street TPK·XYZ·온라인 지도는 편집하지 않습니다.</p>
     <button className="map-data-help" onClick={()=>help.current?.showModal()}>지도 데이터 준비</button>
     </section>
     <dialog ref={help} className="building-dialog" aria-label="지도 데이터 준비">
@@ -143,8 +153,9 @@ export default function MapCanvas(){
       <p>파일·설정 변경 후 서버를 재시작하고 새로고침하세요. 준비되지 않은 레이어는 선택 목록에 표시되지 않습니다.</p>
       <button onClick={()=>help.current?.close()}>닫기</button>
     </dialog>
-    {mapInstance&&sidebarHost&&<MapBuildings map={mapInstance} mapAction={mapAction} sidebarHost={sidebarHost} expanded={facilitiesExpanded} setExpanded={expandFacilities}
+    {mapInstance&&sidebarHost&&<MapBuildings map={mapInstance} inactive={osmEditing} mapAction={mapAction} sidebarHost={sidebarHost} expanded={facilitiesExpanded} setExpanded={expandFacilities}
       onBoundaryEditingChange={setBoundaryEditing} requestedPoint={buildingPoint} onRequestClosed={()=>setBuildingPoint(null)}/>}
+    {osmEditing&&mapInstance&&sidebarHost&&createPortal(<MapOsmEditor map={mapInstance} onChanged={refreshOsm} onExit={()=>{setOsmEditing(false);if(osmLayer.current&&priorLayer.current&&osmLayer.current!==priorLayer.current){mapInstance.removeLayer(osmLayer.current);priorLayer.current.addTo(mapInstance);}mapInstance.getContainer().focus();}}/>,sidebarHost)}
     </div>
     <aside className="map-info" aria-label="지도 좌표 정보">
       <div data-testid="map-center">중심: {center?`${center[0].toFixed(6)}, ${center[1].toFixed(6)}`:'—'}</div>

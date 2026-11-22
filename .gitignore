@@ -44,3 +44,7 @@ data/osm/*
 # Local Python design skill caches
 __pycache__/
 *.pyc
+
+!data/osm-edits/
+data/osm-edits/*
+!data/osm-edits/README.md

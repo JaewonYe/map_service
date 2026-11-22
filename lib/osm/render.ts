@@ -45,8 +45,8 @@ export function renderSvg(features:Feature[],z:number,x:number,y:number,coastlin
       casing.push(`<path d="${d}" fill="none" stroke="#c6bfb5" stroke-width="${width+1.1}"/>`);
       roads.push(`<path d="${d}" fill="none" stroke="${color}" stroke-width="${width}"${['path','footway','steps','track'].includes(f.class)?' stroke-dasharray="3 2"':''}/>`);
     }
-    if(f.name&&p&&p[0]>=5&&p[0]<251&&p[1]>=8&&p[1]<248&&
-      (f.kind==='place'||(f.kind==='road'&&z>=14)||(f.kind==='poi'&&z>=16))){
+    if(f.name&&p&&p[0]>=-128&&p[0]<384&&p[1]>=-128&&p[1]<384&&
+      (f.kind==='place'||(f.kind==='road'&&z>=14)||(['poi','building'].includes(f.kind)&&z>=16))){
       labels.push({f,p,size:f.kind==='place'?(f.class==='city'?15:13):10,weight:f.kind==='place'?'600':'400'});
     }
   }

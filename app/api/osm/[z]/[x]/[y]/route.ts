@@ -7,9 +7,9 @@ export const dynamic='force-dynamic';
 export async function GET(request:Request,context:{params:Promise<{z:string;x:string;y:string}>}){
   try{
     const {z,x,y}=await context.params;const tile=await osmTile(...xyz(z,x,y));
-    if(!tile)return new Response(null,{status:404,headers:{'Cache-Control':'private,max-age=60'}});
+    if(!tile)return new Response(null,{status:404,headers:{'Cache-Control':'private,no-cache'}});
     const etag='"'+createHash('sha256').update(tile.bytes).digest('hex')+'"';
-    const headers={'Content-Type':tile.mime,'Cache-Control':'private,max-age=3600','X-Content-Type-Options':'nosniff','ETag':etag};
+    const headers={'Content-Type':tile.mime,'Cache-Control':'private,no-cache','X-Content-Type-Options':'nosniff','ETag':etag};
     if(request.headers.get('if-none-match')===etag)return new Response(null,{status:304,headers});
     return new Response(new Uint8Array(tile.bytes),{headers});
   }catch(error){return failure(error);}

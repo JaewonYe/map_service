@@ -282,3 +282,54 @@ main 디자인 기준 반영 후 로컬 typecheck, Node 앱 83개/집계 도구 
 최종 커밋 SHA, PR URL, 같은 SHA의 pull_request/main push별 Map regression과 Design skill integrity run·실제 검사 수/실패/스킵·artifact 이름/ID/7일 보관은 [이슈 #16](https://github.com/JaewonYe/map_service/issues/16) 완료 댓글과 PR에 기록한다. 다른 SHA나 로컬 성공을 원격 성공으로 보고하지 않는다. UI PNG/manifest는 저장소에 보관한다.
 
 실제 사용자 시설/지도·실제 터치 기기/스크린 리더·Windows/Ubuntu 실기·외부 접근성 인증·모든 확대/회전·대규모 성능·법적 측량 정확도·인증/운영·승인된 플랫폼 계약은 미검증이다. 대표 지점과 경계 동시 이동·경계 안 위치 강제·위치 필드만 제거·새 데이터 타입/API/예약 정책은 도입하지 않았다.
+
+## 이슈 #18 오프라인 OSM 일반 지도 편집
+
+2026-11-22 Linux 클라우드, Node.js v24.22.1. 기준 main `1d6e7dae269f9e4e642ef06771a23343527fe533`. 최신 platform_core 역할/절차와 map AGENTS를 확인하고 [사전 변경안](https://github.com/JaewonYe/map_service/issues/18#issuecomment-7075008375)을 게시한 후 구현했다. 기반만 완료한 상태에서 닫지 않고 조회·실제 PNG 합성·UI·충돌 복구까지 진행했다.
+
+### 완료 조건별 증거
+
+| # | 완료 조건 | 증거 |
+| --- | --- | --- |
+| 1 | 실제 prepared 객체 선택/현재 정보 | production importer가 만든 합성 PBF SQLite로 way:103 건물/node:24 지명 선택, 목록·클릭/겹친 후보와 현재 이름/분류/좌표/source/state 확인. [실제 화면](OSM_EDIT_UI_REVIEW.md) |
+| 2 | Point/도로/건물 CRUD·취소·복원 | Node API/renderer와 브라우저에서 이름/분류/좌표·정점 삽입/삭제/undo·신규/숨김/복원/취소 검증. unsupported/영역/구형 안내 포함 |
+| 3 | 원본/시설 보존 | PBF/SQLite 수정 전후 SHA256 동일, 기존 시설 파일/UUID/boundary 보존 및 기존 시설 브라우저35개 통과. 시설과 일반 지도 저장 API 분리 |
+| 4 | reload/restart·실제 PNG·캐시 | 독립 Node 프로세스, 실제 production HTTP 서버 종료/재시작, PNG 바이트/ETag/304·메모리/pending 경쟁·이동 전후/인접/다른 줌·Leaflet URL 갱신 검사 |
+| 5 | 충돌/실패/입력 한도 | 실제 디렉터리 쓰기 실패/손상 저장소, 409/428/origin/body/geometry·대량201개/대형geometry, 조회 오류/빈 화면, 지연 저장/대상 잠금/초안 보존 검증 |
+| 6 | PBF 재준비/구형 호환 | 실제 PBF 순서 변경/source 이름 변경/도로 삭제 변환, 동일 key/fingerprint와 changed/deleted 충돌, 명시적 reapply/restore, 실제 schema1 컬럼 호환·수정 기록 보존. 준비 실패 시 기존 세트/수정 파일 유지 |
+| 7 | 시각/기능 회귀 | desktop1440×900/mobile390×844 × Light/Dark × 선택/편집/삭제 확인/충돌 16개 + 모바일 내부 스크롤4개 =20PNG와 [검토표](OSM_EDIT_UI_REVIEW.md). 키보드/터치/테마·크기 변경, 기존 5프로젝트 전체 회귀 |
+| 8 | 최종 SHA 원격 CI | 아래 로컬 실제 수와 구분. 최종 커밋의 PR/main push별 Map 3job 및 Design 1job, run URL/아티팩트/최초 실패 이력은 실행 후 이슈 완료 댓글에 기록 |
+| 9 | 계약/복원/한계·보고 | [OSM_EDITING](OSM_EDITING.md), README/PROJECT_CONTEXT/데이터 폴더 안내, 이 문서/화면 검토. 공통 API·타 DB·상위 gitlink 유지, 통합용 최종 모듈 SHA 보고 |
+
+### 로컬 실행 수와 결과
+
+- typecheck/production build 및 `git diff --check`, Compose config 검증 통과.
+- Node 앱 **97**(tiles22/buildings24/layers6/osm14/measure9/launcher22), 별도 Node 집계 도구 **5** 통과. osm은 기존4→14로10개 추가. 실패/취소/스킵/todo0.
+- Playwright 전체 **67**(single4/multi15/osm10/layers3/buildings35), 기존59→신규8 추가, 실패/flaky/스킵0. 최신 확인 문구·Leaflet URL 검사 추가 후 osm10개를 다시 통과했다. 최종 geometry 보강은 Node14개로 확인하고 최종 SHA 전체 브라우저 결과는 원격 CI에서 확인한다.
+- 신규 OSM 편집 파일은 하나의 준비 데이터셋/전체 revision을 공유하므로 이 파일의 테스트만 default 순차 실행한다. 기존 fullyParallel/2worker·timeout·retry·assert/skip 기준은 유지한다. 원본 OSM2개 및 다른 프로젝트는 기존 병렬 설정이다.
+- 변환 **DEM3/PBF7 =10**, Python 보고 도구 **5** 통과. PBF는 기존4→7로3개 추가. production 도구에 실제 합성 PBF를 입력하고 readonly/nonroot/network=none 실행·schema/source identity·원본 보존·재사용·실패를 검사한다. CI 집계 예상 PBF 수만4→7로 갱신했다.
+- production OSM 도구 image `6778d300ec3369d0fea50fcc743cb9243051412d0b74956fb4ea18a0b0f5a41a`; prepare.py SHA256 `abe6527feeb8f95f3baba184fd129d4130b5ba098ab16214503beca70fee30b2`; schema.sql SHA256 `b9899fabc8008931abdf6ebb9a8122e391769e5c2477d19b0a96790832ed5e35`. 원격 image ID는 별도 runner에서 생성되므로 로컬과 같다고 가정하지 않는다.
+- 디자인 무결성 **92assets/3skills**, Light/Dark 토큰·대비·로컬 UX 검색 통과. 공통 skill/lock/theme/reference 변경 없음. 이 검사를 실제 앱 캡처 검토로 대신하지 않았다.
+
+### 최초 실패와 보완
+
+- 최초 추가 Node11개 중10통과/1실패: tile 경계 바깥 anchor 라벨이 제외되어 실제 PNG가 바뀌지 않는 문제. query/label padding을128px로 맞추고 경계 주변 라벨을 렌더하도록 수정해 통과했다.
+- 한도 검사 추가 후14개 중13통과/1실패: 32KiB 초과를 의도한 대형 fixture가 실제로 약30KiB였다. 6000좌표로 실제 초과 입력을 만들었고 제품 제한은 완화하지 않았다. 이후14개 통과.
+- 최초 신규 포함 OSM browser10개 중5통과/5실패: wrapping select label이 옵션 문자열을 accessible name에 포함(4), unnamed source 두 개의 locator 중복(1). 명시적 label/id·읽기 전용 대상 locator로 수정.
+- 다음10개 중9통과/1실패: undo가 functional state update 시점에 갱신된 ref를 읽어 이전 geometry를 잃었다. 조작 전 좌표를 먼저 캡처해 수정했다. 다음 OSM10/전체67 통과. 마지막 검토에서는 도로가 인접 구간을 되짚는 겹침도 거부하고 순방향 일직선은 유지하는 assertion을 추가했다. 저장 파일 크기는 마지막 newline까지 계산한다.
+- 캡처/수동 HTTP 재시작 확인 도구의 첫 assertion은 Cache-Control 쉼표 뒤 공백 표기를 가정해 실패했다. 동일 객체/revision/PNG는 이미 유지됐으며 헤더 공백을 정규화한 확인에서304와 복원까지 통과했다. 제품 실패나 자동 테스트 수로 계산하지 않는다.
+- Fontconfig의 쓰기 불가 캐시 경고가 있었지만 PNG/build/테스트는 통과했다. GitHub connector와 git fetch/push는 가능했고 네트워크 허용 목록을 바꾸지 않았다.
+
+### 실제 PBF 화면·HTTP 프로세스 재시작
+
+추가 수동 브라우저 확인에서 실제 합성 street TPK와 prepared OSM이 함께 있는 서버를 실행했다. 우선 표시 PNG가 `/api/street/`인 상태에서 일반 지도 편집 진입 후 `/api/osm/`으로 전환되고 종료 후 `/api/street/`으로 돌아오는 것을 확인했다. map-info/타일 API를 모의하지 않았으며 외부 요청은 차단했다. 이 수동 확인을 자동 브라우저67개에 더하지 않는다.
+
+캡처는 생성 CC0 PBF → production schema2 SQLite를 사용했다. 브라우저 회귀의 손으로 구성한 SQLite fixture와 구분한다. 원본 PBF SHA256 `eccc5bddd45f31710c04a5d13f878a7dbcdf5d97e3aa38dfc61f1a1fb6e7cb19`, SQLite SHA256 `0e6f885e693a20a4abd6aeb8583352bb4cb958759050553c77d58f42eb082923`. 캡처 전후 동일하며 manifest에도 기록했다. 충돌은 published set 복사본+metadata 교체와 실제 API 저장으로 재현했고 원본 metadata 복구/테스트 수정 해제까지 확인했다.
+
+격리된 같은 폴더로 실제 production HTTP 서버를 재시작했다. 재시작 전 local Point를 저장하고 `/api/osm/16/55750/25597`이 base와 달라지는 것을 확인했다. 기존 프로세스 종료 후 새 프로세스에서 동일 store revision5·이름/좌표/key/state와 PNG SHA256 `b30686c9b08cdb467cd52dcd32f970b9cbec02aa70fd41a632608304cd412cda` 유지, 동일 ETag와 If-None-Match304, private/no-cache를 확인했다. 테스트 기록만 restore하여 빈 수정 저장소로 돌렸다. 이는 독립 Store/renderer 프로세스 단위 검증과 별도의 실제 HTTP 서버 재시작 실험이다.
+
+### 원격 증거·제한
+
+최종 SHA·PR/병합·PR/main push별 Map/Design run URL·실제 테스트 수·job 결과·7일 artifact ID는 **원격 실행 후 [이슈 #18](https://github.com/JaewonYe/map_service/issues/18)의 완료 댓글**에 남긴다. 이전 SHA/로컬 결과를 최종 원격 성공으로 보고하지 않는다. README와 이 문서의 과거 이슈 수는 해당 시점 기록이며 현재 수는 위97/67/10을 기준으로 한다.
+
+실제 사용자 PBF/시설 데이터·대한민국 전체 성능·Windows11/Ubuntu24.04 실기·다중 서버 동시 쓰기/인증 운영·법적 측량 정확도·임의 태그/관계·routing topology 완전 편집은 미검증/제외다. 단일 서버의 모듈 내부 도구이며 새 공개 인증 정책을 도입하지 않았다. 원본 파일·시설 데이터·키는 커밋/CI artifact에 포함하지 않는다. 상위 gitlink는 별도 통합용 최종 SHA만 보고한다.

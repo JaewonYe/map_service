@@ -30,7 +30,7 @@ def blob(kind,payload):
     return struct.pack('>I',len(header))+header+body
 
 
-def write_fixture(filename):
+def write_fixture(filename,reverse=False,road_name='태안 시험도로',drop_road=False):
     nodes=[]; ways=[]
     def node(lon,lat,tags=None):
         identity=len(nodes)+1; nodes.append((identity,lon,lat,tags or {})); return identity
@@ -41,7 +41,7 @@ def write_fixture(filename):
         ways.append((len(ways)+100,refs,tags))
     # Counterclockwise island: OSM land is on the coastline's left.
     way([(126.22,36.58),(126.26,36.58),(126.26,36.62),(126.22,36.62),(126.22,36.58)],{'natural':'coastline'})
-    way([(126.23,36.595),(126.24,36.598),(126.25,36.602)],{'highway':'primary','name':'Test road','name:ko':'태안 시험도로'})
+    way([(126.23,36.595),(126.24,36.598),(126.25,36.602)],{'highway':'primary','name':'Test road','name:ko':road_name})
     way([(126.235,36.592),(126.245,36.592),(126.245,36.602),(126.235,36.602),(126.235,36.592)],{'landuse':'forest'})
     way([(126.240,36.598),(126.2405,36.598),(126.2405,36.5984),(126.240,36.5984),(126.240,36.598)],{'building':'yes','name':'Test building'})
     way([(126.23,36.61),(126.232,36.61),(126.232,36.612),(126.23,36.612),(126.23,36.61)],{'natural':'water'})
@@ -63,7 +63,8 @@ def write_fixture(filename):
         keys_values += b''.join(varint(indices[k])+varint(indices[v]) for k,v in tags.items())+b'\x00'
     dense=data(1,deltas([n[0] for n in nodes]))+data(8,deltas([round(n[2]*1e7) for n in nodes]))+data(9,deltas([round(n[1]*1e7) for n in nodes]))+data(10,keys_values)
     group=data(2,dense)
-    for identity,refs,tags in ways:
+    for identity,refs,tags in (list(reversed(ways)) if reverse else ways):
+        if drop_road and identity==101: continue
         previous=0; packed=b''
         for ref in refs:
             delta=ref-previous; packed += varint((delta<<1)^(delta>>63)); previous=ref
