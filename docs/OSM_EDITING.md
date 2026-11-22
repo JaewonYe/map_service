@@ -8,7 +8,7 @@
 
 새 importer는 SQLite `PRAGMA user_version=2`와 `features.source_key/fingerprint/readonly_reason`을 쓴다. metadata의 기존 `version:1` 계약은 유지하고 `indexVersion:2`를 추가한다. source key는 실제 OGR `osm_id/osm_way_id`에서 얻은 `node:ID`, `way:ID`, `relation:ID`다. 원본 객체 fingerprint는 kind/class/name/전체 EPSG:3857 geometry의 canonical SHA256이며 준비 순번을 포함하지 않는다. 지원하지 않는 임의 태그 변경까지 추적하는 OSM 서버 version은 아니다.
 
-`features.id`는 공간 색인의 내부 순번이다. 재준비 시 순번·좌표 근접·이름으로 수정 대상을 연결하지 않는다. 원본 key와 fingerprint가 같을 때만 자동 적용한다. metadata 바이트의 SHA256을 dataset revision으로 사용한다. 원본이 변경/삭제되거나 읽기 전용이 되면 기록은 conflict로 남고 새 base를 표시한다. 수정 해제 또는 최신 원본 fingerprint를 확인한 명시적 재적용만 허용한다. 새 원본 범위 밖으로 벗어난 로컬 객체도 충돌이다.
+`features.id`는 공간 색인의 내부 순번이다. 재준비 시 순번·좌표 근접·이름으로 수정 대상을 연결하지 않는다. 원본 key와 fingerprint가 같을 때만 자동 적용한다. metadata 바이트의 SHA256을 dataset revision으로 사용한다. 원본이 변경/삭제되거나 읽기 전용이 되면 기록은 conflict로 남고 새 base를 표시한다. 수정 해제 또는 최신 원본 fingerprint를 확인한 명시적 재적용만 허용한다. 새 원본 범위 밖으로 벗어난 로컬 객체도 충돌이다. 로컬 신규 객체는 형상을 새 범위 안으로 옮긴 뒤 재적용하거나 신규 객체를 제거할 수 있다.
 
 schema1은 기존대로 렌더/조회한다. source 정보가 없어 `legacy:순번`은 읽기 전용이고 다른 데이터셋에 재연결하지 않는다. 같은 PBF의 기존 준비 결과는 자동 덮어쓰지 않는다. **메뉴 7 또는 `docker compose --profile tools run --rm --build prepare-osm --force`**로 새 세트를 만들고 앱을 다시 조회한다. 실패하면 기존 metadata/set/수정 기록을 보존한다. 이전 세트는 자동 삭제하지 않는다. 새 앱은 schema1/2를 읽지만 과거 schema1 전용 앱으로 되돌릴 때는 이전 세트의 metadata도 함께 복구해야 한다.
 

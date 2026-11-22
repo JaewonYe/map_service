@@ -318,6 +318,7 @@ main 디자인 기준 반영 후 로컬 typecheck, Node 앱 83개/집계 도구 
 - 최초 신규 포함 OSM browser10개 중5통과/5실패: wrapping select label이 옵션 문자열을 accessible name에 포함(4), unnamed source 두 개의 locator 중복(1). 명시적 label/id·읽기 전용 대상 locator로 수정.
 - 다음10개 중9통과/1실패: undo가 functional state update 시점에 갱신된 ref를 읽어 이전 geometry를 잃었다. 조작 전 좌표를 먼저 캡처해 수정했다. 다음 OSM10/전체67 통과. 마지막 검토에서는 도로가 인접 구간을 되짚는 겹침도 거부하고 순방향 일직선은 유지하는 assertion을 추가했다. 저장 파일 크기는 마지막 newline까지 계산한다.
 - 캡처/수동 HTTP 재시작 확인 도구의 첫 assertion은 Cache-Control 쉼표 뒤 공백 표기를 가정해 실패했다. 동일 객체/revision/PNG는 이미 유지됐으며 헤더 공백을 정규화한 확인에서304와 복원까지 통과했다. 제품 실패나 자동 테스트 수로 계산하지 않는다.
+- PR 후 최종 코드 검토에서 새 원본 bounds 밖이 된 로컬 신규 객체도 원본 객체와 같은 조건으로 재적용 버튼이 잠기는 문제를 발견했다. 로컬 신규 객체는 새 범위 안으로 옮긴 뒤 재적용할 수 있게 하고 기존 충돌 브라우저 시나리오에 실제 metadata 범위 축소·초안 수정·재적용 검사를 더했다. 원본 삭제/읽기 전용 source의 재적용은 계속 차단한다. 이 보완 이후의 최종 SHA를 전체 원격 검증 대상으로 사용한다.
 - Fontconfig의 쓰기 불가 캐시 경고가 있었지만 PNG/build/테스트는 통과했다. GitHub connector와 git fetch/push는 가능했고 네트워크 허용 목록을 바꾸지 않았다.
 
 ### 실제 PBF 화면·HTTP 프로세스 재시작
