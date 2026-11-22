@@ -143,6 +143,11 @@ jobs:
           set -o pipefail
           docker build --progress plain -f scripts/downloads/Dockerfile -t map-service-download-worker:ci . 2>&1 | tee .cache/ci/downloads/build.log
           docker image inspect map-service-download-worker:ci --format '{{.Id}}' | tee .cache/ci/downloads/image.log
+      - name: Verify Compose credential delivery
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 scripts/ci/download-credentials.py 2>&1 | tee .cache/ci/downloads/credentials.log
       - name: Verify offline synthetic download and restore flows
         shell: bash
         run: |

@@ -5,9 +5,9 @@ RUN --mount=type=secret,id=proxy_ca \
     apt-get "$@" update && apt-get "$@" install -y --no-install-recommends python3 python3-gdal python3-shapely python3-numpy osmium-tool ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY scripts/downloads /app/scripts/downloads
-COPY scripts/osm /app/scripts/osm
-COPY scripts/elevation /app/scripts/elevation
+COPY --chown=1000:1000 scripts/downloads /app/scripts/downloads
+COPY --chown=1000:1000 scripts/osm /app/scripts/osm
+COPY --chown=1000:1000 scripts/elevation /app/scripts/elevation
 RUN useradd --uid 1000 --create-home worker && mkdir -p /data/downloads && chown worker:worker /data/downloads
 USER worker
 ENV MAP_DOWNLOADS_DIR=/data/downloads PYTHONDONTWRITEBYTECODE=1

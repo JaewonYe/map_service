@@ -31,9 +31,23 @@ docker compose --env-file .env.downloads --profile downloads up -d --build downl
 docker compose up -d --build web
 ```
 
-브라우저 `http://localhost:3001/downloads`. 기존 원본 폴더의 read-only bind와 준비 도구의 `network_mode:none`은 유지된다. web은 임의 shell/Docker socket/worker 인증값을 받지 않는다. 다운로드 worker만 공식 제공처에 연결하고 전용 다운로드·원본 폴더에 쓴다. 기본 web bind는 127.0.0.1이며 기존 앱처럼 외부 공개용 로그인/관리 권한 체계를 구현한 것은 아니다. 여러 web 프로세스가 쓰는 운영 구성은 지원하지 않는다.
+브라우저 `http://localhost:3001/downloads`. 기존 원본 폴더의 read-only bind와 준비 도구의 `network_mode:none`은 유지된다. web은 임의 shell/Docker socket/worker 인증값을 받지 않는다. 다운로드 worker만 공식 제공처에 연결하고 전용 다운로드·원본 폴더에 쓴다. 이미지의 세 준비 코드 디렉터리는 UID/GID1000 소유로 복사해 호스트 소스가0600이어도 nonroot worker가 읽을 수 있다. 기본 web bind는 127.0.0.1이며 기존 앱처럼 외부 공개용 로그인/관리 권한 체계를 구현한 것은 아니다. 여러 web 프로세스가 쓰는 운영 구성은 지원하지 않는다.
 
-토큰 파일을 쓰려면 로컬 Compose override에서 개인 파일을 worker에만 read-only로 마운트한다. 대상은 `/run/secrets/arcgis_export_token`, `/run/secrets/opentopography_api_key`다. 값은 각각 한 줄의 토큰/키이며 env 설정보다 파일을 먼저 읽는다. 파일 자체를 이미지에 COPY하지 않는다. Python worker를 호스트 Linux에서 직접 실행할 때는 `MAP_DOWNLOAD_ARCGIS_TOKEN_FILE`, `MAP_DOWNLOAD_OPENTOPOGRAPHY_KEY_FILE`을 설정할 수 있다. Windows에서는 fcntl/GDAL가 포함된 Linux worker 컨테이너를 사용한다.
+토큰 파일을 쓰려면 로컬 Compose override에서 개인 파일을 worker에만 read-only로 마운트한다. 대상은 `/run/secrets/arcgis_export_token`, `/run/secrets/opentopography_api_key`다. 값은 각각 한 줄의 토큰/키다. ARCGIS_TOKEN/OPENTOPOGRAPHY_API_KEY 환경변수를 우선 읽고, 비어 있을 때 명시한 비밀 파일을 읽는다. 기본 *_FILE 경로는 비어 있으며 파일을 쓸 경우 해당 변수를 컨테이너 경로로 설정하고 같은 경로로 마운트해야 한다. 파일 자체를 이미지에 COPY하지 않는다. Python worker를 호스트 Linux에서 직접 실행할 때는 `MAP_DOWNLOAD_ARCGIS_TOKEN_FILE`, `MAP_DOWNLOAD_OPENTOPOGRAPHY_KEY_FILE`을 설정할 수 있다. Windows에서는 fcntl/GDAL가 포함된 Linux worker 컨테이너를 사용한다.
+
+## Windows PowerShell에서 토큰 설정이 사라진 경우
+
+토큰 발급 코드가 `$env:ARCGIS_TOKEN`에 설정한 값은 그 PowerShell 창과 이후 실행한 자식 프로세스에만 전달된다. 다른 창에서 다운로드하면 설정이 없을 수 있다. 발급과 다운로드를 같은 창에서 실행한다. 값 없이 설정 유무를 확인하려면 다음 한 줄을 실행한다.
+
+```powershell
+[string]::IsNullOrWhiteSpace($env:ARCGIS_TOKEN)
+```
+
+True면 현재 창에 토큰이 없으므로 같은 창에서 다시 발급하거나 안전한 로컬 `.env.downloads`에 설정한다. False는 값이 있다는 뜻이며 유효기간·export 권한까지 확인한 결과는 아니다. Node `--env-file=.env.downloads`는 기존 프로세스 환경변수를 우선하므로 파일의 빈 ARCGIS_TOKEN 항목이 현재 창의 값을 덮어쓰지 않는다. CLI도 인증값/파일 경로 설정의 유무만 true/false로 출력하고 값은 출력하지 않는다. 기존에 실행 중인 worker는 컨테이너 생성 당시 설정을 사용하므로 토큰 갱신 후 새로 시작해야 한다.
+
+기본 Compose는 존재하지 않는 `/run/secrets/...` 파일을 자동 지정하지 않는다. 환경변수와 명시 파일이 모두 없으면 현재 터미널의 설정 방법을 안내하며, 파일을 명시했는데 읽을 수 없는 경우에만 마운트/권한 오류를 표시한다. ArcGIS 토큰 누락은 다운로드 전 확인하고 정상 원본 캐시 재사용은 유지한다.
+
+`partial`은 일부 레이어만 성공한 상태다. 예를 들어 고도 completed/등록 완료와 위성 blocked가 함께 있으면 고도 패키지/ZIP은 성공이고 위성은 아직 준비되지 않았다. 성공한 고도 원본은 이후 같은 요청에서 재사용하므로 위성 인증을 고친 뒤 실행할 때 `--refresh`를 붙일 필요가 없다. 고도를 새로 수신할 때는 OpenTopography Key도 실행 환경에 설정해야 한다. 검증된 고도 원본을 재사용할 때는 추가 원본 수신이 필요 없다.
 
 ## 기본 영역과 원본
 

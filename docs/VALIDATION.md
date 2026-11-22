@@ -399,3 +399,16 @@ worker16은 실제 localhost HTTP 전송과 production osmium/GDAL/converters를
 관측된 cloud network revision2는 enforced/restricted이며 기존 custom allowlist `naturalearth.s3.amazonaws.com`, `osmdata.openstreetmap.de`와 package_managers를 유지했다. 환경 변경 도구가 없어 실제 허용 적용을 보고하지 않는다. UI설정을 찾지 못한 사용자에게 비활성 버튼 조작을 반복 요구하지 않는다. 현재 worker 인증값도 없고 사용자의 ArcGIS 계정 보유 사실만 확인됐다.
 
 다음에는 권한 있는 로컬 환경에서 [실행 안내](DOWNLOAD_MANAGER.md)의 태안 CLI를 실행해 실제 TPK/GTiff checksum·형식·실제LOD·coverage·NoData/고도·각레이어 표시·허용된 이전을 기록해야 한다. OSM은 필요 시 --osm 또는 작은Monaco공식자료로 별도 검증한다. ArcGIS의 이 Next.js/Leaflet 표시/이전 권한과 OpenTopography 개인/Enterprise 범위도 해당 계정에서 확인한다. 비밀값은 채팅/로그/manifest/커밋/artifact에 넣지 않는다. 실제 제공처 연결 부분이 남아 있어 #20 전체 완료/close로 처리하지 않는다.
+
+
+### #20 후속: PowerShell/Compose 인증 전달
+
+사용자 보고: 고도 COP30 수신7,898바이트, GDAL 준비·파일 해시 검사·ZIP 생성·등록까지 completed이고 전체는 위성 blocked로 partial이었다. ZIP ID는82e660b9-1d3b-4e8f-98c7-2da97ac7f3ff다. 실제 파일/메타데이터/앱 고도값을 이 환경에서 검토한 것은 아니며 사용자 제공 로그 증거로 한정한다. 위성의 비밀 파일 읽기 오류에 대해 사용자가 같은 터미널의 ARCGIS_TOKEN 공백 검사=True를 확인했다.
+
+원인: token env가 비어 있는데 Compose가 마운트하지 않은 /run/secrets 경로를 기본으로 지정했다. 환경변수 우선 동작은 기존에도 있었으며, 토큰이 설정돼 있는데 파일이 이를 덮어쓴 문제로 보고하지 않는다. 기본 파일 경로를 비우고 명시 파일/환경변수·부분 성공/캐시 재사용·터미널 수명을 문서화했다. CLI는 존재 여부만 출력한다. 명시한 파일의 OSError/권한·인코딩 오류도 인증 설정 오류로 안전하게 처리하며 ArcGIS 미설정은 네트워크 전 안내한다.
+
+검증: Node 다운로드8(기존 앱105/도구5 집계 유지)에 실제 --env-file의 빈 항목 대비 부모 환경변수/자식 전달·로그/argv/작업 비밀 제외 검사를 강화했다. worker16→18로 자격 증명 우선순위/명시 파일/안전 오류와 ArcGIS 누락 시 외부 호출0 검사를 추가하고 exact-count gate를18로 올렸다. production image의 실제 Compose network:none 컨테이너에서 미설정/환경변수/명시 파일/환경변수+없는파일4경우를 검사한다. 테스트 값은 합성이며 실제 사용자 키를 사용하지 않는다. 이 Compose 검사를 기존 다운로드 CI job에 포함하고 진단 로그7일 정책을 유지한다.
+
+최종 SHA·PR/main 실행 URL과 실제 결과는 #20 후속 댓글에 기록한다. 공식 위성/OSM·실제 앱 표시·고도값/허용된 이전 검증은 계속 미완료로 유지한다.
+
+실행 결과: 로컬 Node다운로드8·worker18(실패/오류/스킵0), typecheck·디자인92자산/3스킬 통과. 실제 Compose4경우도 production 이미지 내부 providers.py를 직접 로드해 통과했다. 첫 Compose 실기 probe는 COPY가 제한된 원본 소스 파일 권한(0600)을 유지해 root 소유 코드가 nonroot worker에서 읽히지 않는 문제를 발견했다. 세 코드 디렉터리를 worker UID/GID1000 소유로 COPY하도록 수정하고 같은 검사4경우를 재실행했다. 이전 /source:ro 기반 worker 테스트가 통과했다는 사실로 이미지 내부 읽기 권한까지 검증했다고 보지 않는다. 이 probe는 Docker Compose 기본 파일 설정도 검사하므로 단위 테스트만으로 대체하지 않는다.

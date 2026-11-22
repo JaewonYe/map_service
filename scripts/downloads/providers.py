@@ -16,8 +16,10 @@ def secret(file_name,variable,label):
     file=os.getenv(file_name)
     if not file:return None
     p=Path(file)
-    if not p.is_file() or p.stat().st_size>16384:raise Blocked(label+' 비밀 파일을 읽을 수 없습니다. worker 전용 설정을 확인하세요.')
-    token=p.read_text().strip()
+    try:
+        if not p.is_file() or p.stat().st_size>16384:raise OSError()
+        token=p.read_text().strip()
+    except (OSError,UnicodeError):raise Blocked(label+' 비밀 파일을 읽을 수 없습니다. 명시한 파일 경로·worker 마운트·읽기 권한을 확인하세요.') from None
     if not token or any(c.isspace() for c in token):raise Blocked(label+' 비밀 파일 형식이 잘못되었습니다.')
     return token
 
@@ -210,8 +212,9 @@ def satellite(ctx,out):
     cached=originals.cached(ctx,'satellite',lambda f:validate_tpk(f,ctx.check))
     if cached:
         source,metadata=cached;out.mkdir(parents=True);ctx.copy_file(source,out/'map.tpk');levels=ctx.request['levels']['satellite'];atomic(out/'maps.json',{'version':1,'sources':[{'id':'downloaded','name':ctx.request['name'],'file':'map.tpk','role':'base','priority':0,'minZoom':levels['min'],'maxZoom':levels['max'],'usageConfirmed':True,'enabled':True}]});return metadata
-    token=credentials();c=capabilities(ctx.net,token)
-    if not token:raise Blocked('공식 World Imagery export 권한이 있는 계정 토큰을 worker 전용 파일로 설정하세요. 공개 tile 수집은 하지 않습니다.')
+    token=credentials()
+    if not token:raise Blocked('현재 worker에 ArcGIS 토큰이 없습니다. 다운로드를 실행하는 터미널의 ARCGIS_TOKEN 또는 명시적으로 마운트한 비밀 파일을 설정하세요.')
+    c=capabilities(ctx.net,token)
     levels=ctx.request['levels']['satellite'];b=ctx.request['bounds'];selected=list(range(levels['min'],levels['max']+1))
     if any(str(z) not in c['lods'] for z in selected):raise WorkError('선택 level은 서비스가 실제 지원하는 LOD가 아닙니다.')
     if tile_count(b,levels['min'],levels['max'])>c['maxTiles']:raise WorkError('서비스 export 타일 수 제한 초과')

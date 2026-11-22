@@ -5,7 +5,7 @@ ROOT=pathlib.Path(os.getenv('DOWNLOAD_CODE_ROOT',pathlib.Path(__file__).resolve(
 sys.path.insert(0,str(ROOT/'scripts/downloads'));sys.path.insert(0,str(ROOT/'tests'))
 from common import *
 from worker import Worker
-from providers import validate_tpk
+from providers import validate_tpk, secret
 import package as portable
 from osm_fixture import write_fixture
 from osgeo import gdal,osr
@@ -178,5 +178,21 @@ class DownloadsWorker(unittest.TestCase):
         self.assertEqual(s['state'],'completed',s);self.assertTrue(list((self.worker.root/'originals/imagery').glob('*.tpk')))
         other=Worker(self.worker.root,ROOT,NoNetwork());q={**r,'id':str(uuid.uuid4()),'registryRevision':1};other.process(q);s=read_json(other.root/'jobs'/(q['id']+'.state.json'));self.assertEqual(s['state'],'completed',s);self.assertEqual(s['items']['satellite']['result']['download']['networkBytes'],0)
         original=next((other.root/'originals/imagery').glob('*.tpk'));original.write_bytes(b'corrupt');q={**q,'id':str(uuid.uuid4()),'registryRevision':2};other.process(q);s=read_json(other.root/'jobs'/(q['id']+'.state.json'));self.assertEqual(s['state'],'failed');self.assertEqual(original.read_bytes(),b'corrupt')
+
+    def test_17_credentials_environment_and_explicit_file_priority_and_safe_errors(self):
+        for variable,file_variable,label in [('ARCGIS_TOKEN','MAP_DOWNLOAD_ARCGIS_TOKEN_FILE','ArcGIS'),('OPENTOPOGRAPHY_API_KEY','MAP_DOWNLOAD_OPENTOPOGRAPHY_KEY_FILE','OpenTopography')]:
+            with self.subTest(variable=variable):
+                file=self.root/(variable+'.private');file.write_text('fixture-file-value\n');missing=str(self.root/'missing-private-file')
+                with patch.dict(os.environ,{variable:'',file_variable:''}):self.assertIsNone(secret(file_variable,variable,label))
+                with patch.dict(os.environ,{variable:'fixture-env-value',file_variable:missing}):self.assertEqual(secret(file_variable,variable,label),'fixture-env-value')
+                with patch.dict(os.environ,{variable:'',file_variable:str(file)}):self.assertEqual(secret(file_variable,variable,label),'fixture-file-value')
+                for direct,path in [('',missing),('bad secret',str(file)),('x'*16385,str(file))]:
+                    with patch.dict(os.environ,{variable:direct,file_variable:path}),self.assertRaises(Blocked) as error:secret(file_variable,variable,label)
+                    self.assertNotIn('bad secret',str(error.exception));self.assertNotIn(missing,str(error.exception))
+                with patch.dict(os.environ,{variable:'',file_variable:str(file)}),patch.object(pathlib.Path,'read_text',side_effect=PermissionError('private-path-and-value')),self.assertRaises(Blocked) as error:secret(file_variable,variable,label)
+                self.assertNotIn('private-path-and-value',str(error.exception))
+    def test_18_missing_arcgis_token_is_reported_before_any_network_request(self):
+        other=Worker(self.worker.root,ROOT,NoNetwork());r=self.request(('satellite',));other.process(r);state=self.status(r)
+        self.assertEqual(state['state'],'failed');self.assertEqual(state['items']['satellite']['state'],'blocked');self.assertIn('ARCGIS_TOKEN',state['items']['satellite']['reason']);self.assertNotIn('비밀 파일을 읽을 수 없습니다',state['items']['satellite']['reason']);self.assertEqual(other.registry()['layers'],{})
 
 if __name__=='__main__':unittest.main()

@@ -68,8 +68,8 @@ services:
       dockerfile: scripts/downloads/Dockerfile
     environment:
       MAP_DOWNLOADS_DIR: /data/downloads
-      MAP_DOWNLOAD_ARCGIS_TOKEN_FILE: /run/secrets/arcgis_export_token
-      MAP_DOWNLOAD_OPENTOPOGRAPHY_KEY_FILE: /run/secrets/opentopography_api_key
+      MAP_DOWNLOAD_ARCGIS_TOKEN_FILE: ${MAP_DOWNLOAD_ARCGIS_TOKEN_FILE:-}
+      MAP_DOWNLOAD_OPENTOPOGRAPHY_KEY_FILE: ${MAP_DOWNLOAD_OPENTOPOGRAPHY_KEY_FILE:-}
       ARCGIS_TOKEN: ${ARCGIS_TOKEN:-}
       OPENTOPOGRAPHY_API_KEY: ${OPENTOPOGRAPHY_API_KEY:-}
       MAP_IMAGERY_DIR: /data/imagery
@@ -90,7 +90,7 @@ services:
         target: /data/dem
         bind:
           create_host_path: false
-    # Optional ArcGIS credential: mount a private token file at the above path using an override.
+    # Optional private files: explicitly set the *_FILE container paths and mount them read-only via an override.
     # No Docker socket, host command endpoint, or legacy source mounts.
     restart: unless-stopped
     mem_limit: 2g
