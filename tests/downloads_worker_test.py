@@ -116,7 +116,8 @@ class DownloadsWorker(unittest.TestCase):
         self.assertGreater(read_json(self.root/'backoff.json')['download.geofabrik.de'],time.time()+100)
     def test_09_recovery_marks_interrupted_without_discarding_records(self):
         r=self.request(('osm',));atomic(self.worker.root/'jobs'/(r['id']+'.request.json'),r);atomic(self.worker.root/'jobs'/(r['id']+'.state.json'),{'version':1,'id':r['id'],'state':'running','items':{}});staging=self.worker.root/'staging'/r['id'];staging.mkdir();(staging/'partial').write_bytes(b'partial')
-        Worker(self.worker.root,ROOT,NoNetwork(),offline=True).recover();s=self.status(r);self.assertEqual(s['state'],'interrupted');self.assertFalse(staging.exists());self.assertEqual(read_json(self.worker.root/'jobs'/(r['id']+'.request.json')),r)
+        export=self.worker.root/'exports'/(r['id']+'.zip.part');export.write_bytes(b'incomplete zip')
+        Worker(self.worker.root,ROOT,NoNetwork(),offline=True).recover();self.assertFalse(export.exists());s=self.status(r);self.assertEqual(s['state'],'interrupted');self.assertFalse(staging.exists());self.assertEqual(read_json(self.worker.root/'jobs'/(r['id']+'.request.json')),r)
     def test_10_process_restart_lock_and_offline_queue(self):
         first=subprocess.Popen(['/usr/bin/python3',str(ROOT/'scripts/downloads/worker.py'),'--directory',str(self.worker.root),'--offline'],stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
         try:

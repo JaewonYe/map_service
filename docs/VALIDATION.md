@@ -362,7 +362,7 @@ main 디자인 기준 반영 후 로컬 typecheck, Node 앱 83개/집계 도구 
 | 전체 Playwright | 최종 로컬74통과1.9분(single4/multi15/osm10/layers10/buildings35), 실패/스킵/재시도0. 기존5프로젝트/2workers/timeout 유지 |
 | 최종 UI지원LOD/assert·설명 보완 후 layers 재검증 | 10통과20.4초. 이후 최종 로컬 전체74도 재실행 성공. 최종 원격CI 별도 확인 |
 | 기존 변환/보고 도구 | DEM3/PBF7=10 + Python보고도구5, 실패/스킵0, 기존production도구 사용 |
-| production download worker Docker / read-only + network:none + nonroot + tmpfs | worker16통과9.499초, 실패/오류/스킵0, exact-count gate 통과 |
+| production download worker Docker / read-only + network:none + nonroot + tmpfs | worker16통과4.654초, 실패/오류/스킵0, exact-count gate 통과 |
 | 디자인 | 92locked assets·3skill·양테마토큰/대비·로컬UX검색 통과. 공통자산 수정 없음 |
 | Compose config / `git diff --check` | 통과. 인증값을 출력하지 않는 config --quiet 사용 |
 
@@ -389,6 +389,7 @@ worker16은 실제 localhost HTTP 전송과 production osmium/GDAL/converters를
 - 전체74의 최초1건 실패는 기존 테마 테스트가 시설 이동 완료 전 중심을 기록한 경합이다. 예상 시설 좌표 도달을 기다린 후 기존 exact center/zoom 비교를 유지해74통과했다. timeout/worker수/재시도/skip으로 숨기지 않았다.
 - OSM 교체 중 await 이후 닫힌 DB 사용 가능성을 재검사/close멱등 처리하고 기존 pending 회귀 assertion을 추가했다.
 - 최초 실제 격리 HTTP 표시에서 위성422가 발생해 합성 TPK와 validator의 V2 header 검사 누락을 발견했다. product validator에 version3/16384 및 index floor 검사를 추가하고 올바른 fixture header로 **새 격리 v2**를 만들어 위 표의 세 타일/고도값을 재검증했다. 실패한 v1을 성공 증거로 재사용하지 않았다.
+- 최종 PR 검토에서 worker 강제 종료 시 미완성 export ZIP이 남는 경우를 보완했다. flock을 획득한 worker의 복구에서 전용 zip.part를 정리하고 기존 복구 테스트에 삭제 검증을 추가해16통과했다. 진행 중일 수 있는 web incoming 업로드는 건드리지 않는다.
 - 지도 캡처는 tile fade/loading 완료를 기다려 미완료 프레임이 실제 지도 결과처럼 보이지 않도록 보완했다. Fontconfig cache 경고는 있었으나 실제 PNG/변환/build 검사는 통과했다.
 
 ### 실제 제공처 차단·필요한 후속 검증

@@ -89,6 +89,8 @@ class Worker:
                 if s.get('packageId') and s['packageId'] in r['layers'].values():s.update(state='partial' if any(i.get('state')!='completed' for i in s.get('items',{}).values()) else 'completed',stage='등록 결과 복구',registered=True)
                 atomic(p,s);shutil.rmtree(self.root/'staging'/id,ignore_errors=True)
         for p in (self.root/'staging').glob('*.part'):p.unlink(missing_ok=True)
+        # Only this locked worker writes export parts; incoming uploads may still be live in web.
+        for p in (self.root/'exports').glob('*.zip.part'):p.unlink(missing_ok=True)
     def process(self,request):
         request=validate_request(request);self.request=request;self.started=time.monotonic();self.committed=False;self.received=0;self.item=None
         self.state={'version':1,'id':request['id'],'request':request,'state':'running','stage':'시작','createdAt':request['createdAt'],'updatedAt':now(),'items':{}};self.save();staging=self.root/'staging'/request['id']
