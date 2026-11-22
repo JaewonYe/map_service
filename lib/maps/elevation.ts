@@ -1,4 +1,5 @@
 import {readFile, realpath, stat} from 'node:fs/promises';
+import {managedDirectory} from '../downloads/active';
 import {createHash} from 'node:crypto';
 import {isAbsolute, relative, resolve, win32, join} from 'node:path';
 import sharp from 'sharp';
@@ -110,7 +111,7 @@ export class Elevation {
 }
 let current: {key:string;stamp:string;at:number;value:Promise<Elevation>} | undefined;
 export async function getElevation() {
-  const directory = resolve(/*turbopackIgnore: true*/ process.env.ELEVATION_DIR || 'data/elevation');
+  const directory = await managedDirectory('elevation') || resolve(/*turbopackIgnore: true*/ process.env.ELEVATION_DIR || 'data/elevation');
   if (current?.key === directory && Date.now() - current.at < 1000) return current.value;
   const details = await stat(/*turbopackIgnore: true*/ join(directory,'metadata.json')).catch(error => {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new TileError('No prepared DEM dataset. Prepare data/elevation/source/dem.tif first.',503);

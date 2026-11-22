@@ -87,7 +87,9 @@ export default function MapCanvas(){
             if(!map!.getBounds().intersects(area))map!.fitBounds(area,{padding:[30,30],maxZoom:metadata.layers[id!].maxNativeZoom??16});}
         });
         let point:L.CircleMarker|undefined;
-        map.on('moveend zoomend',()=>{const c=map!.getCenter();setCenter([c.lat,c.lng]);setZoom(map!.getZoom());});
+        const rememberDownloadBounds=()=>{const b=map!.getBounds();try{sessionStorage.setItem('map.download-bbox',JSON.stringify({west:b.getWest(),south:b.getSouth(),east:b.getEast(),north:b.getNorth()}));}catch{}};
+        rememberDownloadBounds();
+        map.on('moveend zoomend',()=>{const c=map!.getCenter();setCenter([c.lat,c.lng]);setZoom(map!.getZoom());rememberDownloadBounds();});
         map.on('click',(event:L.LeafletMouseEvent)=>{setClicked([event.latlng.lat,event.latlng.lng]);point?.remove();point=L.circleMarker(event.latlng,{radius:5,color:'#ff574e',fillOpacity:1}).addTo(map!);});
         setMapInstance(map);
       }catch(error){if(!abort.signal.aborted)setMessage(error instanceof Error?error.message:'지도 초기화 실패');}
@@ -96,7 +98,7 @@ export default function MapCanvas(){
   useEffect(()=>{
     if(!clicked||!info?.layers.elevation.available){setHeight('');return;}
     const abort=new AbortController();setHeight('확인 중…');
-    fetch(`/api/elevation?lat=${clicked[0]}&lon=${clicked[1]}`,{signal:abort.signal}).then(async response=>{
+    fetch(`/api/elevation?lat=${clicked[0]}&lon=${clicked[1]}`,{signal:abort.signal,cache:'no-store'}).then(async response=>{
       const result=await response.json();if(!response.ok)throw Error(result.error||'고도 조회 실패');
       if(!abort.signal.aborted)setHeight(result.elevationMeters===null?'데이터 없음':`${result.elevationMeters.toFixed(1)} m`);
     }).catch(error=>{if(!abort.signal.aborted)setHeight(error instanceof Error?error.message:'고도 조회 실패');});

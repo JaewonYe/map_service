@@ -1,4 +1,5 @@
 import {readFile,realpath,stat} from 'node:fs/promises';
+import {managedDirectory} from '../downloads/active';
 import {join,resolve,relative,isAbsolute} from 'node:path';
 import {DatabaseSync,type StatementSync} from 'node:sqlite';
 import {createHash} from 'node:crypto';
@@ -84,13 +85,14 @@ export class OsmIndex{
       return {edit,base,object};
     });
   }
-  close(){this.closed=true;if(!this.pending.size)this.db.close();}
+  close(){if(this.closed)return;this.closed=true;if(!this.pending.size)this.db.close();}
   async tile(z:number,x:number,y:number){
     xyz(String(z),String(x),String(y));
     if(this.closed)throw new TileError('OSM dataset changed; reload the page',503);
     const b=this.metadata.bounds,a=tileBounds(z,x,y);
     if(z>19||a.west>=b.east||a.east<=b.west||a.south>=b.north||a.north<=b.south)return null;
     const snapshot=await getOsmEdits().read();
+    if(this.closed)throw new TileError('OSM dataset changed while loading edits; reload the page',503);
     const key=`${this.revision}:${snapshot.revision}:${z}/${x}/${y}`,hit=this.memory.get(key);
     if(hit){this.memory.delete(key);this.memory.set(key,hit);return hit;}
     const pending=this.pending.get(key);if(pending)return pending;
@@ -124,7 +126,7 @@ export class OsmIndex{
 let active:{directory:string;stamp:string;time:number;reader:OsmIndex}|undefined;
 let loading:Promise<OsmIndex>|undefined;
 export async function getOsmIndex(force=false){
-  const directory=resolve(/*turbopackIgnore: true*/ process.env.OSM_TILE_DIR||'data/osm');
+  const directory=await managedDirectory('osm')||resolve(/*turbopackIgnore: true*/ process.env.OSM_TILE_DIR||'data/osm');
   if(!force&&active?.directory===directory&&Date.now()-active.time<1000)return active.reader;
   const details=await stat(/*turbopackIgnore: true*/ join(directory,'metadata.json'));
   const stamp=`${details.size}:${details.mtimeMs}:${details.ctimeMs}`;

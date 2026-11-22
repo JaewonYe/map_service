@@ -334,3 +334,67 @@ main 디자인 기준 반영 후 로컬 typecheck, Node 앱 83개/집계 도구 
 최종 SHA·PR/병합·PR/main push별 Map/Design run URL·실제 테스트 수·job 결과·7일 artifact ID는 **원격 실행 후 [이슈 #18](https://github.com/JaewonYe/map_service/issues/18)의 완료 댓글**에 남긴다. 이전 SHA/로컬 결과를 최종 원격 성공으로 보고하지 않는다. README와 이 문서의 과거 이슈 수는 해당 시점 기록이며 현재 수는 위97/67/10을 기준으로 한다.
 
 실제 사용자 PBF/시설 데이터·대한민국 전체 성능·Windows11/Ubuntu24.04 실기·다중 서버 동시 쓰기/인증 운영·법적 측량 정확도·임의 태그/관계·routing topology 완전 편집은 미검증/제외다. 단일 서버의 모듈 내부 도구이며 새 공개 인증 정책을 도입하지 않았다. 원본 파일·시설 데이터·키는 커밋/CI artifact에 포함하지 않는다. 상위 gitlink는 별도 통합용 최종 SHA만 보고한다.
+
+## 이슈 #20 지도 다운로드·관리
+
+작업 기준 main `38c189c0520abf5e1f5340332977972090b0856b`, 2026-11-22 KST. 별도 `/downloads`·공식 제공처 adapter·영속 worker·등록/ZIP/격리 복원·Windows/Ubuntu CLI를 구현했다. **실제 공식 위성/OSM/DEM 원본 다운로드 및 그 실제 자료의 앱 표시는 미완료이며 이슈를 닫지 않는다.** 합성 검증을 공식 연결 성공으로 바꾸지 않는다.
+
+### 완료 기준별 증거
+
+| #20 체크 | 상태·증거 |
+| --- | --- |
+| 1 영역/종류/상세도 별도 페이지 | 구현·브라우저/실제4×5화면 확인. 최초 설치 로컬 개요·사각형/숫자/시설 bbox·실제 LOD·미확정 용량 구분 |
+| 2 세 종류 실제 공식 원본 다운로드 | **미완료**. 네 호스트 프록시 CONNECT403, 현재 토큰/키 미연결, ArcGIS 앱/이전 범위 별도 확인 필요 |
+| 3 실제 공식 원본 준비·등록·표시 | **미완료**. 합성 pipeline/앱 표시는 아래 별도 증거이며 이 조건을 대신하지 않음 |
+| 4 거부/제한/중단/취소/재시도/오류/재시작 보존 | Node API8/Pythonworker16/브라우저7 및 실제 앱 재시작으로 검증. 권한/제공처 응답은 합성 프로토콜 테스트, 실제 계정 거부 실기는 미검증 |
+| 5 OSM수정/충돌·기존 데이터 보존 | managed resolver를 OSM조회/편집/PNG에 동일 적용. Node OSM14/다운로드8 + 기존 OSM브라우저10·시설35. 원본 파일 hash 보존/안정sourceID/충돌 회귀 |
+| 6 격리 ZIP복원/무외부통신 앱 표시 | 합성 원본으로 실제15파일hash·격리NoNetwork import·3종 타일/42.5m·브라우저외부요청0 검증. 공식 원본 이전 조건은 체크2/3 대기 |
+| 7 양 테마·두 viewport·5상태 | 20PNG + 실제 복원 지도2PNG, [UI 검토](DOWNLOAD_UI_REVIEW.md)·manifest |
+| 8 최종SHA 자동CI/실제 제공처 연결 분리 | 로컬 아래 통과. 최종 PR/main 원격 실행 URL/개수/SHA는 이슈 진행 댓글에 기록. 실제 제공처 segment는 미완료 |
+| 9 문서/증거/미완료 보고 | README/PROJECT_CONTEXT/운영·라이선스·UI검토/본 문서. 최종 커밋·run URL은 해당 SHA의 이슈 댓글을 정본으로 기록 |
+
+### 로컬 실행
+
+| 검증 | 결과 |
+| --- | --- |
+| typecheck / production Next build | 통과 (layers 브라우저 준비에서도 build 실행) |
+| `npm run ci:node` | 앱105=tiles22/buildings24/layers6/osm14/measure9/launcher22/downloads8, CI 도구5. 실패/취소/스킵/todo0 |
+| 전체 Playwright | 최종 로컬74통과1.9분(single4/multi15/osm10/layers10/buildings35), 실패/스킵/재시도0. 기존5프로젝트/2workers/timeout 유지 |
+| 최종 UI지원LOD/assert·설명 보완 후 layers 재검증 | 10통과20.4초. 이후 최종 로컬 전체74도 재실행 성공. 최종 원격CI 별도 확인 |
+| 기존 변환/보고 도구 | DEM3/PBF7=10 + Python보고도구5, 실패/스킵0, 기존production도구 사용 |
+| production download worker Docker / read-only + network:none + nonroot + tmpfs | worker16통과9.499초, 실패/오류/스킵0, exact-count gate 통과 |
+| 디자인 | 92locked assets·3skill·양테마토큰/대비·로컬UX검색 통과. 공통자산 수정 없음 |
+| Compose config / `git diff --check` | 통과. 인증값을 출력하지 않는 config --quiet 사용 |
+
+worker16은 실제 localhost HTTP 전송과 production osmium/GDAL/converters를 사용한다. full pipeline/부분성공/MD5/중단·취소/잘림/등록 revision/ZIP경로·해시·symlink/크기·디스크/공식host/429지속대기/재시작flock/비밀필터/nativechild취소/ArcGIS POST3857/TPKX·Compact header/offset/OpenTopography querykey제외/원본0바이트재사용을 검사한다. 테스트가 실제 사용자 credential을 읽지 않도록 환경 이름을 비운다. 새 CI는 기존Map3job을 유지하고 worker job1개를 추가한다. 로그만7일 보존하며 데이터 ZIP/키/원본을 artifact에 올리지 않는다.
+
+### 실제 격리 앱 증거 — CC0 합성 자료
+
+`tests/fixtures/downloads-proof.py`로 세 adapter가 localhost 원본을 실제 스트리밍하고 production도구로 준비했다. ZIP SHA256 `a805b0cf0ad2de8560c012d51df047222b59b756dbcd568eb9cb59b437d9f443`, sourceJob `43c78f29-d71f-4d4e-88f5-6960488c3114`, 격리 importJob `2f4ab83e-8109-449b-85e0-9d669591c8a1`. 다른 디렉터리의 NoNetwork worker로 복원했으며 **15파일의 목록/bytes/SHA가 원본과 동일**했다. OSM의 실제 안정 키 `node:24`를 유지한다.
+
+| 실제 앱 요청 | 결과·SHA256 |
+| --- | --- |
+| `/api/tiles/16/55749/25600` | 200 JPEG1652bytes / d9ef0fbccd77fec9bc95d21a570609e7edb31d110a2e127fad24f8f780d6c094 |
+| `/api/osm/16/55749/25600` | 200 PNG2911bytes / 6f892c4662359e06f5bcf1544ac67b56eab2bf28dacb7f1b728f203d38d20426 |
+| `/api/elevation/tiles/13/6968/3200` | 200 PNG921bytes / c1e35c7cf9884f98cefea8c50f4325abd763f54a1fb104326c89722ca8a33f6d |
+| 중심36.597889,126.240136 고도 | 42.5m / native13 / EGM2008 orthometric height |
+
+브라우저에서 일반/고도/위성 선택 후 실제 로드된 이미지를 검사하고 localhost 외 요청0을 기록했다. 새 HTTP서버 PID/단순200만으로 지도 표시를 판정하지 않았다. 앱 서버를 종료/재기동하여 active registry·작업 종료 상태·세 타일 hash가 동일하고 기존 복원15파일 SHA가 보존되는지도 확인했다. 재시작 전후 registry/jobs/타일 SHA가 동일했고15파일 해시도 보존됐다. 상세 실행 증거는 최종 이슈 댓글과 함께 보고한다.
+
+### 실패를 숨기지 않은 보완
+
+- 첫 Python fixture helper import 오류는 기존 write_fixture 사용으로 수정했다. 최초Next build는 읽기전용 telemetry config EROFS로 실패해 NEXT_TELEMETRY_DISABLED=1로 재실행했다. HOME/캐시 정책 우회 없음.
+- 초기 secret URL 필터가 공개 ArcGIS item?id까지 거부한 worker1건은 고정 공식 public item 32hex id만 허용해 수정했다. signed/token URL 거부는 유지했다.
+- 모바일 폼이 flex 축소되어 작업과 겹치던 문제를 수정했다. 초기 브라우저2건은 Next announcer까지 alert로 잡는 locator를 페이지 안으로 한정했다.
+- 전체74의 최초1건 실패는 기존 테마 테스트가 시설 이동 완료 전 중심을 기록한 경합이다. 예상 시설 좌표 도달을 기다린 후 기존 exact center/zoom 비교를 유지해74통과했다. timeout/worker수/재시도/skip으로 숨기지 않았다.
+- OSM 교체 중 await 이후 닫힌 DB 사용 가능성을 재검사/close멱등 처리하고 기존 pending 회귀 assertion을 추가했다.
+- 최초 실제 격리 HTTP 표시에서 위성422가 발생해 합성 TPK와 validator의 V2 header 검사 누락을 발견했다. product validator에 version3/16384 및 index floor 검사를 추가하고 올바른 fixture header로 **새 격리 v2**를 만들어 위 표의 세 타일/고도값을 재검증했다. 실패한 v1을 성공 증거로 재사용하지 않았다.
+- 지도 캡처는 tile fade/loading 완료를 기다려 미완료 프레임이 실제 지도 결과처럼 보이지 않도록 보완했다. Fontconfig cache 경고는 있었으나 실제 PNG/변환/build 검사는 통과했다.
+
+### 실제 제공처 차단·필요한 후속 검증
+
+상속 프록시/TLS를 그대로 사용한 Python urllib 요청에서 `download.geofabrik.de`, `tiledbasemaps.arcgis.com`, `copernicus-dem-30m.s3.amazonaws.com`, `portal.opentopography.org` 모두 **Tunnel connection failed:403 Forbidden**이었다. GitHub 접근은 정상이다. 서비스가 계정 권한을 거부한 응답에 도달하지 못했으므로 GitHub 이슈 권한 부족/ArcGIS권한부족/API Key오류와 구분한다.
+
+관측된 cloud network revision2는 enforced/restricted이며 기존 custom allowlist `naturalearth.s3.amazonaws.com`, `osmdata.openstreetmap.de`와 package_managers를 유지했다. 환경 변경 도구가 없어 실제 허용 적용을 보고하지 않는다. UI설정을 찾지 못한 사용자에게 비활성 버튼 조작을 반복 요구하지 않는다. 현재 worker 인증값도 없고 사용자의 ArcGIS 계정 보유 사실만 확인됐다.
+
+다음에는 권한 있는 로컬 환경에서 [실행 안내](DOWNLOAD_MANAGER.md)의 태안 CLI를 실행해 실제 TPK/GTiff checksum·형식·실제LOD·coverage·NoData/고도·각레이어 표시·허용된 이전을 기록해야 한다. OSM은 필요 시 --osm 또는 작은Monaco공식자료로 별도 검증한다. ArcGIS의 이 Next.js/Leaflet 표시/이전 권한과 OpenTopography 개인/Enterprise 범위도 해당 계정에서 확인한다. 비밀값은 채팅/로그/manifest/커밋/artifact에 넣지 않는다. 실제 제공처 연결 부분이 남아 있어 #20 전체 완료/close로 처리하지 않는다.

@@ -124,6 +124,7 @@ test('edits and rendered PNGs survive an independent server process; pending old
  const script=`import {OsmIndex} from './lib/osm/index.ts';import {getOsmEdits} from './lib/osm/edit-store.ts';const r=await OsmIndex.load(process.env.OSM_TILE_DIR);const tile=await r.tile(15,${c.x},${c.y});console.log(JSON.stringify({snapshot:await getOsmEdits().read(),etag:tile.etag}));r.close();`;
  const {stdout}=await promisify(execFile)(process.execPath,['--import','tsx','--input-type=module','-e',script],{cwd:process.cwd(),env:{...process.env,OSM_TILE_DIR:directory}});
  const actual=JSON.parse(stdout.trim());assert.equal(actual.etag,after.etag);assert.equal(actual.snapshot.edits[0].value.name,'독립 프로세스 변경');
+ const closing=index.tile(15,c.x,c.y);index.close();index.close();await assert.rejects(closing,{status:503});
 });
 test('bounded selection rejects dense results and omits huge geometry instead of sending a national dataset',async t=>{
  const {directory,metadata}=await editingFixture(t);

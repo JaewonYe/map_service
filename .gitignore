@@ -48,3 +48,11 @@ __pycache__/
 !data/osm-edits/
 data/osm-edits/*
 !data/osm-edits/README.md
+
+!data/downloads/
+data/downloads/*
+!data/downloads/README.md
+
+!data/dem/
+data/dem/*
+!data/dem/README.md

@@ -17,6 +17,7 @@ services:
       STREET_TPK_DIR: /data/street
       STREET_USAGE_CONFIRMED: ${STREET_USAGE_CONFIRMED:-false}
       ELEVATION_DIR: /data/elevation
+      MAP_DOWNLOADS_DIR: /data/downloads
     volumes:
       - type: bind
         source: ${TPK_HOST_DIR:-./data/tpk}
@@ -51,9 +52,50 @@ services:
         target: /data/osm-edits
         bind:
           create_host_path: false
+      - type: bind
+        source: ${MAP_DOWNLOADS_HOST_DIR:-./data/downloads}
+        target: /data/downloads
+        bind:
+          create_host_path: false
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-3001}:3001"
     restart: unless-stopped
+  download-worker:
+    profiles: [downloads]
+    image: map-service-download-worker:local
+    build:
+      context: .
+      dockerfile: scripts/downloads/Dockerfile
+    environment:
+      MAP_DOWNLOADS_DIR: /data/downloads
+      MAP_DOWNLOAD_ARCGIS_TOKEN_FILE: /run/secrets/arcgis_export_token
+      MAP_DOWNLOAD_OPENTOPOGRAPHY_KEY_FILE: /run/secrets/opentopography_api_key
+      ARCGIS_TOKEN: ${ARCGIS_TOKEN:-}
+      OPENTOPOGRAPHY_API_KEY: ${OPENTOPOGRAPHY_API_KEY:-}
+      MAP_IMAGERY_DIR: /data/imagery
+      MAP_DEM_DIR: /data/dem
+    volumes:
+      - type: bind
+        source: ${MAP_DOWNLOADS_HOST_DIR:-./data/downloads}
+        target: /data/downloads
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${IMAGERY_HOST_DIR:-./data/imagery}
+        target: /data/imagery
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${DEM_HOST_DIR:-./data/dem}
+        target: /data/dem
+        bind:
+          create_host_path: false
+    # Optional ArcGIS credential: mount a private token file at the above path using an override.
+    # No Docker socket, host command endpoint, or legacy source mounts.
+    restart: unless-stopped
+    mem_limit: 2g
+    pids_limit: 128
+    stop_grace_period: 25s
   prepare-osm:
     profiles: [tools]
     image: map-service-osm-tools:local

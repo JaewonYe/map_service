@@ -200,3 +200,68 @@ label {font-size:12px;padding:2px 4px;}
   .building-dialog {padding:16px;}
 }
 @media(prefers-reduced-motion:reduce) {html {scroll-behavior:auto;}}
+
+/* Download preparation uses the same platform shell, surfaces and controls. */
+.app-header nav a {display:flex;align-items:center;padding:0 8px;color:var(--color-on-header);text-decoration:none;border-bottom:3px solid transparent;min-height:44px;}
+.app-header nav a:hover {background:var(--color-header);text-decoration:underline;}
+.download-page {display:grid;grid-template-columns:360px minmax(0,1fr);grid-template-rows:minmax(320px,48%) minmax(0,1fr);width:100%;min-width:0;min-height:0;}
+.download-settings {grid-row:1 / 3;display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--color-surface);border-right:1px solid var(--color-muted-border);}
+.download-panel-heading {padding:20px 24px 12px;}
+.download-panel-heading h2 {margin:0 0 8px;}
+.download-panel-heading p,.download-jobs p,.download-settings p {font-size:14px;margin:8px 0;}
+.download-panel-heading .download-eyebrow {color:var(--color-accent);font-size:12px;margin:0 0 8px;}
+.download-settings-content {flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 24px 24px;scroll-padding:12px;}
+.download-settings label:not(.download-check),.download-transfer label:not(.download-check) {display:grid;gap:6px;margin:12px 0 6px;}
+.download-settings input:not([type=checkbox]),.download-settings select {width:100%;}
+.download-settings fieldset {min-width:0;margin:20px 0 0;padding:16px 0;border:0;border-top:1px solid var(--color-muted-border);}
+.download-settings legend {font-weight:600;padding-right:12px;}
+.download-settings-footer {display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:16px 24px;border-top:1px solid var(--color-muted-border);font-size:14px;}
+.download-settings-footer button {flex:1;}
+.download-steps {list-style:none;display:flex;gap:8px;padding:0;margin:8px 0;font-size:12px;}
+.download-steps li {background:var(--color-primary-subtle);color:var(--color-on-primary-subtle);border-radius:var(--radius-control);padding:8px;}
+.download-actions {display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;}
+.download-actions button,.download-link-button {font-size:14px;}
+.download-coordinate-grid {display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.download-check {display:flex;align-items:flex-start;gap:8px;min-height:44px;padding:8px 0;}
+.download-check input {flex-shrink:0;width:20px;height:20px;margin:0;}
+.download-source {padding:12px;margin:12px 0;border:1px solid var(--color-muted-border);border-radius:var(--radius-panel);font-size:14px;overflow-wrap:anywhere;}
+.download-source strong {display:block;margin-bottom:8px;}
+.download-estimate {padding:12px;border:1px solid var(--color-control-border);border-radius:var(--radius-panel);margin:12px 0;font-variant-numeric:tabular-nums;}
+.download-preview {position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--map-terrain);}
+.download-map-tools {position:absolute;top:12px;left:12px;right:12px;display:flex;align-items:center;gap:12px;z-index:500;pointer-events:none;font-size:14px;}
+.download-map-tools span,.download-map-tools button {pointer-events:auto;background:var(--color-surface);color:var(--color-foreground);padding:8px;border:1px solid var(--color-control-border);border-radius:var(--radius-control);}
+.download-map {flex:1;min-height:240px;background:var(--color-background);}
+.download-map-description {margin:0;padding:8px 16px;font-size:12px;background:var(--color-surface);color:var(--color-muted-foreground);}
+.download-jobs {min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;padding:16px 24px;background:var(--color-background);scroll-padding:12px;}
+.download-jobs-heading {display:flex;align-items:center;gap:16px;justify-content:space-between;}
+.download-jobs-heading h2 {margin:0;}
+.download-jobs small {overflow-wrap:anywhere;}
+.download-job-layout {display:grid;grid-template-columns:minmax(140px,220px) minmax(0,1fr);gap:16px;margin:16px 0;}
+.download-job-list {list-style:none;margin:0;padding:0;max-height:300px;overflow:auto;overscroll-behavior:contain;}
+.download-job-list li {content-visibility:auto;contain-intrinsic-size:auto 64px;margin:0 0 8px;}
+.download-job-list button {width:100%;text-align:left;overflow-wrap:anywhere;}
+.download-job-list button[aria-pressed=true] {background:var(--color-primary-subtle);border-color:var(--color-accent);color:var(--color-on-primary-subtle);}
+.download-job-layout article {min-width:0;padding:16px;background:var(--color-surface);border:1px solid var(--color-muted-border);border-radius:var(--radius-panel);}
+.download-job-layout h3 {margin:0 0 8px;}
+.download-job-item {border-top:1px solid var(--color-muted-border);margin-top:16px;padding-top:12px;overflow-wrap:anywhere;}
+.download-job-item h4 {margin:0;}
+.download-job-item progress {width:100%;accent-color:var(--color-accent);}
+.download-link-button {display:inline-flex;align-items:center;min-height:44px;padding:8px 12px;border:1px solid var(--color-control-border);border-radius:var(--radius-control);background:var(--color-surface);text-decoration:none;}
+.download-transfer {margin:16px 0;padding:12px;border:1px solid var(--color-muted-border);border-radius:var(--radius-panel);}
+@media(max-width:760px){
+ .app-header {gap:8px;padding-left:12px;padding-right:12px;}
+ .app-brand {gap:6px;}
+ .app-brand h1 {font-size:14px;}
+ .app-brand svg {width:16px;height:16px;}
+ .app-header nav a,.app-header nav span {padding:0 6px;font-size:14px;}
+ .download-page {display:flex;flex-direction:column;overflow:auto;}
+ .download-preview {order:0;flex:none;height:330px;}
+ .download-settings {order:1;flex:none;border-right:0;overflow:visible;}
+ .download-settings-content {flex:none;overflow:visible;}
+ .download-panel-heading {padding:20px 16px 12px;}
+ .download-settings-content {padding:0 16px 16px;}
+ .download-settings-footer {position:sticky;bottom:0;z-index:600;background:var(--color-surface);padding:12px 16px;}
+ .download-jobs {order:2;flex:none;overflow:visible;padding:16px;}
+ .download-job-layout {grid-template-columns:minmax(0,1fr);}
+ .download-map-tools {font-size:12px;}
+}

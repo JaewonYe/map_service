@@ -68,7 +68,7 @@ test('denied storage and invalid preference fall back to system and do not preve
 
 test('switching themes preserves search selection map coordinates form input and boundary draft',async({page})=>{
  await fixtures(page);await page.goto('/');const search=page.getByRole('searchbox',{name:'시설명 검색'});await search.fill('시험장');
- await page.getByRole('list',{name:'시설 검색 결과'}).getByRole('button',{name:/제1시험장/}).click();const center=await page.getByTestId('map-center').innerText(),zoom=await page.getByTestId('zoom').innerText();
+ await page.getByRole('list',{name:'시설 검색 결과'}).getByRole('button',{name:/제1시험장/}).click();await expect(page.getByTestId('map-center')).toContainText('126.241000');const center=await page.getByTestId('map-center').innerText(),zoom=await page.getByTestId('zoom').innerText();
  await theme(page).selectOption('dark');await expect(search).toHaveValue('시험장');await expect(page.getByRole('region',{name:'선택 시설'})).toBeVisible();
  await page.getByRole('dialog').getByRole('button',{name:'수정',exact:true}).click();const form=page.getByRole('dialog');await form.getByRole('textbox',{name:'설명',exact:true}).fill('테마 전환 중 유지');
  await page.getByLabel('편집창 화면 테마',{exact:true}).selectOption('system');

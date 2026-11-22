@@ -2,7 +2,7 @@ import {spawn} from 'node:child_process';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 
-export const nodeSuites = ['test:tiles', 'test:buildings', 'test:layers', 'test:osm', 'test:measure', 'test:launcher', 'test:ci-tools'];
+export const nodeSuites = ['test:tiles', 'test:buildings', 'test:layers', 'test:osm', 'test:measure', 'test:launcher', 'test:downloads', 'test:ci-tools'];
 export const projects = ['single', 'multi', 'osm', 'layers', 'buildings'];
 
 export function nodeCounts(output) {

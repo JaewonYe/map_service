@@ -1,0 +1,252 @@
+{
+  "baseURL": "http://127.0.0.1:3120",
+  "fixture": {
+    "transport": "CC0 synthetic localhost HTTP; production adapters/GDAL/osmium; no official source downloads",
+    "sourceJob": "43c78f29-d71f-4d4e-88f5-6960488c3114",
+    "importJob": "2f4ab83e-8109-449b-85e0-9d669591c8a1",
+    "zipSha256": "a805b0cf0ad2de8560c012d51df047222b59b756dbcd568eb9cb59b437d9f443",
+    "fileCount": 15,
+    "byteIdenticalFiles": true,
+    "isolatedNoNetworkImport": true,
+    "failureJob": "2821d4cc-2dd3-4d67-b782-c3a9416bed79",
+    "progressJob": "54d7fab2-d5e9-4933-aaea-5630e7ecda84"
+  },
+  "source": "CC0 localhost HTTP protocol fixture, production converters, isolated offline import; not official source download evidence",
+  "captures": [
+    {
+      "file": "desktop-light-progress.png",
+      "device": "desktop",
+      "theme": "light",
+      "state": "progress",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "desktop-dark-progress.png",
+      "device": "desktop",
+      "theme": "dark",
+      "state": "progress",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "mobile-light-progress.png",
+      "device": "mobile",
+      "theme": "light",
+      "state": "progress",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "mobile-dark-progress.png",
+      "device": "mobile",
+      "theme": "dark",
+      "state": "progress",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "desktop-light-area.png",
+      "device": "desktop",
+      "theme": "light",
+      "state": "area",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "desktop-light-settings.png",
+      "device": "desktop",
+      "theme": "light",
+      "state": "settings",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "desktop-light-failure.png",
+      "device": "desktop",
+      "theme": "light",
+      "state": "failure",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "desktop-light-complete.png",
+      "device": "desktop",
+      "theme": "light",
+      "state": "complete",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "desktop-dark-area.png",
+      "device": "desktop",
+      "theme": "dark",
+      "state": "area",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "desktop-dark-settings.png",
+      "device": "desktop",
+      "theme": "dark",
+      "state": "settings",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "desktop-dark-failure.png",
+      "device": "desktop",
+      "theme": "dark",
+      "state": "failure",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "desktop-dark-complete.png",
+      "device": "desktop",
+      "theme": "dark",
+      "state": "complete",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "mobile-light-area.png",
+      "device": "mobile",
+      "theme": "light",
+      "state": "area",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "mobile-light-settings.png",
+      "device": "mobile",
+      "theme": "light",
+      "state": "settings",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "mobile-light-failure.png",
+      "device": "mobile",
+      "theme": "light",
+      "state": "failure",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "mobile-light-complete.png",
+      "device": "mobile",
+      "theme": "light",
+      "state": "complete",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "mobile-dark-area.png",
+      "device": "mobile",
+      "theme": "dark",
+      "state": "area",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "mobile-dark-settings.png",
+      "device": "mobile",
+      "theme": "dark",
+      "state": "settings",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "mobile-dark-failure.png",
+      "device": "mobile",
+      "theme": "dark",
+      "state": "failure",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "mobile-dark-complete.png",
+      "device": "mobile",
+      "theme": "dark",
+      "state": "complete",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "desktop-light-offline-restored-map.png",
+      "device": "desktop",
+      "theme": "light",
+      "state": "offline-restored-map",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "desktop-dark-offline-restored-map.png",
+      "device": "desktop",
+      "theme": "dark",
+      "state": "offline-restored-map",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    }
+  ],
+  "restoredLayerChecks": [
+    {
+      "label": "일반 지도",
+      "loaded": true
+    },
+    {
+      "label": "고도 지도",
+      "loaded": true
+    },
+    {
+      "label": "위성영상",
+      "loaded": true
+    }
+  ],
+  "externalRequests": 0
+}

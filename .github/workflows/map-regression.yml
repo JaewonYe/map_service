@@ -127,3 +127,33 @@ jobs:
           include-hidden-files: true
           retention-days: 7
           if-no-files-found: warn
+
+  downloads:
+    name: Download worker regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Build production download worker
+        shell: bash
+        run: |
+          mkdir -p .cache/ci/downloads
+          set -o pipefail
+          docker build --progress plain -f scripts/downloads/Dockerfile -t map-service-download-worker:ci . 2>&1 | tee .cache/ci/downloads/build.log
+          docker image inspect map-service-download-worker:ci --format '{{.Id}}' | tee .cache/ci/downloads/image.log
+      - name: Verify offline synthetic download and restore flows
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm --network none --read-only --tmpfs /tmp:rw,size=1g -v "$PWD:/source:ro" -e DOWNLOAD_CODE_ROOT=/source --entrypoint /usr/bin/python3 map-service-download-worker:ci /source/scripts/ci/download-worker.py 2>&1 | tee .cache/ci/downloads/worker.log
+      - name: Preserve download diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: download-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .cache/ci/downloads/*.log
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn

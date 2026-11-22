@@ -100,3 +100,12 @@ UI UX Pro Max와 Web Design Guidelines를 `.agents/skills/`에 설치하고 AGEN
 - 원본 key+fingerprint 일치 수정만 base에서 제외/합성해 실제 PNG에 반영한다. source 변경/삭제·지원 불가는 conflict로 기록을 보존하고 최신 원본을 표시한다. 메모리/pending/base/store revision, ETag/no-cache, Leaflet URL 갱신으로 이전 위치·라벨 잔상을 처리한다. 다른 탭의 변경은 재조회/지도 이동/새로고침으로 가져온다.
 - 새 모듈 내부 /api/osm/objects 목록/상세/수정 인터페이스, 좌표·geometry·요청/응답/저장 한도와 호환성은 [OSM_EDITING](docs/OSM_EDITING.md)에 기록한다. 구현 전 변경안은 이슈 댓글에 남겼다. 공통 OpenAPI·타 DB·상위 gitlink·공개 OSM 전송은 변경하지 않는다.
 - Node 앱97+도구5, 브라우저67(기존59+신규8), 변환DEM3/PBF7+Python도구5, 디자인 무결성과 실제 합성 PBF 앱20PNG를 검증한다. 실제 실행/최초 실패 보완/서버 재시작/원본 해시/최종 SHA PR·main CI 증거는 [VALIDATION](docs/VALIDATION.md#이슈-18-오프라인-osm-일반-지도-편집)과 이슈 완료 댓글에 기록한다. 실데이터·OS 실기·다중 서버/인증 운영·법적 측량 정확도는 미검증이다.
+
+## 이슈 #20 지도 다운로드·관리 (실제 제공처 검증 대기)
+
+- `/downloads`에서 로컬 Natural Earth 국가 개요/기존 지도·사각형 두 점·숫자 좌표·시설 bbox로 범위와 원본/상세도를 선택한다. 실제 지원 LOD, 선택 면적/타일 후보/지역 원본 수신량·미확정 용량·서버 여유를 구분한다. Light/Dark/System과 모바일/키보드 대안을 유지한다.
+- 사용자 확인 방법에 따라 World Imagery for Export POST/EPSG:3857/TPK level15–17, OpenTopography COP30 GTiff/API Key를 태안 기본값으로 연결한다. Geofabrik 지역 전체 PBF→complete_ways bbox→기존 schema2 importer, AWS GLO-30 대안→GDAL clip/기존 DEM 준비를 지원한다. 원본 해상도·표시 LOD·권한/이전 조건은 별개다.
+- 별도 Docker worker가 영속 요청/상태, 공식 호스트 스트림, 체크섬·형식·한도·취소/실패/재시작, immutable package와 revision 원자 등록을 처리한다. web에 Docker socket/임의 명령/인증값을 전달하지 않는다. 기존 source read-only 및 준비 도구 network:none을 유지한다.
+- 원본은 data/imagery·data/dem, 작업/패키지/ZIP/활성 레지스트리는 data/downloads에 분리한다. 같은 요청의 원본은 SHA/형식 검사 후 재사용하며 refresh로 새 수신한다. 시설/경계·기존 PBF/TPK/DEM/catalog·OSM 로컬 수정은 보존한다. managed OSM의 안정적 source key/fingerprint로 #18 수정/충돌 흐름을 유지한다.
+- version1 내부 downloads API·상태/manifest·배포·복원은 [DOWNLOAD_MANAGER](docs/DOWNLOAD_MANAGER.md), 제공처/계정 조건은 [DOWNLOAD_PROVIDER_LICENSES](docs/DOWNLOAD_PROVIDER_LICENSES.md), 4×5 화면과 격리 실제 앱 검토는 [DOWNLOAD_UI_REVIEW](docs/DOWNLOAD_UI_REVIEW.md)에 기록한다. 공통 OpenAPI·모듈 책임·상위 gitlink는 변경하지 않는다.
+- 합성 로컬 HTTP→production adapters/GDAL/osmium→ZIP→네트워크 금지 격리 복원/앱 타일·42.5m 검증을 공식 원본 검증과 분리한다. 네 공식 호스트 CONNECT403, 현재 worker 인증값 없음, ArcGIS/Next.js·Leaflet 사용/이전 권한 미확인으로 실제 원본 조건은 미완료이며 #20을 닫지 않는다. 기존 네트워크 허용 목록/프리셋은 유지한다. 로컬 Windows/Ubuntu CLI를 제공하며 두 OS 실기·실제 제공처 다운로드·공개 운영/다중 서버는 미검증이다.

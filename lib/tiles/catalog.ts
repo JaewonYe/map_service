@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {managedDirectory} from '../downloads/active';
 import {readFile, realpath, stat} from 'node:fs/promises';
 import {dirname, isAbsolute, join, relative, resolve, win32} from 'node:path';
 import sharp from 'sharp';
@@ -334,7 +335,13 @@ export class MapCatalog {
 }
 
 let active: Promise<MapCatalog> | undefined;
+let managed: {directory:string;value:Promise<MapCatalog>} | undefined;
 export async function getCatalog() {
+  const directory=await managedDirectory('satellite');
+  if(directory){
+    if(managed?.directory!==directory){const value=MapCatalog.load({configPath:join(directory,'maps.json')});managed={directory,value};value.catch(()=>{if(managed?.value===value)managed=undefined;});}
+    const catalog=await managed!.value;await catalog.checkUnchanged();return catalog;
+  }
   if (!active) { active = MapCatalog.load(); active.catch(() => { active = undefined; }); }
   const catalog = await active;
   await catalog.checkUnchanged();

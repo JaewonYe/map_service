@@ -22,6 +22,22 @@ docker compose up -d --build
 
 현재 저장소에는 **실제 사용자 TPK가 없습니다.** 실제 파일을 첨부하거나 위 위치에 준비해야 실제 형식·화질·영역 검증을 완료할 수 있습니다. 합성 테스트 패키지를 실제 Esri 영상으로 제공하지 않습니다.
 
+## 지도에서 영역을 고르고 원본 다운로드하기
+
+별도 **`http://localhost:3001/downloads`** 페이지에서 사각형/시설 범위와 위성·일반·고도를 선택해 다운로드→검사·준비→등록을 요청하고, 진행·취소·재시도·이전 ZIP을 관리합니다. 최초 설치에도 번들 국가 개요가 있어 좌표를 외부 지도에서 복사할 필요가 없습니다. 상세 지도 미리보기는 현재 설치된 로컬 자료만 사용합니다.
+
+태안 기본값은 사용자 지정 영역의 **World Imagery for Export POST / EPSG:3857 / TPK level15–17**, **OpenTopography COP30 GeoTIFF**입니다. 원본은 `data/imagery`, `data/dem`, 작업·준비 패키지·ZIP은 `data/downloads`에 저장합니다. 검증한 기존 원본을 재사용하며 기존 시설/경계·OSM 수정·원본 폴더를 덮어쓰지 않습니다. 위성 export/이 앱의 오프라인 표시·이전 권한과 개인/Enterprise API Key 조건을 먼저 확인하세요.
+
+Windows/Ubuntu 공용 CLI: `downloads.worker.env.example`을 기존 파일이 없을 때만 로컬 `.env.downloads`로 복사하고 유효한 ArcGIS 토큰/OpenTopography Key를 **그 파일에만** 설정합니다. Docker 실행 후:
+
+```sh
+node --env-file=.env.downloads scripts/download-taean.mjs --accept-usage
+```
+
+기본 위성+고도, `--osm`은 대한민국 지역 PBF **전체 수신**을 추가하고 `--refresh`는 원본을 다시 받습니다. 웹 관리용 worker 실행·안전한 인증/수동 로그인·오프라인 복원·제한은 [다운로드 운영 안내](docs/DOWNLOAD_MANAGER.md), 라이선스와 계정별 선행 조건은 [제공처 확인](docs/DOWNLOAD_PROVIDER_LICENSES.md)을 참고하세요. 토큰/키를 채팅에 보낼 필요는 없습니다.
+
+**현재 공식 원본 다운로드 검증은 미완료입니다.** 클라우드의 네 공식 호스트가 프록시 CONNECT403으로 차단됐고 인증값도 연결되지 않았습니다. 합성 HTTP/변환·격리 복원/앱 표시 테스트 통과를 실제 Esri·OSM·DEM 수신 성공으로 보고하지 않습니다. [검증 기록](docs/VALIDATION.md#이슈-20-지도-다운로드관리)과 [화면 검토](docs/DOWNLOAD_UI_REVIEW.md)를 참고하세요. 클라우드의 비활성 설정 버튼을 조작하지 않아도 위 로컬 절차를 사용할 수 있습니다.
+
 ## 일반 지도·고도 지도 추가
 
 현재 보유한 **World Imagery TPK(대한민국 0–13, 태안 14–19)는 위성영상**입니다. 이 영상의 줌을 늘려도 도로·건물명 지도나 실제 고도값이 생성되지는 않습니다. 아래 데이터를 별도로 준비해야 합니다. **데이터가 없는 레이어는 선택기에 표시되지 않으며, 오른쪽 `지도 데이터 준비`에서 상태와 필요한 파일을 확인할 수 있습니다.**

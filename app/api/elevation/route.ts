@@ -10,6 +10,6 @@ export async function GET(request:Request){
     const lat=Number(latText),lon=Number(lonText);
     if(!latText?.trim()||!lonText?.trim()||!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>85.05112878||Math.abs(lon)>180)
       throw new TileError('lat and lon must be valid Web Mercator coordinates',400);
-    return Response.json(await (await getElevation()).sample(lat,lon),{headers:{'Cache-Control':'private,max-age=60'}});
+    return Response.json(await (await getElevation()).sample(lat,lon),{headers:{'Cache-Control':'private,no-cache'}});
   }catch(error){return failure(error);}
 }
