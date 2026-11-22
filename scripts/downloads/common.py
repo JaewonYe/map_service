@@ -65,8 +65,22 @@ def safe_url(url):
     u=urllib.parse.urlsplit(url)
     if u.scheme!='https' or u.hostname not in HOSTS or u.port not in (None,443) or u.username or u.password or u.fragment:raise WorkError('Unapproved provider/redirect URL')
     return url
+def provider_headers(url):
+    headers={'User-Agent':'MapServiceOfflineManager/1.0','Accept-Encoding':'identity'}
+    if urllib.parse.urlsplit(url).hostname=='tiledbasemaps.arcgis.com':
+        referer=os.getenv('ARCGIS_REFERER','')
+        if referer:
+            try:
+                u=urllib.parse.urlsplit(referer);u.port
+                if len(referer)>2048 or any(ord(c)<33 or ord(c)>126 for c in referer) or not u.hostname or u.username or u.password or u.query or u.fragment or not (u.scheme=='https' or u.scheme=='http' and u.hostname in ('localhost','127.0.0.1')):raise ValueError()
+            except ValueError:raise Blocked('ARCGIS_REFERER에는 토큰 발급 시 지정한 올바른 앱 기본 URL을 설정하세요.') from None
+            headers['Referer']=referer
+    return headers
 class Redirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self,req,fp,code,msg,headers,newurl):return super().redirect_request(req,fp,code,msg,headers,safe_url(newurl))
+    def redirect_request(self,req,fp,code,msg,headers,newurl):
+        redirected=super().redirect_request(req,fp,code,msg,headers,safe_url(newurl))
+        if redirected and urllib.parse.urlsplit(newurl).hostname!='tiledbasemaps.arcgis.com':redirected.remove_header('Referer')
+        return redirected
 class Network:
     def __init__(self,backoff_file=None):self.opener=urllib.request.build_opener(Redirect());self.backoff_file=backoff_file
     def open(self,url,data=None,method=None):
@@ -76,7 +90,7 @@ class Network:
             backoff=read_json(self.backoff_file,8192)
             if not isinstance(backoff,dict) or any(k not in HOSTS or not isinstance(v,(int,float)) or not math.isfinite(v) for k,v in backoff.items()):raise WorkError('제공처 재시도 상태 파일이 손상됐습니다. 보존 후 복구하세요.')
         if backoff.get(host,0)>time.time():raise Blocked('제공처 Retry-After 대기 중입니다. '+datetime.datetime.fromtimestamp(backoff[host],datetime.timezone.utc).isoformat()+' 이후 재시도하세요.')
-        try:return self.opener.open(urllib.request.Request(url,data=data,method=method,headers={'User-Agent':'MapServiceOfflineManager/1.0','Accept-Encoding':'identity'}),timeout=20)
+        try:return self.opener.open(urllib.request.Request(url,data=data,method=method,headers=provider_headers(url)),timeout=20)
         except urllib.error.HTTPError as e:
             if e.code==429 and self.backoff_file:
                 raw=e.headers.get('Retry-After','60')

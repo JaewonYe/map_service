@@ -16,7 +16,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_HEAD(self):self.do_GET()
     def do_GET(self):
         name=self.path.split('?')[0]
-        if self.server.export_enabled and name.endswith('/MapServer'):data=json.dumps({'exportTilesAllowed':True,'maxExportTilesCount':1000,'tileInfo':{'rows':256,'cols':256,'spatialReference':{'wkid':3857},'lods':[{'level':0,'resolution':156543.03392804097/2**16}]}}).encode()
+        self.server.seen_headers.append((name,self.headers.get('Referer')))
+        if self.server.required_referer and (name.startswith('/arcgis/') or name.endswith('.tpk')) and self.headers.get('Referer')!=self.server.required_referer:data=b'{"error":{"code":498}}'
+        elif self.server.export_enabled and name.endswith('/MapServer'):data=json.dumps({'exportTilesAllowed':True,'maxExportTilesCount':1000,'tileInfo':{'rows':256,'cols':256,'spatialReference':{'wkid':3857},'lods':[{'level':0,'resolution':156543.03392804097/2**16}]}}).encode()
         elif self.server.export_enabled and name.endswith('/exportTiles'):data=b'{"jobId":"fixture-job","jobStatus":"esriJobSubmitted"}'
         elif self.server.export_enabled and name.endswith('/jobs/fixture-job'):data=b'{"jobStatus":"esriJobSucceeded","results":{"out":{"paramUrl":"results/out"}}}'
         elif self.server.export_enabled and name.endswith('/results/out'):data=json.dumps({'value':{'url':'https://tiledbasemaps.arcgis.com/export/map.'+self.server.export_extension}}).encode()
@@ -35,12 +37,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(data[cursor:])
             else:self.wfile.write(data)
     def log_message(self,*args):pass
-class Transport(Network):
-    """Test-only substitution; production Network still enforces HTTPS official hosts."""
+class FixtureOpener:
     def __init__(self,server):self.server=server
-    def open(self,url,data=None,method=None):
-        safe_url(url);u=urllib.parse.urlsplit(url)
-        return urllib.request.urlopen(urllib.request.Request(f'http://127.0.0.1:{self.server.server_address[1]}'+u.path+('?' + u.query if u.query else ''),data=data,method=method),timeout=5)
+    def open(self,request,timeout=5):
+        safe_url(request.full_url);u=urllib.parse.urlsplit(request.full_url)
+        return urllib.request.urlopen(urllib.request.Request(f'http://127.0.0.1:{self.server.server_address[1]}'+u.path+('?' + u.query if u.query else ''),data=request.data,method=request.get_method(),headers=dict(request.header_items())),timeout=min(timeout,5))
+class Transport(Network):
+    """Only the socket target changes; production URL checks, headers and errors run."""
+    def __init__(self,server):super().__init__();self.opener=FixtureOpener(server)
 class NoNetwork:
     def __getattr__(self,key):raise AssertionError('Offline import tried network: '+key)
 class Context:
@@ -55,12 +59,12 @@ class DownloadsWorker(unittest.TestCase):
         xml='<CacheInfo><TileCacheInfo><SpatialReference><WKID>3857</WKID></SpatialReference><TileCols>256</TileCols><TileRows>256</TileRows><TileOrigin><X>-20037508.342789244</X><Y>20037508.342789244</Y></TileOrigin><LODInfos><LODInfo><LevelID>0</LevelID><Resolution>'+str(156543.03392804097/2**16)+'</Resolution></LODInfo></LODInfos></TileCacheInfo><StorageFormat>esriMapCacheStorageModeCompactV2</StorageFormat><PacketSize>128</PacketSize></CacheInfo>'
         tpk=io.BytesIO()
         with zipfile.ZipFile(tpk,'w') as z:z.writestr('Layers/conf.xml',xml);z.writestr('Layers/conf.cdi','<EnvelopeN><WKID>4326</WKID><XMin>126.22</XMin><XMax>126.26</XMax><YMin>36.58</YMin><YMax>36.62</YMax></EnvelopeN>');z.writestr(f'Layers/_alllayers/L00/R{y//128*128:04x}C{x//128*128:04x}.bundle',bundle)
-        cls.server=socketserver.TCPServer(('127.0.0.1',0),Handler);cls.server.pbf=cls.pbf;cls.server.dem=dem.read_bytes();cls.server.tpk=tpk.getvalue();cls.server.export_enabled=False;cls.server.export_extension='tpk';cls.server.checksum=hashlib.md5(cls.pbf).hexdigest();cls.server.truncate=False;cls.thread=threading.Thread(target=cls.server.serve_forever,daemon=True);cls.thread.start()
+        cls.server=socketserver.TCPServer(('127.0.0.1',0),Handler);cls.server.pbf=cls.pbf;cls.server.dem=dem.read_bytes();cls.server.tpk=tpk.getvalue();cls.server.export_enabled=False;cls.server.required_referer=None;cls.server.seen_headers=[];cls.server.export_extension='tpk';cls.server.checksum=hashlib.md5(cls.pbf).hexdigest();cls.server.truncate=False;cls.thread=threading.Thread(target=cls.server.serve_forever,daemon=True);cls.thread.start()
     @classmethod
     def tearDownClass(cls):cls.server.shutdown();cls.server.server_close();cls.tmp.cleanup()
     def setUp(self):
-        secrets_patch=patch.dict(os.environ,{'ARCGIS_TOKEN':'','OPENTOPOGRAPHY_API_KEY':'','MAP_DOWNLOAD_ARCGIS_TOKEN_FILE':'','MAP_DOWNLOAD_OPENTOPOGRAPHY_KEY_FILE':''});secrets_patch.start();self.addCleanup(secrets_patch.stop)
-        self.temp=tempfile.TemporaryDirectory();self.root=pathlib.Path(self.temp.name);self.addCleanup(self.temp.cleanup);self.worker=Worker(self.root/'downloads',ROOT,Transport(self.server));self.server.checksum=hashlib.md5(self.pbf).hexdigest();self.server.truncate=False;self.server.export_enabled=False;self.server.export_extension='tpk'
+        secrets_patch=patch.dict(os.environ,{'ARCGIS_TOKEN':'','OPENTOPOGRAPHY_API_KEY':'','MAP_DOWNLOAD_ARCGIS_TOKEN_FILE':'','MAP_DOWNLOAD_OPENTOPOGRAPHY_KEY_FILE':'','ARCGIS_REFERER':''});secrets_patch.start();self.addCleanup(secrets_patch.stop)
+        self.temp=tempfile.TemporaryDirectory();self.root=pathlib.Path(self.temp.name);self.addCleanup(self.temp.cleanup);self.worker=Worker(self.root/'downloads',ROOT,Transport(self.server));self.server.checksum=hashlib.md5(self.pbf).hexdigest();self.server.truncate=False;self.server.export_enabled=False;self.server.required_referer=None;self.server.seen_headers=[];self.server.export_extension='tpk'
     def request(self,kinds=('osm','elevation'),**extra):
         return {'version':1,'type':'download','id':str(uuid.uuid4()),'createdAt':now(),'name':'CC0 다운로드 검사','bounds':{'west':126.23,'south':36.59,'east':126.25,'north':36.61},'kinds':list(kinds),'region':'south-korea','demProvider':'aws','levels':{'satellite':{'min':0,'max':13},'elevation':{'min':12,'max':13}},'accepted':dict.fromkeys(kinds,True),'registryRevision':0,**extra}
     def status(self,request):return read_json(self.worker.root/'jobs'/(request['id']+'.state.json'))
@@ -194,5 +198,21 @@ class DownloadsWorker(unittest.TestCase):
     def test_18_missing_arcgis_token_is_reported_before_any_network_request(self):
         other=Worker(self.worker.root,ROOT,NoNetwork());r=self.request(('satellite',));other.process(r);state=self.status(r)
         self.assertEqual(state['state'],'failed');self.assertEqual(state['items']['satellite']['state'],'blocked');self.assertIn('ARCGIS_TOKEN',state['items']['satellite']['reason']);self.assertNotIn('비밀 파일을 읽을 수 없습니다',state['items']['satellite']['reason']);self.assertEqual(other.registry()['layers'],{})
+
+    def test_19_referer_bound_export_scope_redirect_and_invalid_configuration(self):
+        referer='https://fixture-app.example';self.server.required_referer=referer;self.server.export_enabled=True
+        request=self.request(('satellite',),levels={'satellite':{'min':16,'max':16},'elevation':{'min':8,'max':13}})
+        with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-bound-token'}):
+            state=self.run_job(request);self.assertEqual(state['items']['satellite']['state'],'blocked');self.assertIn('code 498',state['items']['satellite']['reason']);self.assertNotIn('export 권한',state['items']['satellite']['reason'])
+            with patch.dict(os.environ,{'ARCGIS_REFERER':referer}):
+                state=self.run_job({**request,'id':str(uuid.uuid4())});self.assertEqual(state['state'],'completed',state)
+                self.assertIn(('/export/map.tpk',referer),self.server.seen_headers)
+                for host in ('portal.opentopography.org','download.geofabrik.de','copernicus-dem-30m.s3.amazonaws.com'):
+                    net=Network()
+                    with patch.object(net.opener,'open',return_value=io.BytesIO()) as opened:net.open('https://'+host+'/fixture').close();self.assertIsNone(opened.call_args.args[0].get_header('Referer'))
+                initial=urllib.request.Request('https://tiledbasemaps.arcgis.com/a',headers=provider_headers('https://tiledbasemaps.arcgis.com/a'))
+                target=Redirect().redirect_request(initial,None,302,'',{},'https://download.geofabrik.de/a');self.assertIsNone(target.get_header('Referer'))
+            for invalid in ('https://user:fixture@host','https://host/?token=fixture','https://host/\r\nInjected:yes','https://host/\x7f','file:///private'):
+                with patch.dict(os.environ,{'ARCGIS_REFERER':invalid}),self.assertRaises(Blocked):provider_headers('https://tiledbasemaps.arcgis.com/a')
 
 if __name__=='__main__':unittest.main()

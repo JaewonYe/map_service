@@ -34,7 +34,7 @@ Windows/Ubuntu 공용 CLI: `downloads.worker.env.example`을 기존 파일이 �
 node --env-file=.env.downloads scripts/download-taean.mjs --accept-usage
 ```
 
-기본 위성+고도, `--osm`은 대한민국 지역 PBF **전체 수신**을 추가하고 `--refresh`는 원본을 다시 받습니다. 웹 관리용 worker 실행·안전한 인증/수동 로그인·오프라인 복원·제한은 [다운로드 운영 안내](docs/DOWNLOAD_MANAGER.md), 라이선스와 계정별 선행 조건은 [제공처 확인](docs/DOWNLOAD_PROVIDER_LICENSES.md)을 참고하세요. 토큰/키를 채팅에 보낼 필요는 없습니다.
+기본 위성+고도, `--osm`은 대한민국 지역 PBF **전체 수신**을 추가하고 `--refresh`는 원본을 다시 받습니다. 웹 관리용 worker 실행·안전한 인증/수동 로그인·오프라인 복원·제한은 [다운로드 운영 안내](docs/DOWNLOAD_MANAGER.md), 라이선스와 계정별 선행 조건은 [제공처 확인](docs/DOWNLOAD_PROVIDER_LICENSES.md)을 참고하세요. 토큰/키를 채팅에 보낼 필요는 없습니다. 계정 API는 정상인데 위성 서비스가498을 반환하면 [ArcGIS 조직·Referer 로그인 안내](docs/ARCGIS_AUTH_POWERSHELL.md)를 따라 서비스 접근부터 확인하세요.
 
 **현재 공식 원본 다운로드 검증은 미완료입니다.** 클라우드의 네 공식 호스트가 프록시 CONNECT403으로 차단됐고 인증값도 연결되지 않았습니다. 합성 HTTP/변환·격리 복원/앱 표시 테스트 통과를 실제 Esri·OSM·DEM 수신 성공으로 보고하지 않습니다. [검증 기록](docs/VALIDATION.md#이슈-20-지도-다운로드관리)과 [화면 검토](docs/DOWNLOAD_UI_REVIEW.md)를 참고하세요. 클라우드의 비활성 설정 버튼을 조작하지 않아도 위 로컬 절차를 사용할 수 있습니다.
 

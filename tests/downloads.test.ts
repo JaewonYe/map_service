@@ -60,3 +60,13 @@ test('Taean CLI keeps credentials out of job and argv while using specified boun
  assert.deepEqual(JSON.parse(await readFile(join(root,'env-proof.json'),'utf8')),{arcgis:true,opentopo:true});assert.ok(output.includes('\"ARCGIS_TOKEN\":true'));
  const files=(await readdir(join(root,'jobs'))).filter(n=>n.endsWith('.request.json'));assert.equal(files.length,1);const raw=await readFile(join(root,'jobs',files[0]),'utf8'),r=JSON.parse(raw);assert.equal(r.bounds.south,36.585138820015565);assert.equal(r.bounds.east,126.24993476192829);assert.deepEqual(r.levels.satellite,{min:15,max:17});assert.equal(r.demProvider,'opentopography');assert.equal(r.kinds.includes('osm'),false);assert.equal(raw.includes(sentinel),false);assert.equal(output.includes(sentinel),false);const argv=JSON.parse(await readFile(join(root,'argv.json'),'utf8'));assert.deepEqual(argv,['compose','--profile','downloads','run','--rm','--build','download-worker','--once']);assert.equal(argv.join(' ').includes(sentinel),false);
 });
+
+test('organization discovery uses the current token safely and only returns an official organization URL',async t=>{
+ const root=await fixture(t),loader=join(root,'mock-fetch.mjs'),{execFile}=await import('node:child_process'),{promisify}=await import('node:util');
+ const sentinel='fixture-discovery-token',base={urlKey:'fixture-org',customBaseUrl:'maps.arcgis.com',user:{orgId:'fixture-org-id',username:'fixture-user',email:'fixture@example.test'}};
+ for(const [result,ok]of [[base,true],[{...base,customBaseUrl:'evil.example'},false],[{...base,urlKey:'x/../../bad'},false],[{error:{code:498,message:sentinel}},false]] as const){
+  await writeFile(loader,`globalThis.fetch=async(url,options)=>{if(url!=='https://www.arcgis.com/sharing/rest/portals/self?f=json'||options.headers.Authorization!=='Bearer '+process.env.ARCGIS_TOKEN||options.headers.Referer!=='https://fixture-app.example'||options.redirect!=='error')throw Error('invalid request');return new Response(JSON.stringify(${JSON.stringify(result)}));};`);
+  let stdout='',stderr='',code=0;try{({stdout,stderr}=await promisify(execFile)(process.execPath,['--import',loader,'scripts/arcgis-organization.mjs'],{cwd:process.cwd(),env:{...process.env,ARCGIS_TOKEN:sentinel,ARCGIS_REFERER:'https://fixture-app.example'}}));}catch(e:any){stdout=e.stdout;stderr=e.stderr;code=e.code;}
+  assert.equal(code,ok?0:1);if(ok)assert.equal(stdout,'https://fixture-org.maps.arcgis.com\n');else assert.equal(stdout,'');assert.equal((stdout+stderr).includes(sentinel),false);assert.equal((stdout+stderr).includes('fixture@example.test'),false);assert.equal((stdout+stderr).includes('fixture-user'),false);
+ }
+});

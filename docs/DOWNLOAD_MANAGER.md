@@ -49,6 +49,14 @@ True면 현재 창에 토큰이 없으므로 같은 창에서 다시 발급하�
 
 `partial`은 일부 레이어만 성공한 상태다. 예를 들어 고도 completed/등록 완료와 위성 blocked가 함께 있으면 고도 패키지/ZIP은 성공이고 위성은 아직 준비되지 않았다. 성공한 고도 원본은 이후 같은 요청에서 재사용하므로 위성 인증을 고친 뒤 실행할 때 `--refresh`를 붙일 필요가 없다. 고도를 새로 수신할 때는 OpenTopography Key도 실행 환경에 설정해야 한다. 검증된 고도 원본을 재사용할 때는 추가 원본 수신이 필요 없다.
 
+## 계정 API는 정상인데 World Imagery가498일 때
+
+계정 API의 signedIn/organizationMember와 World Imagery 사용 가능 여부를 구분한다. 498만으로 전체 토큰 만료나 export 권한 부족을 단정하지 않는다. 498=서비스가 토큰을 유효하지 않다고 응답,499=토큰 필요,401/403=인증·권한 거부로 구분한다.
+
+공식 조직 URL에서 client=referer 토큰을 발급하고 worker의 ARCGIS_REFERER를 발급 당시 URL과 일치시킬 수 있다. [Windows 수동 로그인·서비스 확인](ARCGIS_AUTH_POWERSHELL.md)의 블록을 사용한다. 조직 주소 조회는 `node --env-file=.env.downloads scripts/arcgis-organization.mjs`이며 토큰/이름/이메일 대신 공식 조직 URL만 출력한다. 임의 호스트로 비밀번호를 보내지 않도록 주소를 검사한다. ARCGIS_REFERER는 worker 전용이며 비어 있으면 기존 동작을 유지하고, 설정하면 tiledbasemaps.arcgis.com으로만 보낸다. OpenTopography/OSM/AWS 및 그쪽 redirect에는 전달하지 않는다. URL에 인증정보·query/fragment·제어문자를 넣지 않는다.
+
+이 경로의 실제 서비스 성공은 사용자 PC에서 새 토큰 응답으로 확인해야 한다. 코드 지원/합성 테스트를 실제 export 성공이나 권한 부여로 보고하지 않는다.
+
 ## 기본 영역과 원본
 
 | 항목 | 기본값 / 처리 |

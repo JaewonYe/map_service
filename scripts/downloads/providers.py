@@ -31,7 +31,9 @@ def arc(net,path='',params=None,token=None,post=False):
     value=net.json(ARCGIS+path,q) if post else net.json(ARCGIS+path+'?'+urllib.parse.urlencode(q))
     if 'error' in value:
         code=value['error'].get('code')
-        if code in (401,403,498,499):raise Blocked(f'ArcGIS export 권한/토큰이 필요하거나 만료되었습니다 (code {code}).')
+        if code==498:raise Blocked('ArcGIS 서비스가 토큰을 유효하지 않다고 응답했습니다 (code 498). 토큰 발급 조직 URL·만료·client/referer 조건과 worker의 ARCGIS_REFERER를 확인하세요.')
+        if code==499:raise Blocked('ArcGIS 서비스 인증 토큰이 필요합니다 (code 499). 현재 worker의 토큰 설정을 확인하세요.')
+        if code in (401,403):raise Blocked(f'ArcGIS 요청이 인증·권한 검사에서 거부됐습니다 (code {code}). 해당 계정과 서비스의 허용 범위를 확인하세요.')
         raise WorkError(f'ArcGIS 요청이 거부되었습니다 (code {code}); 제공처 제한을 확인하세요.')
     return value
 

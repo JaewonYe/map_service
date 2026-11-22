@@ -112,3 +112,5 @@ UI UX Pro Max와 Web Design Guidelines를 `.agents/skills/`에 설치하고 AGEN
 
 - #20 사용자 PC 후속 로그에서 OpenTopography COP30 7,898바이트 수신→GDAL 준비→ZIP 생성→등록 완료(partial)가 보고됐다(ZIP ID82e660b9-1d3b-4e8f-98c7-2da97ac7f3ff). 사용자 제공 로그로 기록하며 직접 원본 메타데이터/앱 고도값을 검토한 증거와 구분한다. 위성은 worker 인증 설정 단계에서 막혔고 사용자 확인 결과 현재 PowerShell ARCGIS_TOKEN이 비어 있었다.
 - 인증 전달 보완: Compose의 기본 *_FILE 경로를 비우고 명시 파일+마운트만 사용한다. 기존 환경변수 우선순위를 문서와 일치시키고, CLI는 인증 설정 유무만 출력한다. ArcGIS 누락은 네트워크 전 안내하며 기존 정상 원본/고도 ZIP/시설/OSM 수정은 보존한다. 회귀 worker18, Node 앱105+도구5, 실제 network:none Compose4경우와 최종 PR/main CI 증거는 이슈 #20 후속 댓글에 기록한다.
+
+- #20 추가 인증 진단에서 사용자 PC의 community/self는 signedIn=true/organizationMember=true이나 World Imagery 직접 요청은 POST 및 Authorization+Referer GET 모두498이었다. 전역 토큰 만료/개인 공개계정/Docker만의 오류로 단정하지 않는다. 공식 조직 URL/client=referer 발급과 일치하는 ARCGIS_REFERER 전달을 지원하고, read-only 조직 조회 CLI는 공식 URL만 반환한다. 비밀번호는 사용자 PC의 수동 공식 HTTPS POST에만 사용하며 실제 export 성공은 별도 검증을 유지한다.

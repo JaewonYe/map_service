@@ -8,7 +8,7 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 const flags=process.argv.slice(2),allowed=['--accept-usage','--refresh','--help','--osm'];
 if(flags.some(x=>!allowed.includes(x)))throw Error('지원 옵션: --accept-usage --refresh --osm --help');
 if(flags.includes('--help')||!flags.includes('--accept-usage')){console.log('공식 이용 조건과 이 앱의 오프라인 표시·이전 권한을 확인한 뒤 실행하세요.\nnode --env-file=.env.downloads scripts/download-taean.mjs --accept-usage [--refresh] [--osm]\n기본: 지정 태안 영역 / World Imagery export POST EPSG:3857 level15–17 + OpenTopography COP30 GTiff. --osm은 대한민국 지역 PBF 전체 다운로드를 추가합니다.');process.exit(flags.includes('--help')?0:2);}
-console.log('인증 설정 유무 (값·계정 권한은 표시하지 않음): '+JSON.stringify(Object.fromEntries(['ARCGIS_TOKEN','OPENTOPOGRAPHY_API_KEY','MAP_DOWNLOAD_ARCGIS_TOKEN_FILE','MAP_DOWNLOAD_OPENTOPOGRAPHY_KEY_FILE'].map(k=>[k,Boolean(process.env[k])]))));
+console.log('인증 설정 유무 (값·계정 권한은 표시하지 않음): '+JSON.stringify(Object.fromEntries(['ARCGIS_TOKEN','ARCGIS_REFERER','OPENTOPOGRAPHY_API_KEY','MAP_DOWNLOAD_ARCGIS_TOKEN_FILE','MAP_DOWNLOAD_OPENTOPOGRAPHY_KEY_FILE'].map(k=>[k,Boolean(process.env[k])]))));
 const directory=resolve(root,process.env.MAP_DOWNLOADS_HOST_DIR||'data/downloads');await mkdir(join(directory,'jobs'),{recursive:true});
 for(const p of [process.env.IMAGERY_HOST_DIR||'data/imagery',process.env.DEM_HOST_DIR||'data/dem'])await mkdir(resolve(root,p),{recursive:true});
 const files=(await readdir(join(directory,'jobs'))).filter(x=>x.endsWith('.request.json'));if(files.length>=100)throw Error('작업 기록100개 한도입니다. 백업 후 정리하세요.');

@@ -412,3 +412,14 @@ worker16은 실제 localhost HTTP 전송과 production osmium/GDAL/converters를
 최종 SHA·PR/main 실행 URL과 실제 결과는 #20 후속 댓글에 기록한다. 공식 위성/OSM·실제 앱 표시·고도값/허용된 이전 검증은 계속 미완료로 유지한다.
 
 실행 결과: 로컬 Node다운로드8·worker18(실패/오류/스킵0), typecheck·디자인92자산/3스킬 통과. 실제 Compose4경우도 production 이미지 내부 providers.py를 직접 로드해 통과했다. 첫 Compose 실기 probe는 COPY가 제한된 원본 소스 파일 권한(0600)을 유지해 root 소유 코드가 nonroot worker에서 읽히지 않는 문제를 발견했다. 세 코드 디렉터리를 worker UID/GID1000 소유로 COPY하도록 수정하고 같은 검사4경우를 재실행했다. 이전 /source:ro 기반 worker 테스트가 통과했다는 사실로 이미지 내부 읽기 권한까지 검증했다고 보지 않는다. 이 probe는 Docker Compose 기본 파일 설정도 검사하므로 단위 테스트만으로 대체하지 않는다.
+
+
+### #20 후속: 서비스별 토큰/Referer 인증
+
+사용자 보고: 동일 토큰의 계정 API는 tokenPresent=true/errorCode=null/signedIn=true/organizationMember=true이고, World Imagery 직접 POST 및 Authorization+Referer GET은498이었다. 토큰/계정 자체가 전역으로 유효하지 않거나 Docker에서만 실패한다고 해석하지 않는다. Esri 공식 export 안내에 맞춘 조직 URL+client=referer 신규 토큰 검증 경로를 추가하며, 기존 requestip 토큰에 헤더만 추가한 실패와 구분한다. 현재 원인/실제 imagery export 성공은 확정되지 않았다.
+
+ARCGIS_REFERER는 worker 환경변수로만 전달하고 공식 imagery 호스트 요청에 한정한다. 다른 제공처/그쪽 redirect에는 제거하며 query/fragment/사용자정보/제어문자를 거부한다. 498/499/401·403 사유를 분리한다. 조직 조회 CLI는 고정 공식 Portal Self만 요청하고 redirect/응답1MiB/20초 제한, 공식 조직 URL만 stdout, 오류 code만 허용해 토큰·사용자 이름/이메일을 출력하지 않는다. Windows 로그인 절차는 안전한 조직 URL 확인 후 사용자 PC에서 HTTPS POST와 현재 PowerShell 환경변수만 사용한다.
+
+회귀: worker18→19(실제 localhost HTTP Referer 필수 export 실패→성공·TPK 다운로드·다른host/redirect 헤더제거·잘못된설정), Node다운로드8→9(조직조회4가지와 비밀/개인정보 제외)로 앱106+도구5가 된다. transport fixture가 production Network의 URL/headers/errors를 거친 뒤 socket만 localhost로 대체하도록 강화했다. production image Compose4경우에서도 ARCGIS_REFERER 전달/다른provider제외를 확인한다. UI·공통API·기존 source/고도 패키지/상위 gitlink/클라우드 허용 목록은 변경하지 않는다. 실제 서비스 인증/원본 다운로드/표시는 계속 사용자 PC에서 확인할 미완료 조건이며 최종 SHA·PR/main CI 증거는 #20 댓글에 기록한다.
+
+로컬 실행: 다운로드Node9·worker19(실패/오류/스킵0)·production Compose4·typecheck·디자인92자산/3skills 통과. 신규 worker 테스트의 첫 실행은 환경변수에 NUL을 주입하려다 OS의 embedded null byte 거부로1오류가 발생했다. 실제 환경변수로 표현 가능한 DEL 제어문자 거부 검사로 수정해 같은19개를 재실행했고, production의 제어문자 거부 검증은 유지했다. Windows 수동 로그인 블록의 실제 계정/서비스 실기는 사용자 PC의 결과가 필요하며 로컬 합성 성공으로 대신하지 않는다.
