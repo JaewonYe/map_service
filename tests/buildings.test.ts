@@ -234,3 +234,50 @@ test('real storage write failure preserves saved boundary and permits retry afte
   assert.ok(!Object.hasOwn(await store.update(record.id,{...input,boundary:null},1),'boundary'));
   assert.equal((await readdir(directory)).filter(file=>file.endsWith('.tmp')).length,0);
 });
+
+import {editBoundaryDraft, newBoundaryDraft} from '../lib/buildings/boundary-draft';
+test('draft moves, inserts and deletes selected middle vertices and undo restores selection without mutating source', () => {
+  const original=boundaryPoints(normalizeBoundary(rectangle)), source=JSON.stringify(original);
+  let state=newBoundaryDraft(original);
+  state=editBoundaryDraft(state,{type:'move',index:1,point:[36.00001,126.002]});
+  const moved=state; assert.equal(state.selected,1);
+  state=editBoundaryDraft(state,{type:'insert',after:1,point:[36.001,126.0021]});
+  assert.equal(state.points.length,5); assert.equal(state.selected,2);
+  state=editBoundaryDraft(state,{type:'delete'}); assert.equal(state.points.length,4);
+  state=editBoundaryDraft(state,{type:'undo'});assert.equal(state.points.length,5);assert.equal(state.selected,2);
+  state=editBoundaryDraft(state,{type:'undo'});assert.deepEqual(state.points,moved.points);
+  state=editBoundaryDraft(state,{type:'undo'});assert.deepEqual(state.points,original);
+  assert.equal(JSON.stringify(original),source); assert.deepEqual(editBoundaryDraft(state,{type:'undo'}),state);
+});
+test('draft editing enforces triangle minimum and maximum insertion, validates numeric moves and preserves invalid geometry for repair',()=>{
+  const trianglePoints=boundaryPoints(boundaryFromPoints([[36,126],[36,126.001],[36.001,126]]));
+  let state=newBoundaryDraft(trianglePoints);
+  assert.equal(editBoundaryDraft(state,{type:'delete'}),state);
+  assert.throws(()=>editBoundaryDraft(state,{type:'move',index:0,point:[86,126]}));
+  assert.throws(()=>editBoundaryDraft(state,{type:'insert',after:0,point:[NaN,126]}));
+  state=editBoundaryDraft(state,{type:'move',index:1,point:trianglePoints[0]});
+  assert.throws(()=>boundaryFromPoints(state.points));assert.deepEqual(editBoundaryDraft(state,{type:'undo'}).points,trianglePoints);
+  const full=newBoundaryDraft(Array.from({length:128},(_,i)=>[36+i*0.000001,126] as const));
+  assert.equal(editBoundaryDraft(full,{type:'insert',after:0,point:[36,126]}),full);
+  assert.equal(editBoundaryDraft(full,{type:'select',index:128}),full);
+});
+test('point-only PUT keeps boundary and metadata byte-equivalent and does not touch neighbours; delete removes only target', async t=>{
+  const {store,directory}=await fixture(t),a=await store.create({...input,boundary:rectangle}),b=await store.create({...input,name:'다른 시설',boundary:rectangle});
+  const neighbour=await readFile(join(directory,`${b.id}.json`),'utf8');
+  const {boundary:_boundary,...legacy}=a;
+  const moved=await store.update(a.id,{...legacy,latitude:36.02,longitude:126.02},a.version);
+  assert.deepEqual(moved.boundary,a.boundary);assert.equal(moved.id,a.id);assert.equal(moved.createdAt,a.createdAt);
+  for(const key of ['name','description','category','address','contact','website'] as const)assert.equal(moved[key],a[key]);
+  assert.equal(moved.version,2);assert.deepEqual(await new BuildingStore(directory).get(a.id),moved);
+  await assert.rejects(store.delete(a.id,1),(e:unknown)=>e instanceof BuildingError&&e.status===409);
+  await store.delete(a.id,2);await assert.rejects(store.get(a.id),(e:unknown)=>e instanceof BuildingError&&e.status===404);
+  assert.equal(await readFile(join(directory,`${b.id}.json`),'utf8'),neighbour);
+});
+test('real delete write failure preserves target and neighbour and allows retry',async t=>{
+  const {store,directory}=await fixture(t),a=await store.create({...input,boundary:rectangle}),b=await store.create({...input,name:'다른 시설',boundary:rectangle});
+  const {chmod}=await import('node:fs/promises');const aPath=join(directory,`${a.id}.json`),before=await readFile(aPath,'utf8');
+  await chmod(directory,0o500);
+  try{await assert.rejects(store.delete(a.id,1));assert.equal(await readFile(aPath,'utf8'),before);assert.deepEqual(await store.get(b.id),b);}
+  finally{await chmod(directory,0o700);}
+  await store.delete(a.id,1);await assert.rejects(store.get(a.id));assert.deepEqual(await store.get(b.id),b);
+});

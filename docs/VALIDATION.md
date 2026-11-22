@@ -246,3 +246,39 @@ main 디자인 기준 반영 후 로컬 typecheck, Node 앱 83개/집계 도구 
 보완 코드 `dcdfe26b2d31b6790048f65a7add97f88ee691fc`의 PR run [44937344600](https://github.com/JaewonYe/map_service/actions/runs/44937344600)에서 브라우저 50개·변환·디자인 검사는 통과했다. Node job(ID 136946761788)은 checkout 단계에서 수 분간 진행되지 않았고 아직 typecheck/Node 테스트를 시작하지 못했다. 로그 archive 조회도 준비되지 않은 BlobNotFound를 반환했다. 원인을 코드/네트워크 허용 목록 문제로 단정하지 않으며 이 상태를 Node 테스트 성공이나 실패 수에 합산하지 않는다.
 
 해당 진행 기록을 추가한 새 커밋으로 PR 전체 CI를 다시 시작한다. 기존 concurrency 규칙이 이전 진행 중 실행을 정리하며 workflow·timeout·worker·retry·skip·코드는 바꾸지 않는다. 최종 새 SHA의 실제 전체 검사 결과를 완료 댓글/PR에 별도 기록한다.
+
+## 이슈 #16 시설 대표 지점 이동·경계 꼭짓점 직접 편집
+
+2026-11-22(KST), main `f28e4f050d98bfc9f0835761db8464e94a0de961`에서 시작했다. 최신 플랫폼 AGENTS/역할/절차/계약 및 모듈 문서·#11/#13/#16과 현재 코드를 확인했다. 기존 숫자 좌표 수정/삭제를 유지하며 신규 지도 조작과 구분한다. 공통 API·UUID·boundary 형식/정규화·저장·타 DB·예약·공통 디자인/lock/reference·상위 gitlink는 변경하지 않았다. 기존 네트워크 허용 목록은 유지했고 GitHub connector 조회와 Git fetch가 성공했다.
+
+### 완료 기준별 증거
+
+| 기준 | 검증 |
+| --- | --- |
+| 신규/기존 구분 | README/PROJECT_CONTEXT에 새 위치/정점 직접 조작과 기존 숫자 좌표 수정·시설 삭제 재사용을 명시. DELETE 처리/API 중복 없음 |
+| 대표 지점 이동 | 명시적 위치 수정, 마커 드래그/빈 지도 클릭/좌표 입력 미리보기, 원래 위치와 초안/되돌리기, 저장 전 원본 동일·취소/Esc 복원, 실제 PUT 저장 후 상세/마커 동기화·새로고침 |
+| 경계/다른 시설 보존 | boundary 생략 PUT으로 대표 좌표만 변경. 실제 저장소 reopen·UUID/등록일/다른 속성·boundary 동일 및 이웃 파일 바이트 불변, 브라우저 이웃 레코드 동일 |
+| 직접 정점 조작 | 마우스/Chromium 터치 드래그·실시간 면적/둘레, 중간 + 삽입 1회·선택 삭제·undo·좌표 대안, 정규화 저장 후 재조회. 3개 선택 삭제 제한/128개 추가 제한·중복/교차/범위/퇴화 저장 차단. 기존 검증/서버 경계 테스트 유지 |
+| 삭제 의미 구분 | 정점 삭제는 초안, 경계 전체 제거는 기존 PUT null, 시설 삭제는 기존 DELETE + If-Match. 삭제 확인에 레코드/마커/경계 명시, 돌아가기·실패·충돌·성공 후 목록/수/선택/마커/경계 및 이웃 격리 |
+| 실패/동시성 | 실제 디렉터리 권한 제거 후 DELETE 실패·파일/이웃 유지/복구 재시도. 위치와 드래그 정점 503/실제 오래된 버전 409·초안 유지, 저장 전 대상 전환 폐기, 지연 저장 시 대상 전환/Esc/중복 저장·편집 차단 및 최종 원래 UUID에만 반영 |
+| UI/입력/모드 | 기존 #13 테마7개 및 전체 지도/측정/레이어/오프라인 회귀 유지. 모바일 touchStart/Move/End·tap 삽입/삭제/저장, 키보드 숫자/선택/Enter·Delete/Backspace 비삭제, theme/resize 초안/검색/카메라 보존과 44px/줌 비중첩 검사 |
+| 시각 증거 | 실제 localhost production 앱, desktop1440×900/mobile390×844 × Light/Dark × 위치 초안/정점 편집/시설 삭제 확인12장 + 모바일 스크롤 대안4장. 합성 fixture/manifest·원본16장과 검토는 [DIRECT_EDIT_REVIEW](DIRECT_EDIT_REVIEW.md) |
+| 문서/최종 CI | README/PROJECT_CONTEXT/검증·검토 문서 갱신, 최종 SHA의 PR/main Map regression 3job + Design skill integrity는 실제 완료 후 이슈 #16/PR에 별도 기록. 상위 gitlink 통합용 SHA만 보고 |
+
+### 로컬 실행 수와 실패 보완
+
+- Typecheck 성공. Node buildings 20→24개: 순수 초안 연산/undo·최소/최대/invalid 복구, 대표 지점 이동의 영구 저장/metadata/이웃 보존, 실제 DELETE 쓰기 실패 검사4개 추가. 앱 총87개(tiles22/buildings24/layers6/osm4/measure9/launcher22) + Node 집계 도구5개 통과, 실패/취소/스킵/todo0. 집계 도구의 의도적인 실패/스킵 fixture 출력을 앱 실패 수에 합산하지 않는다.
+- Playwright 기존50개를 그대로 유지하고 직접 편집9개를 추가해 총59개(single4/multi15/osm2/layers3/buildings35). 기존 worker2/timeout/retry/skip·검증 조건은 완화하지 않았다.
+- 첫 buildings 실행34개는31통과/3실패. 선택 정점 select의 wrapping label이 옵션 문자열까지 포함해 exact label 조회가 실패하는2건, 모바일 터치 드래그의 지도 pan 애니메이션 완료 전 좌표 조작1건이었다. 명시적 label/id 연결, 정점 핸들의 삽입 핸들 위 우선순위, 실제 pan class 종료 확인을 적용했다.
+- 직접 편집8개 재실행은7통과/1실패. 교차 fixture로 지정한 좌표가 실제로는 유효한 오목 다각형이었다. 기존 교차 검사를 바꾸지 않고 실제 반대 변을 가로지르는 좌표로 수정했다.
+- 이후 **전체59개 통과**, 실패/flaky/스킵0. 추가로 실제 터치 삭제/저장 및 지연 정점 저장/대상 전환 시나리오2개를 최종 테스트 코드에서 재실행해 모두 통과했다. 별도 확인 수는 기본59개에 합산하지 않는다.
+- 기존 production DEM3/PBF4와 Python 집계 도구5개 통과, 실패/오류/스킵0. 저장된 production 이미지(`map-service-elevation-tools:ci` 60c0bde27f16 / `map-service-osm-tools:ci` 8ecec9525561), 읽기 전용·비루트·network=none·합성 데이터로 실행했고 변환 코드/이미지는 이번 작업에서 바꾸지 않았다. 상세 버전과 hash는 기존 이슈 #7 기록과 실행 결과를 따른다.
+- 디자인 무결성: locked asset92개·세 스킬·Light/Dark 토큰/명암비·로컬 UX 검색 통과. 무결성과 실제 앱 화면 검토는 별도다. 원본 지도 픽셀·공통 reference/lock 및 #13 기존 캡처는 바꾸지 않았다.
+
+캡처 도구는 pan 애니메이션 종료 후 모바일 지도 작업 공간을 확보하고 각 상태를 기록한다. 본문 위/아래 스크롤 상태를 별도로 보관해 항상 보이는 저장/취소와 숫자 입력/선택 대안을 확인했다. 촬영 중 저장/삭제는 확정하지 않았고 시작/종료 레코드 동일을 검사했다.
+
+### 원격 증거와 한계
+
+최종 커밋 SHA, PR URL, 같은 SHA의 pull_request/main push별 Map regression과 Design skill integrity run·실제 검사 수/실패/스킵·artifact 이름/ID/7일 보관은 [이슈 #16](https://github.com/JaewonYe/map_service/issues/16) 완료 댓글과 PR에 기록한다. 다른 SHA나 로컬 성공을 원격 성공으로 보고하지 않는다. UI PNG/manifest는 저장소에 보관한다.
+
+실제 사용자 시설/지도·실제 터치 기기/스크린 리더·Windows/Ubuntu 실기·외부 접근성 인증·모든 확대/회전·대규모 성능·법적 측량 정확도·인증/운영·승인된 플랫폼 계약은 미검증이다. 대표 지점과 경계 동시 이동·경계 안 위치 강제·위치 필드만 제거·새 데이터 타입/API/예약 정책은 도입하지 않았다.

@@ -7,6 +7,7 @@ import {BUILDING_CATEGORIES, FIELD_LIMITS, type Building, type BuildingCategory,
 import {filterBuildings, matchesBuilding, mergeBuildingSnapshot} from '../lib/buildings/search';
 import ThemeControl from './ThemeControl';
 import FacilityBoundaryEditor from './FacilityBoundaryEditor';
+import FacilityPositionEditor from './FacilityPositionEditor';
 import {boundaryMetrics, boundaryPoints} from '../lib/buildings/boundary';
 import {formatArea, formatDistance} from '../lib/map-measure';
 import type {Coordinate} from '../lib/map-measure';
@@ -21,8 +22,9 @@ type Props = {mapAction: number; sidebarHost: HTMLElement; expanded: boolean; se
 
 export default function MapBuildings({map, requestedPoint, onRequestClosed, onBoundaryEditingChange, sidebarHost, expanded, setExpanded, mapAction}: Props) {
   const [boundaryTarget, setBoundaryTarget] = useState<Building | null>(null);
+  const [positionTarget, setPositionTarget] = useState<Building | null>(null);
   const boundaryBusy = useRef(false);
-  useEffect(() => {onBoundaryEditingChange(!!boundaryTarget); return () => onBoundaryEditingChange(false);}, [boundaryTarget, onBoundaryEditingChange]);
+  useEffect(() => {onBoundaryEditingChange(!!boundaryTarget || !!positionTarget); return () => onBoundaryEditingChange(false);}, [boundaryTarget, positionTarget, onBoundaryEditingChange]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [listStatus, setListStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -34,7 +36,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<BuildingCategory | ''>('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  useEffect(()=>{if(mapAction && !boundaryTarget)setEditor(null);},[mapAction]);
+  useEffect(()=>{if(mapAction && !boundaryTarget && !positionTarget)setEditor(null);},[mapAction]);
   const selectionRequest = useRef(0);
   const listRequest = useRef(0);
   const revision = useRef(0);
@@ -42,10 +44,10 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
   const toggle = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement>(map.getContainer());
   useEffect(()=>{
-    if(!expanded || editor || boundaryTarget || !matchMedia('(max-width:800px)').matches)return;
+    if(!expanded || editor || boundaryTarget || positionTarget || !matchMedia('(max-width:800px)').matches)return;
     const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();setExpanded(false);toggle.current?.focus();}};
     document.addEventListener('keydown',escape);return()=>document.removeEventListener('keydown',escape);
-  },[expanded,editor,boundaryTarget,setExpanded]);
+  },[expanded,editor,boundaryTarget,positionTarget,setExpanded]);
   const visible = useMemo(() => filterBuildings(buildings, search, category), [buildings, search, category]);
 
   async function load(signal?: AbortSignal) {
@@ -71,7 +73,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
   }, []);
   useEffect(() => {
     if (requestedPoint && !boundaryBusy.current) {
-      setBoundaryTarget(null);
+      setBoundaryTarget(null); setPositionTarget(null);
       selectionRequest.current++; setDetailLoading(false); setDetailError(''); setRetryId(null);
       setSelectedId(null); collapseForMap(); returnFocus.current = map.getContainer();
       setEditor({building: null, point: requestedPoint});
@@ -86,8 +88,8 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
   }, [visible, selectedId, editor, onRequestClosed]);
 
   const openBuilding = useCallback(async (id: string, fromList = false) => {
-    if (boundaryBusy.current || boundaryTarget?.id === id) return;
-    setBoundaryTarget(null); setEditor(null);
+    if (boundaryBusy.current || boundaryTarget?.id === id || positionTarget?.id === id) return;
+    setBoundaryTarget(null); setPositionTarget(null); setEditor(null);
     const sequence = ++selectionRequest.current;
     returnFocus.current = fromList && toggle.current ? toggle.current : map.getContainer();
     collapseForMap(); setDetailLoading(true); setDetailError(''); setRetryId(null);
@@ -119,7 +121,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
         setDetailError(error instanceof Error ? error.message : '시설 정보를 불러오지 못했습니다.'); setRetryId(id);
       }
     } finally {if (sequence === selectionRequest.current) setDetailLoading(false);}
-  }, [map, search, category, boundaryTarget, collapseForMap]);
+  }, [map, search, category, boundaryTarget, positionTarget, collapseForMap]);
 
   useEffect(() => {
     const group = L.layerGroup().addTo(map);
@@ -128,17 +130,18 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
     for (const building of visible) {
       if (building.boundary) {
         const polygon = L.polygon(boundaryPoints(building.boundary).map(([lat, lon]) => L.latLng(lat, lon)), {
-          color: 'var(--map-selection-stroke)', weight: 3, fillOpacity: 0.18, interactive: !boundaryTarget, bubblingMouseEvents: false, className: 'facility-boundary-saved'
+          color: 'var(--map-selection-stroke)', weight: 3, fillOpacity: 0.18, interactive: !boundaryTarget && !positionTarget, bubblingMouseEvents: false, className: 'facility-boundary-saved'
         }).addTo(group).on('click', () => void openBuilding(building.id));
         const element = polygon.getElement();
-        element?.setAttribute('tabindex', boundaryTarget ? '-1' : '0'); element?.setAttribute('role', 'button');
-        if (boundaryTarget) element?.setAttribute('aria-disabled', 'true');
+        element?.setAttribute('tabindex', boundaryTarget || positionTarget ? '-1' : '0'); element?.setAttribute('role', 'button');
+        if (boundaryTarget || positionTarget) element?.setAttribute('aria-disabled', 'true');
         element?.setAttribute('aria-label', `${building.name} 시설 경계 정보 보기`);
         element?.addEventListener('keydown', event => {
           const key = (event as KeyboardEvent).key;
           if (key === 'Enter' || key === ' ') {event.preventDefault(); void openBuilding(building.id);}
         });
       }
+      if (positionTarget?.id === building.id) continue;
       const text = document.createElement('span'); text.textContent = building.name;
       const marker = L.marker([building.latitude, building.longitude], {icon, keyboard: true, bubblingMouseEvents: false})
         .bindTooltip(text, {direction: 'top', className: 'building-tooltip'})
@@ -146,7 +149,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
       marker.getElement()?.setAttribute('aria-label', `${building.name} 시설·건물 정보 보기`);
     }
     return () => {group.remove();};
-  }, [map, visible, openBuilding, boundaryTarget]);
+  }, [map, visible, openBuilding, boundaryTarget, positionTarget]);
 
   function changeFilters(nextSearch: string, nextCategory: BuildingCategory | '') {
     selectionRequest.current++; setDetailLoading(false); setDetailError(''); setRetryId(null);
@@ -172,7 +175,7 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
   }
 
   return <>
-    {!boundaryTarget && createPortal(<aside className="facility-panel" data-expanded={expanded} aria-label="시설 목록">
+    {!boundaryTarget && !positionTarget && createPortal(<aside className="facility-panel" data-expanded={expanded} aria-label="시설 목록">
       <div className="facility-panel-heading"><h2>시설 찾기</h2><button ref={toggle} type="button" className="facility-list-toggle" aria-label="시설 목록" aria-expanded={expanded} aria-controls="facility-list-content"
         onClick={() => setExpanded(value => !value)}><span aria-hidden="true">{expanded ? '접기' : '펼치기'}{(search.trim() || category) && ' · 조건 적용 중'}</span></button></div>
       {expanded && <div id="facility-list-content" className="facility-list-content">
@@ -205,19 +208,25 @@ export default function MapBuildings({map, requestedPoint, onRequestClosed, onBo
         {retryId ? '시설 정보 다시 불러오기' : '목록 다시 불러오기'}</button>}
     </div>}
     {editor && <BuildingDialog key={editor.building?.id || 'new'} editor={editor} returnFocus={returnFocus.current}
-      onClose={close} onSaved={saved} onDeleted={deleted} onBoundary={() => {
+      onClose={close} onSaved={saved} onDeleted={deleted} onPosition={() => {
+        if (!editor.building) return;
+        selectionRequest.current++; setPositionTarget(editor.building); setEditor(null); collapseForMap();
+      }} onBoundary={() => {
         if (!editor.building) return;
         selectionRequest.current++; setBoundaryTarget(editor.building); setEditor(null); collapseForMap();
       }}/>}
+    {positionTarget && createPortal(<FacilityPositionEditor key={`${positionTarget.id}:${positionTarget.version}`} map={map} building={positionTarget}
+      onBusy={value => {boundaryBusy.current = value;}} onSaved={building => {setPositionTarget(null); saved(building);setEditor({building,point:[building.latitude,building.longitude]});}}
+      onCancel={() => {if (boundaryBusy.current) return; setPositionTarget(null); map.getContainer().focus();}}/>, sidebarHost)}
     {boundaryTarget && createPortal(<FacilityBoundaryEditor key={`${boundaryTarget.id}:${boundaryTarget.version}`} map={map} building={boundaryTarget}
       onBusy={value => {boundaryBusy.current = value;}} onSaved={building => {setBoundaryTarget(null); saved(building);}}
       onCancel={() => {if (boundaryBusy.current) return; setBoundaryTarget(null); setEditor(null); map.getContainer().focus();}}/>, sidebarHost)}
   </>;
 }
 
-function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted, onBoundary}: {
+function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted, onBoundary, onPosition}: {
   editor: Editor; returnFocus: HTMLElement; onClose: () => void;
-  onSaved: (building: Building) => void; onDeleted: (id: string) => void; onBoundary: () => void;
+  onSaved: (building: Building) => void; onDeleted: (id: string) => void; onBoundary: () => void; onPosition: () => void;
 }) {
   const {building, point} = editor;
   const alive = useRef(false), abort = useRef<AbortController | null>(null);
@@ -294,6 +303,7 @@ function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted, onBou
       <p>{building.boundary ? `저장된 경계 · 면적 ${formatArea(boundaryMetrics(building.boundary).area)} · 둘레 ${formatDistance(boundaryMetrics(building.boundary).perimeter)}` : '저장된 경계 없음'}</p>
       {error && <p ref={errorSummary} tabIndex={-1} className="building-error" role="alert">{error}</p>}
       <div className="building-dialog-actions">
+        <button type="button" disabled={busy} onClick={onPosition}>위치 수정</button>
         <button className="boundary-start" type="button" disabled={busy} onClick={onBoundary}>{building.boundary ? '경계 수정' : '경계 추가'}</button>
         {building.boundary && <button className="boundary-remove" type="button" disabled={busy} onClick={() => setConfirmBoundary(true)}>경계 제거</button>}
       </div>
@@ -323,7 +333,7 @@ function BuildingDialog({editor, returnFocus, onClose, onSaved, onDeleted, onBou
       {building && <p className="building-dates">등록 {date(building.createdAt)} · 수정 {date(building.updatedAt)}</p>}
       {error && <p ref={errorSummary} tabIndex={-1} className="building-error" role="alert">{error}</p>}
       {confirmDelete ? <div className="building-delete-confirm">
-        <p>이 시설·건물 정보를 삭제하시겠습니까?</p>
+        <p>이 시설·건물 레코드와 대표 마커, 저장된 경계를 모두 삭제하시겠습니까? 다른 시설은 유지됩니다.</p>
         <button className="danger" type="button" disabled={busy} onClick={() => void remove()}>삭제 확인</button>
         <button type="button" disabled={busy} onClick={() => setConfirmDelete(false)}>돌아가기</button>
       </div> : <div className="building-dialog-actions">

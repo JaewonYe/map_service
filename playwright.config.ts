@@ -10,7 +10,7 @@ export default defineConfig({
     {name:'multi',testMatch:['catalog.spec.ts','measure.spec.ts'],use:{baseURL:'http://127.0.0.1:3101'}},
     {name:'osm',testMatch:'osm.spec.ts',use:{baseURL:'http://127.0.0.1:3104'}},
     {name:'layers',testMatch:'layers.spec.ts',use:{baseURL:'http://127.0.0.1:3103'}},
-    {name:'buildings',testMatch:['buildings.spec.ts','boundary.spec.ts','ui-theme.spec.ts'],use:{baseURL:'http://127.0.0.1:3102'}}
+    {name:'buildings',testMatch:['buildings.spec.ts','boundary.spec.ts','ui-theme.spec.ts','direct-edit.spec.ts'],use:{baseURL:'http://127.0.0.1:3102'}}
   ],
   webServer:[
     {command:'npx tsx scripts/create-test-tpk.ts && npx tsx scripts/create-test-catalog.ts && node scripts/create-test-buildings.mjs && npx tsx scripts/create-test-layers.ts && npx tsx scripts/create-test-osm.ts && npm run build && npm run start -- --port 3100',url:'http://127.0.0.1:3100',timeout:180000,

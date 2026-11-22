@@ -5,11 +5,21 @@ import type {Building} from '../lib/buildings/model';
 import {boundaryFromPoints, boundaryMetrics, boundaryPoint, boundaryPoints, MAX_BOUNDARY_VERTICES} from '../lib/buildings/boundary';
 import {formatArea, formatDistance, segmentMeters, type Coordinate} from '../lib/map-measure';
 import {useMapPointDrawing} from './useMapPointDrawing';
+import {useMapEditHandles} from './useMapEditHandles';
+import {editBoundaryDraft, newBoundaryDraft, type BoundaryDraft, type DraftAction} from '../lib/buildings/boundary-draft';
 
 type Props = {map: L.Map; building: Building; onSaved: (value: Building) => void; onCancel: () => void; onBusy: (busy: boolean) => void};
 export default function FacilityBoundaryEditor({map, building, onSaved, onCancel, onBusy}: Props) {
   // The snapshot and its version belong to this editor instance, never to the latest selection.
-  const [points, setPoints] = useState<Coordinate[]>(() => building.boundary ? boundaryPoints(building.boundary) : []);
+  const [draft, setDraft] = useState(() => newBoundaryDraft(building.boundary ? boundaryPoints(building.boundary) : []));
+  const {points, selected} = draft;
+  const draftRef = useRef(draft), dragStart = useRef<BoundaryDraft | null>(null);
+  const apply = useCallback((action: DraftAction) => {
+    if (saving.current) return;
+    try {const next = editBoundaryDraft(draftRef.current, action); draftRef.current = next; setDraft(next); setError('');}
+    catch (error) {setError(error instanceof Error ? error.message : '좌표를 확인하세요.');}
+  }, []);
+  const setPoints = (value: Coordinate[] | ((points: Coordinate[]) => Coordinate[])) => apply({type: 'replace', points: typeof value === 'function' ? value(draftRef.current.points) : value});
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [latitude, setLatitude] = useState(''), [longitude, setLongitude] = useState('');
   const alive = useRef(false), saving = useRef(false), controller = useRef<AbortController | null>(null);
@@ -27,12 +37,30 @@ export default function FacilityBoundaryEditor({map, building, onSaved, onCancel
   useEffect(() => {if (error) errorElement.current?.focus({preventScroll: false});}, [error]);
   const addPoint = useCallback((point: Coordinate) => {
     if (saving.current) return;
+    const previous = draftRef.current.points;
+    if (previous.length >= MAX_BOUNDARY_VERTICES) {setError('정점은 최대 128개입니다. 기존 정점을 수정하거나 삭제하세요.'); return;}
     try {
       const normalized = boundaryPoint(point);
-      setPoints(previous => previous.length >= MAX_BOUNDARY_VERTICES || previous.length && segmentMeters(previous.at(-1)!, normalized) < 0.01
-        ? previous : [...previous, normalized]); setError('');
+      if (previous.length && segmentMeters(previous.at(-1)!, normalized) < 0.01) return;
+      apply({type: 'insert', after: previous.length - 1, point: normalized});
     } catch (error) {setError(error instanceof Error ? error.message : '좌표를 확인하세요.');}
-  }, []);
+  }, [apply]);
+  useMapEditHandles(map, {points, selected, disabled: busy,
+    select: index => apply({type:'select',index}),
+    start: index => {apply({type:'select',index}); dragStart.current = draftRef.current;},
+    move: (index, point) => {
+      if (saving.current) return;
+      try {const next = editBoundaryDraft(draftRef.current, {type:'move',index,point});
+        const live = {...next, past: draftRef.current.past}; draftRef.current = live; setDraft(live); setError('');}
+      catch (error) {setError(error instanceof Error ? error.message : '좌표를 확인하세요.');}
+    },
+    end: () => {const before = dragStart.current; dragStart.current = null;
+      if (before && JSON.stringify(before.points) !== JSON.stringify(draftRef.current.points)) {
+        const next = {...draftRef.current, past: [...before.past.slice(-99), {points:before.points,selected:before.selected}]}; draftRef.current=next;setDraft(next);
+      }
+    },
+    insert: points.length < MAX_BOUNDARY_VERTICES ? (after,point) => apply({type:'insert',after,point}) : undefined
+  });
   useMapPointDrawing(map, !busy, addPoint);
   useEffect(() => {
     alive.current = true; panel.current?.focus({preventScroll: true});
@@ -43,15 +71,13 @@ export default function FacilityBoundaryEditor({map, building, onSaved, onCancel
     document.addEventListener('keydown', escape); return () => document.removeEventListener('keydown', escape);
   }, [onCancel]);
   useEffect(() => {
-    const color = getComputedStyle(map.getContainer()).getPropertyValue('--color-danger').trim();
+    const color = 'var(--color-danger)';
     const group = L.layerGroup().addTo(map), coordinates = points.map(([lat, lon]) => L.latLng(lat, lon));
     if (coordinates.length >= 2) {
       const options = {color, weight: 3, dashArray: '7 5', interactive: false, className: 'facility-boundary-draft'};
       if (coordinates.length >= 3) L.polygon(coordinates, {...options, fillOpacity: 0.12}).addTo(group);
       else L.polyline(coordinates, options).addTo(group);
     }
-    coordinates.forEach((point, index) => L.circleMarker(point, {radius: 5, color, fillColor: 'var(--color-surface)', fillOpacity: 1,
-      interactive: false, className: 'facility-boundary-vertex'}).bindTooltip(String(index + 1), {permanent: true, direction: 'top'}).addTo(group));
     return () => {group.remove();};
   }, [map, points]);
   async function save() {
@@ -74,16 +100,22 @@ export default function FacilityBoundaryEditor({map, building, onSaved, onCancel
   }
   return <section ref={panel} tabIndex={-1} className="facility-boundary-editor" aria-label="시설 경계 편집" aria-busy={busy}>
     <div className="boundary-editor-content"><h2>{building.name} · 경계 편집</h2>
-    <p>지도에서 경계를 따라 점을 선택하세요. 붉은 점선은 미저장 편집, 청록 실선은 저장된 경계입니다.</p>
+    <p>숫자 핸들을 끌어 정점을 옮기고 +로 변 중간에 삽입하세요. 빈 지도 클릭은 끝에 추가합니다. 붉은 점선은 미저장 초안, 청록 실선은 저장 경계입니다.</p>
     <p role="status" data-testid="boundary-point-count">정점 {points.length} / {MAX_BOUNDARY_VERTICES}개</p>
     <output aria-live="polite">{preview.metrics ? `면적 ${formatArea(preview.metrics.area)} · 둘레 ${formatDistance(preview.metrics.perimeter)}` : preview.error}</output>
     {error && <p ref={errorElement} tabIndex={-1} role="alert" className="building-error">{error}</p>}
     <fieldset disabled={busy}>
       <div className="boundary-actions">
+        <button type="button" disabled={!draft.past.length} onClick={() => apply({type:"undo"})}>직전 조작 되돌리기</button>
         <button type="button" onClick={() => setPoints([])}>다시 그리기</button>
         <button type="button" disabled={!points.length} onClick={() => setPoints(value => value.slice(0, -1))}>경계 마지막 점 취소</button>
         <button type="button" onClick={() => map.getContainer().focus()}>지도 이동</button>
       </div>
+      <label htmlFor="boundary-selected-vertex">선택 정점</label><select id="boundary-selected-vertex" name="selected-vertex" value={selected ?? ''} onChange={e => apply({type:'select',index:Number(e.target.value)})}>
+        {!points.length && <option value="">정점 없음</option>}{points.map((_, index)=><option key={index} value={index}>{index+1}번 정점</option>)}
+      </select>
+      <button className="danger" type="button" disabled={selected === null || points.length <= 3} onClick={() => apply({type:'delete'})}>선택 정점 삭제</button>
+      <p>{points.length <= 3 ? '정점은 최소 3개를 유지합니다. 전체 경계 제거는 편집 취소 후 시설 상세의 ‘경계 제거’를 이용하세요.' : '선택 정점 삭제는 초안만 바꿉니다. 시설과 전체 경계는 삭제하지 않습니다.'}</p>
       <details><summary>좌표로 정점 추가·수정</summary>
         <div className="boundary-coordinate-entry">
           <label>정점 위도<input name="boundary-latitude" autoComplete="off" inputMode="decimal" type="number" step="any" min={-85.05112878} max={85.05112878} value={latitude} onChange={e => setLatitude(e.target.value)}/></label>
@@ -91,10 +123,13 @@ export default function FacilityBoundaryEditor({map, building, onSaved, onCancel
         </div>
         <button type="button" disabled={!latitude.trim() || !longitude.trim() || points.length >= MAX_BOUNDARY_VERTICES}
           onClick={() => {addPoint([Number(latitude), Number(longitude)]);}}>정점 추가</button>
+        <button type="button" disabled={selected === null || !latitude.trim() || !longitude.trim() || points.length >= MAX_BOUNDARY_VERTICES}
+          onClick={() => {if (selected !== null) apply({type:'insert',after:selected,point:[Number(latitude),Number(longitude)]});}}>선택 정점 뒤에 삽입</button>
+        <p>삽입 후 일직선 오류가 표시되면 새 정점을 이동하거나 좌표로 수정하세요.</p>
         <ol className="boundary-coordinate-list">{points.map((point, index) => <li key={index}>
           <span>{index + 1}: {point[0]}, {point[1]}</span>
           <button type="button" disabled={!latitude.trim() || !longitude.trim()} onClick={() => {
-            try {const value = boundaryPoint([Number(latitude), Number(longitude)]); setPoints(previous => previous.map((p, i) => i === index ? value : p)); setError('');}
+            try {apply({type:'move',index,point:[Number(latitude), Number(longitude)]});}
             catch (error) {setError(error instanceof Error ? error.message : '좌표를 확인하세요.');}
           }}>{index + 1}번 정점 수정</button>
         </li>)}</ol>

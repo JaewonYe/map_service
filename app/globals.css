@@ -153,6 +153,16 @@ label {font-size:12px;padding:2px 4px;}
 .boundary-coordinate-list {padding-left:20px;max-height:200px;overflow:auto;overscroll-behavior:contain;}
 .boundary-coordinate-list li {margin-top:8px;overflow-wrap:anywhere;}
 .boundary-coordinate-list button {display:block;margin-top:4px;}
+.facility-boundary-vertex,.facility-boundary-insert,.facility-position-handle {display:flex!important;align-items:center;justify-content:center;cursor:grab;touch-action:none;user-select:none;}
+.facility-boundary-vertex span,.facility-boundary-insert span,.facility-position-handle span {display:flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 4px;border:2px solid var(--color-danger);border-radius:50%;background:var(--color-surface);color:var(--color-foreground);font-size:12px;font-weight:600;}
+.facility-boundary-vertex[aria-pressed="true"] span {background:var(--color-danger);color:var(--color-on-danger);}
+.facility-boundary-insert {cursor:pointer;}
+.facility-boundary-insert span {width:20px;height:20px;min-width:20px;border-color:var(--color-control-border);border-style:dashed;}
+.facility-position-handle span {width:40px;height:40px;}
+.facility-boundary-vertex:hover span,.facility-boundary-insert:hover span,.facility-position-handle:hover span {box-shadow:0 0 0 2px var(--color-focus);}
+.facility-boundary-editor select {max-width:100%;margin:8px;}
+.position-editor-form {display:flex;flex-direction:column;flex:1;min-height:0;}
+.position-warning {padding:8px;background:var(--color-warning-subtle);color:var(--color-warning);border-radius:var(--radius-control);}
 @media(max-width:800px) {
   .app-header {padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right));gap:12px;}
   .app-brand {gap:8px;}.app-brand h1 {font-size:16px;}.app-brand svg {width:20px;height:20px;}

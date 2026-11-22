@@ -1,0 +1,198 @@
+{
+  "baseURL": "http://127.0.0.1:3120",
+  "fixture": "Isolated .cache/ui-16-data; CC0 synthetic tiles, one synthetic facility; no saves/deletes",
+  "captures": [
+    {
+      "file": "desktop-light-position.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "state": "position",
+      "details": "Original coordinate + unsaved point preview; saved boundary unchanged",
+      "camera": "중심: 36.598492, 126.241000",
+      "zoom": "16"
+    },
+    {
+      "file": "desktop-light-vertices.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "state": "vertices",
+      "details": "Four saved vertices; vertex 2 selected; drag and insertion handles; no save",
+      "camera": "중심: 36.598492, 126.241000",
+      "zoom": "16"
+    },
+    {
+      "file": "desktop-light-delete-confirm.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "state": "delete-confirm",
+      "details": "Existing DELETE confirmation; record + marker + boundary consequence; never confirmed",
+      "camera": "중심: 36.598492, 126.241000",
+      "zoom": "16"
+    },
+    {
+      "file": "desktop-dark-position.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "state": "position",
+      "details": "Original coordinate + unsaved point preview; saved boundary unchanged",
+      "camera": "중심: 36.598492, 126.241000",
+      "zoom": "16"
+    },
+    {
+      "file": "desktop-dark-vertices.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "state": "vertices",
+      "details": "Four saved vertices; vertex 2 selected; drag and insertion handles; no save",
+      "camera": "중심: 36.598492, 126.241000",
+      "zoom": "16"
+    },
+    {
+      "file": "desktop-dark-delete-confirm.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "state": "delete-confirm",
+      "details": "Existing DELETE confirmation; record + marker + boundary consequence; never confirmed",
+      "camera": "중심: 36.598492, 126.241000",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-light-position.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "position",
+      "details": "Original coordinate + unsaved point preview; saved boundary unchanged",
+      "camera": "중심: 36.595736, 126.241000",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-light-position-coordinates.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "position-coordinates",
+      "details": "Scrolled position coordinate alternative; save/cancel footer stays visible",
+      "camera": "중심: 36.595736, 126.241000",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-light-vertices.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "vertices",
+      "details": "Four saved vertices; vertex 2 selected; drag and insertion handles; no save",
+      "camera": "중심: 36.595736, 126.241000",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-light-vertices-controls.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "vertices-controls",
+      "details": "Scrolled vertex selection/deletion controls and fixed save/cancel footer",
+      "camera": "중심: 36.595736, 126.241000",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-light-delete-confirm.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "state": "delete-confirm",
+      "details": "Existing DELETE confirmation; record + marker + boundary consequence; never confirmed",
+      "camera": "중심: 36.598492, 126.241000",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-dark-position.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "position",
+      "details": "Original coordinate + unsaved point preview; saved boundary unchanged",
+      "camera": "중심: 36.595736, 126.241000",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-dark-position-coordinates.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "position-coordinates",
+      "details": "Scrolled position coordinate alternative; save/cancel footer stays visible",
+      "camera": "중심: 36.595736, 126.241000",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-dark-vertices.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "vertices",
+      "details": "Four saved vertices; vertex 2 selected; drag and insertion handles; no save",
+      "camera": "중심: 36.595736, 126.241000",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-dark-vertices-controls.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "vertices-controls",
+      "details": "Scrolled vertex selection/deletion controls and fixed save/cancel footer",
+      "camera": "중심: 36.595736, 126.241000",
+      "zoom": "16"
+    },
+    {
+      "file": "mobile-dark-delete-confirm.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "state": "delete-confirm",
+      "details": "Existing DELETE confirmation; record + marker + boundary consequence; never confirmed",
+      "camera": "중심: 36.598492, 126.241000",
+      "zoom": "16"
+    }
+  ]
+}
