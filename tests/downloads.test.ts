@@ -70,3 +70,21 @@ test('organization discovery uses the current token safely and only returns an o
   assert.equal(code,ok?0:1);if(ok)assert.equal(stdout,'https://fixture-org.maps.arcgis.com\n');else assert.equal(stdout,'');assert.equal((stdout+stderr).includes(sentinel),false);assert.equal((stdout+stderr).includes('fixture@example.test'),false);assert.equal((stdout+stderr).includes('fixture-user'),false);
  }
 });
+
+test('Taean CLI resumes a Docker startup failure without another request or changed revision',async t=>{
+ const root=await fixture(t),bin=join(root,'bin');await mkdir(bin);const {chmod}=await import('node:fs/promises'),{execFile}=await import('node:child_process'),{promisify}=await import('node:util');
+ const docker=join(bin,'docker');await writeFile(docker,`#!/usr/bin/env node\nconst fs=require('node:fs'),p=require('node:path'),root=process.env.MAP_DOWNLOADS_HOST_DIR;fs.appendFileSync(p.join(root,'calls.jsonl'),JSON.stringify(process.argv.slice(2))+'\\n');if(process.env.CLI_FIXTURE_MODE==='offline')process.exit(127);const file=fs.readdirSync(p.join(root,'jobs')).find(x=>x.endsWith('.request.json'));const r=JSON.parse(fs.readFileSync(p.join(root,'jobs',file)));fs.writeFileSync(p.join(root,'jobs',r.id+'.state.json'),JSON.stringify({id:r.id,state:'completed',stage:'registered',registered:true,items:{}}));\n`);await chmod(docker,0o755);
+ const sentinel='fixture-resume-token';const env={...process.env,PATH:bin+':'+process.env.PATH,MAP_DOWNLOADS_HOST_DIR:root,IMAGERY_HOST_DIR:join(root,'imagery'),DEM_HOST_DIR:join(root,'dem'),ARCGIS_TOKEN:sentinel};
+ async function run(flags:string[],mode='online'){try{const r=await promisify(execFile)(process.execPath,['scripts/download-taean.mjs','--accept-usage',...flags],{cwd:process.cwd(),env:{...env,CLI_FIXTURE_MODE:mode}});return {code:0,output:r.stdout+r.stderr};}catch(e:any){return {code:e.code,output:e.stdout+e.stderr};}}
+ const first=await run([],'offline');assert.equal(first.code,127);assert.ok(first.output.includes('--resume'));const files=()=>readdir(join(root,'jobs')).then(v=>v.filter(x=>x.endsWith('.request.json')));assert.equal((await files()).length,1);
+ const file=(await files())[0],before=await readFile(join(root,'jobs',file)),request=JSON.parse(before.toString());
+ const duplicate=await run([]);assert.equal(duplicate.code,1);assert.ok(duplicate.output.includes('새 요청을 추가하지 않았습니다'));assert.equal((await files()).length,1);
+ const incompatible=await run(['--resume','--refresh']);assert.equal(incompatible.code,1);
+ assert.equal((await readFile(join(root,'calls.jsonl'),'utf8')).trim().split('\n').length,1);
+ await atomic(join(root,'active.json'),{version:1,revision:7,layers:{}});await atomic(join(root,'jobs',request.id+'.state.json'),{id:request.id,state:'running',items:{}});
+ const resumed=await run(['--resume']);assert.equal(resumed.code,0);assert.ok(resumed.output.includes('기존 태안 작업 '+request.id));assert.deepEqual(await readFile(join(root,'jobs',file)),before);assert.equal(JSON.parse(before.toString()).registryRevision,0);
+ const calls=await readFile(join(root,'calls.jsonl'),'utf8');assert.equal(calls.trim().split('\n').length,2);assert.equal(calls.includes(sentinel),false);assert.equal((first.output+resumed.output+before.toString()).includes(sentinel),false);
+ const completed=await run(['--resume']);assert.equal(completed.code,1);assert.equal((await files()).length,1);
+ await rm(join(root,'jobs',request.id+'.state.json'));const other=randomUUID();await atomic(join(root,'jobs',other+'.request.json'),{...request,id:other});const multiple=await run(['--resume']);assert.equal(multiple.code,1);assert.equal((await files()).length,2);assert.equal((await readFile(join(root,'calls.jsonl'),'utf8')).trim().split('\n').length,2);
+ await rm(join(root,'jobs',other+'.request.json'));await atomic(join(root,'jobs',file),{...request,name:'another task'});const unrelated=await run(['--resume']);assert.equal(unrelated.code,1);assert.equal((await readFile(join(root,'calls.jsonl'),'utf8')).trim().split('\n').length,2);
+});

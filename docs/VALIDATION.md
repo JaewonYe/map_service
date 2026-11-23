@@ -451,3 +451,13 @@ V1은 header60, 별도5바이트 column-major index, offset 위치의4바이트 
 PR #25 head45e504cad7bc4c4ccc452310812cbacd19fabefd의 [PR Map](https://github.com/JaewonYe/map_service/actions/runs/45167634422)/[PR Design](https://github.com/JaewonYe/map_service/actions/runs/45167634455)은 모두 성공했다. 같은 SHA를 main에 반영한 뒤 [main Map45168085326](https://github.com/JaewonYe/map_service/actions/runs/45168085326)의 Conversion regression job137670157567이 집계 단계에서 실패했다. DEM3/PBF7은 실제로 통과했지만 unittest의 stderr 진행 줄 끝에 stdout의 CONVERSION_RESULT JSON이 붙어, 줄 시작 marker만 읽는 집계기가 DEM을 missing report로 거부했다. 이 실패를 단순 재실행 성공으로 덮거나 최종 green 증거로 재사용하지 않는다.
 
 변환/다운로드 unittest 진행과 결과 JSON을 stdout 하나에 순서대로 기록하고 변환 preflight traceback도 같은 스트림에 출력한다. parser의 줄 시작/JSON/수 제한·실패/오류/스킵 거부 기준은 유지한다. 보고 도구5→6으로 늘려 stdout/stderr 분리 캡처에서 성공·실패3개 실행과 setup 오류의 진행/traceback/단일 marker가 한 스트림에 있고 기존 read_report로 읽히는지 검사한다. 진행 줄 중간에 붙은 marker는 계속 거부하는 assertion도 유지한다. 로컬 보고 도구6·production DEM3/PBF7와 summary·worker28·디자인92자산/3스킬·diff 검사 통과(실패/오류/스킵0). Node114/브라우저74/worker28/Compose4와 실제 변환 코드는 바꾸지 않는다. 후속 PR의 최종 SHA에서 PR/main 전체 CI를 다시 확인하고 실패 run과 최종 run을 함께 #20에 기록한다.
+
+### #20 후속: export 전체 LOD metadata와 CLI 미완료 요청 재개
+
+사용자 PC에서 f5073c94-8d64-40f9-9323-966c0235ef27 요청은 저장됐지만 Docker LinuxEngine 파이프가 없어 worker가 시작되지 않았다. 다음 abd30b49-c3ff-4e15-a121-edbb1ff019a6 작업에서는 Docker가 복구되고 TPK1,567,737바이트 수신/이전 V1 offset 검사를 지나 `지원하지 않는 TPK LOD`로 실패했다. 고도는 재사용 completed, 마지막 등록은 revision 충돌로 미완료다. 실제 conf.xml과 충돌 상대 작업 ID는 이 환경에 없으므로 구체적 LOD 값/충돌 원인을 확정하지 않는다.
+
+앱 TS 리더의 config metadata 지원 범위는 XYZ0–24인데 Python은 실제 bundle이 없는 metadata20–24도19 한도로 거부했다. metadata의 level≥0/유한 양수resolution/XYZ0–24/해상도 오차를 검사하고 실제 bundle은 기존0–19 한도와 실제타일/요청LOD를 검사하도록 일치시킨다. 실제 한도 밖 bundle과0/NaN/잘못된resolution metadata는 계속 거부한다. V1/V2 합성 export가 metadata20–23만 추가로 갖고 실제16만 수신한 경우 완료·실수신LOD16을 검사하는 worker 회귀를 추가했다. TS에서도 metadata20–23이 있어도 실제15–17만 제공하고 JPEG를 읽는 회귀를 추가했다.
+
+CLI는 미완료 요청이 있을 때 새 작업을 생성하지 않고, --resume --accept-usage로 단일 미완료 태안 요청을 변경 없이 실행/모니터한다. Docker 실패→원문/ID/revision 보존→새 요청 거부→동일 요청 재개와 부모 환경/argv 비밀 제외를 실제 Node 자식프로세스로 검사한다. 여러 미완료/다른 이름/완료된 요청 및 refresh/osm 재정의는 Docker 실행 전 거부한다. 변경된 registry revision을 기존 요청에 자동 적용하지 않으며 Worker의 CAS/복구를 유지한다. 동시에 시작한 CLI/웹까지 전역 직렬화하는 기능은 아니며 stale 등록은 기존 보호로 거부한다.
+
+최종 로컬 worker29·Node앱111+도구5=116(tiles26/downloads10)·typecheck·production image build/Compose4·디자인92자산/3스킬·Compose config·diff 검사 통과, 실패/오류/스킵0. 변환 보고 도구6·production DEM3/PBF7/summary도 앞선 stdout 보완에서 통과했다. 최초 CI 집계 실패와 설치 지연 중간 SHA를 최종 증거로 사용하지 않고, 최종 PR/main SHA/카운트/artifact를 #20에 기록한다. 실제 사용자 파일의 새 LOD 검사/위성 앱 표시는 후속 확인이 필요하며 #20 OPEN 유지한다.

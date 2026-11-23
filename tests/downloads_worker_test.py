@@ -365,4 +365,29 @@ class DownloadsWorker(unittest.TestCase):
         with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-v1-token'}),patch('providers.capabilities',return_value={'lods':{'15':1,'16':0},'maxTiles':1000,'attribution':'CC0 fixture'}):state=self.run_job(r)
         self.assertEqual(state['state'],'failed');self.assertIn('실제 LOD가 누락',state['items']['satellite']['reason']);self.assertEqual(self.worker.registry()['layers'],{})
 
+    def test_29_export_metadata_lods20_to23_are_not_downloaded_levels(self):
+        def metadata(data,resolution=None,actual=False):
+            result=io.BytesIO()
+            with zipfile.ZipFile(io.BytesIO(data)) as source,zipfile.ZipFile(result,'w') as archive:
+                for entry in source.infolist():
+                    content=source.read(entry)
+                    if entry.filename.endswith('conf.xml'):
+                        extra=''.join('<LODInfo><LevelID>'+str(z)+'</LevelID><Resolution>'+str(resolution if resolution is not None else 156543.03392804097/2**z)+'</Resolution></LODInfo>' for z in range(20,24))
+                        content=content.replace(b'</LODInfos>',extra.encode()+b'</LODInfos>')
+                    archive.writestr(entry.filename,content)
+                    if actual and entry.filename.endswith(('.bundle','.bundlx')):archive.writestr(entry.filename.replace('/L00/','/L20/'),content)
+            return result.getvalue()
+        self.server.export_enabled=True
+        for version,data in [('v1',self.v1_fixture()[0]),('v2',self.tpk_bytes)]:
+            with self.subTest(version=version):
+                self.worker=Worker(self.root/version,ROOT,Transport(self.server));self.server.tpk=metadata(data)
+                request=self.request(('satellite',),levels={'satellite':{'min':16,'max':16},'elevation':{'min':8,'max':13}})
+                with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-export-lods'}):state=self.run_job(request)
+                self.assertEqual(state['state'],'completed',state);self.assertEqual(state['items']['satellite']['result']['zoomLevels'],[16])
+                self.assertEqual(state['items']['satellite']['result']['nonEmptyTileRecords'],1)
+                for resolution,actual in [(None,True),(0,False),(float('nan'),False),(123,False)]:
+                    path=self.root/'bad-lods.tpk';path.write_bytes(metadata(data,resolution,actual))
+                    with self.assertRaises(WorkError) as error:validate_tpk(path)
+                    if actual:self.assertIn('XYZ=20',str(error.exception))
+
 if __name__=='__main__':unittest.main()

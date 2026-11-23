@@ -24,6 +24,8 @@ docker compose up -d --build
 
 ## 지도에서 영역을 고르고 원본 다운로드하기
 
+태안 CLI 실행 전에 Docker Desktop의 Linux 엔진이 실행 중인지 확인하세요. Docker 실행 실패로 요청만 저장됐다면 같은 환경에서 `node --env-file=.env.downloads scripts/download-taean.mjs --resume --accept-usage`로 단일 미완료 태안 작업을 이어서 처리할 수 있습니다. 일반 실행은 기존 미완료 작업이 있으면 새 요청을 추가하지 않습니다. [실행·재개·등록 충돌 안내](docs/DOWNLOAD_MANAGER.md)를 참고하세요.
+
 별도 **`http://localhost:3001/downloads`** 페이지에서 사각형/시설 범위와 위성·일반·고도를 선택해 다운로드→검사·준비→등록을 요청하고, 진행·취소·재시도·이전 ZIP을 관리합니다. 최초 설치에도 번들 국가 개요가 있어 좌표를 외부 지도에서 복사할 필요가 없습니다. 상세 지도 미리보기는 현재 설치된 로컬 자료만 사용합니다.
 
 태안 기본값은 사용자 지정 영역의 **World Imagery for Export POST / EPSG:3857 / TPK level15–17**, **OpenTopography COP30 GeoTIFF**입니다. 원본은 `data/imagery`, `data/dem`, 작업·준비 패키지·ZIP은 `data/downloads`에 저장합니다. 검증한 기존 원본을 재사용하며 기존 시설/경계·OSM 수정·원본 폴더를 덮어쓰지 않습니다. 위성 export/이 앱의 오프라인 표시·이전 권한과 개인/Enterprise API Key 조건을 먼저 확인하세요.

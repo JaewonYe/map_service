@@ -36,7 +36,7 @@ test('corrupt Compact V2 offsets cannot read outside the member',async()=>{
 for(const compressed of [false,true])test(`Compact V1 nonzero empty records return no tile, compressed=${compressed}`,async()=>{
   const directory=await mkdtemp(join(tmpdir(),'tpk-v1-empty-'));let reader:Tpk|undefined;
   try{
-    const fixture=await makeTpk(directory,1,compressed,false,true);reader=await Tpk.load(fixture.path,join(directory,'cache'),{usageConfirmed:true});
+    const fixture=await makeTpk(directory,1,compressed,false,{v1MissingRecords:true});reader=await Tpk.load(fixture.path,join(directory,'cache'),{usageConfirmed:true});
     const c=coordinate(16);
     assert.deepEqual((await reader.tile(16,c.x,c.y))?.bytes,fixture.jpeg);
     assert.equal(await reader.tile(16,c.x+1,c.y),null);
@@ -48,6 +48,15 @@ test('Compact V1 records pointing inside the 60-byte header are rejected',async(
   try{
     const fixture=await makeTpk(directory,1,false,true);reader=await Tpk.load(fixture.path,join(directory,'cache'),{usageConfirmed:true});
     const c=coordinate(16);await assert.rejects(reader.tile(16,c.x,c.y),/record offset/);
+  }finally{reader?.close();await rm(directory,{recursive:true,force:true});}
+});
+test('export metadata may include LOD20–23 while only downloaded levels are served',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'tpk-export-lods-'));let reader:Tpk|undefined;
+  try{
+    const fixture=await makeTpk(directory,1,false,false,{extraMetadataLods:[20,21,22,23]});reader=await Tpk.load(fixture.path,join(directory,'cache'),{usageConfirmed:true});
+    assert.deepEqual(reader.info().zoomLevels,[15,16,17]);const c=coordinate(16);
+    assert.deepEqual((await reader.tile(16,c.x,c.y))?.bytes,fixture.jpeg);
+    assert.equal(await reader.tile(20,1,1),null);
   }finally{reader?.close();await rm(directory,{recursive:true,force:true});}
 });
 

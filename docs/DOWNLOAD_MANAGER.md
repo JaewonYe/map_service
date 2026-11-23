@@ -20,6 +20,14 @@ node --env-file=.env.downloads scripts/download-taean.mjs --accept-usage
 
 기본은 **태안 위성 + 고도만** 준비한다. 대한민국 지역 PBF 전체를 추가로 받으려면 `--osm`, 같은 요청의 유효한 기존 파일을 재사용하지 않고 원본을 새로 받으려면 `--refresh`를 붙인다. 부분 성공은 종료 코드 1이며 성공한 레이어와 ZIP은 보존된다. `--help`는 Docker/원본 다운로드를 실행하지 않는다. 실제 수신 바이트·단계·오류를 출력하며 미확정 전체 진행률/시간을 만들어내지 않는다. Windows/Ubuntu 공용 실행 코드는 테스트했지만 두 OS의 실기 다운로드는 아직 검증하지 않았다.
 
+Docker Desktop이 꺼져 `dockerDesktopLinuxEngine` 파이프를 찾지 못하면 요청만 저장되고 worker는 실행되지 않는다. Docker Desktop을 켜고 `docker info --format '{{.OSType}}'`가 `linux`인지 확인한다. 같은 환경에서 단일 미완료 태안 작업을 재개하려면 다음을 실행한다.
+
+```powershell
+node --env-file=.env.downloads scripts/download-taean.mjs --resume --accept-usage
+```
+
+`--resume`은 요청 원문/ID/revision을 바꾸거나 새 요청을 추가하지 않고 기존 작업을 실행·모니터한다. 새 환경변수는 worker에 전달되지만 원본 선택/등록 요청은 유지하며 `--refresh`/`--osm`으로 재정의할 수 없다. 일반 CLI는 미완료 작업이 있으면 새 요청을 만들지 않는다. 여러 미완료 작업이나 다른 종류 작업은 `/downloads`에서 먼저 확인한다. 이미 끝난 failed/partial/interrupted 작업은 `--resume` 대상이 아니며, 원인을 고친 후 일반 CLI 또는 웹의 새 작업으로 재시도한다. 실행 중 worker가 중단됐다면 기존 복구 절차가 interrupted로 기록하며, 재개 옵션으로 성공을 강제하지 않는다. 이 옵션은 HTTP Range 파일 이어받기가 아니다. 동시 CLI/웹 등록에 대한 기존 revision 충돌 보호도 유지한다.
+
 웹 페이지에서 계속 관리하려면 로컬 폴더를 먼저 만든 후 worker와 web을 실행한다. 사용자 지정 폴더를 쓰는 경우 web과 worker에 **같은 MAP_DOWNLOADS_HOST_DIR**를 적용한다.
 
 ```sh
@@ -79,6 +87,8 @@ ArcGIS는 실제 exportTilesAllowed, 좌표계/타일 크기, LOD, maxExportTile
 이전 버전의 `현재 리더가 지원하지 않는 TPKX/기타 형식` 오류는 URL 확장자 검사만으로도 발생했으므로 실제 파일이 TPKX였다는 증거가 아니다. 최신 코드를 `git pull --ff-only origin main`으로 받은 뒤 **토큰을 설정한 같은 PowerShell 창**에서 기존 CLI를 다시 실행한다. CLI가 worker 이미지를 자동 빌드하며 `--refresh` 없이 검증된 고도 원본을 재사용한다. 기존 ZIP/원본은 삭제하거나 확장자를 바꾸지 않는다. 수정 지원과 합성 테스트 통과는 실제 공식 TPK 다운로드·앱 표시 성공과 구분한다.
 
 Compact V1은 60바이트 bundle header 뒤의 4바이트 길이 레코드를 `.bundlx`의 5바이트 column-major offset으로 찾는다. offset60의 길이0 레코드도 정상적인 빈 타일일 수 있다. V2의 64바이트 header/index 한도를 V1에 적용하지 않으며, V1의 60 미만 위치·잘린 길이·파일 밖 payload·크기 초과와 실제 타일이 없는 패키지는 계속 거부한다. 앱 리더도 같은 V1 최소 위치를 적용한다. 빈 bundle만 있는 LOD는 실제 수신 LOD에 포함하지 않으며 요청한 LOD 전체가 실제 타일을 포함하는지 검사한다. 형식 차이는 [독립 구현과 검증 기록](VALIDATION.md#20-후속-compact-v1-header60과-등록-충돌)에서 확인한다.
+
+conf.xml의 전체 tiling scheme에 실제 export하지 않은 LOD20–24가 남을 수 있다. metadata는 앱 TS 리더와 같은 XYZ0–24 범위/정상 resolution으로 검사하고, 실제 bundle이 있을 때만 다운로드 지원 범위0–19와 실타일 여부를 검사한다. 실제 수신 LOD와 요청LOD 검증을 생략하거나 지원하지 않는 해상도를 임의 보정하지 않는다. 미지원 LOD 오류에는 level/XYZ 숫자를 표시하며 토큰이나 결과 URL을 넣지 않는다.
 
 `등록 revision 충돌`은 요청 이후 다른 등록으로 active 상태가 변경됐을 때 기존 지도를 보호하는 검사다. ZIP/준비 패키지가 만들어져도 **자동 등록은 완료되지 않은 상태**이며 재다운로드나 active.json 삭제로 해결하지 않는다. 진행 중인 다른 작업이 끝난 뒤 `/downloads`를 다시 조회하고 해당 작업의 **준비된 지도 다시 등록**을 명시적으로 선택한다. 위성 검사에 실패해 고도만 포함된 ZIP에는 이 동작으로 위성이 추가되지 않는다. 위성 리더 수정 후에는 기존 고도를 재사용하는 새 작업에서 위성 검증/등록을 확인한다.
 

@@ -97,10 +97,13 @@ def validate_tpk(path,check=lambda:None):
         if origin is None or abs(float(origin.findtext('X'))+WORLD)>1 or abs(float(origin.findtext('Y'))-WORLD)>1:raise WorkError('지원하지 않는 TPK 원점')
         levels=[];samples=0;bundle_count=0;tile_records=0
         for lod in c.findall('.//LODInfo'):
-            resolution=float(lod.findtext('Resolution'));z=round(math.log2(156543.03392804097/resolution));level=int(lod.findtext('LevelID'))
-            if not 0<=z<=19 or abs(resolution-156543.03392804097/2**z)>resolution*1e-5:raise WorkError('지원하지 않는 TPK LOD')
+            resolution=float(lod.findtext('Resolution'));level=int(lod.findtext('LevelID'))
+            if not math.isfinite(resolution) or resolution<=0 or level<0:raise WorkError('잘못된 TPK LOD metadata')
+            z=round(math.log2(156543.03392804097/resolution))
+            if not 0<=z<=24 or abs(resolution-156543.03392804097/2**z)>resolution*1e-5:raise WorkError(f'지원하지 않는 TPK LOD metadata (level={level}, XYZ={z})')
             bundles=[(k,i) for k,i in entries.items() if re.search(r'/l0*'+str(level)+r'/r[0-9a-f]+c[0-9a-f]+\.bundle$',k) and k.startswith(prefix+'_alllayers/')]
             if not bundles:continue
+            if z>19:raise WorkError(f'실제 TPK bundle LOD가 다운로드 지원 범위0–19 밖입니다 (level={level}, XYZ={z}).')
             previous_records=tile_records
             for key,i in bundles:
                 bundle_count+=1

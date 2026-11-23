@@ -21,10 +21,11 @@ export function zip(files:Array<{name:string;bytes:Buffer}>,compressed=false){
   const directory=Buffer.concat(central),end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50);end.writeUInt16LE(files.length,8);end.writeUInt16LE(files.length,10);end.writeUInt32LE(directory.length,12);end.writeUInt32LE(offset,16);
   return Buffer.concat([...records,directory,end]);
 }
-export async function makeTpk(directory:string,version:1|2=2,compressed=false,badOffset=false,v1MissingRecords=false){
+export async function makeTpk(directory:string,version:1|2=2,compressed=false,badOffset=false,options:{v1MissingRecords?:boolean;extraMetadataLods?:number[]}={}){
+  const {v1MissingRecords=false,extraMetadataLods=[]}=options;
   await mkdir(directory,{recursive:true});const jpeg=await readFile(new URL('./satellite.jpg',import.meta.url));const picture=png();
   const files:Array<{name:string;bytes:Buffer}>=[];
-  const lods=[15,16,17].map((z,i)=>`<LODInfo><LevelID>${i}</LevelID><Resolution>${156543.03392804097/2**z}</Resolution></LODInfo>`).join('');
+  const lods=[15,16,17].map((z,i)=>`<LODInfo><LevelID>${i}</LevelID><Resolution>${156543.03392804097/2**z}</Resolution></LODInfo>`).concat(extraMetadataLods.map(z=>`<LODInfo><LevelID>${z}</LevelID><Resolution>${156543.03392804097/2**z}</Resolution></LODInfo>`)).join('');
   files.push({name:'v101/Layers/conf.xml',bytes:Buffer.from(`<CacheInfo><TileCacheInfo><SpatialReference><WKID>102100</WKID></SpatialReference><TileOrigin><X>-20037508.342789244</X><Y>20037508.342789244</Y></TileOrigin><TileCols>256</TileCols><TileRows>256</TileRows><LODInfos>${lods}</LODInfos></TileCacheInfo><CacheImageInfo><CacheTileFormat>MIXED</CacheTileFormat></CacheImageInfo><CacheStorageInfo><StorageFormat>esriMapCacheStorageModeCompact${version===2?'V2':''}</StorageFormat><PacketSize>128</PacketSize></CacheStorageInfo></CacheInfo>`)});
   files.push({name:'v101/Layers/conf.cdi',bytes:Buffer.from('<EnvelopeN><XMin>14051896.830</XMin><YMin>4381437.173</YMin><XMax>14054078.450</XMax><YMax>4384973.002</YMax></EnvelopeN>')});
   files.push({name:'esriinfo/iteminfo.xml',bytes:Buffer.from('<ESRI_ItemInformation><version>1.0-synthetic</version><licenseInfo>CC0 synthetic pixels; not real satellite imagery</licenseInfo></ESRI_ItemInformation>')});
