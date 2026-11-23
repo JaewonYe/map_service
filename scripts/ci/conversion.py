@@ -64,10 +64,13 @@ def run(kind):
         print('CONVERSION_ENVIRONMENT ' + json.dumps(report, sort_keys=True), flush=True)
         # unittest reports import errors as errors; they are never skipped or accepted as success.
         suite = unittest.TestLoader().discover(str(root/'tests'), pattern=pattern)
-        result = unittest.TextTestRunner(verbosity=2).run(suite)
+        # Docker merges stdout/stderr asynchronously; keep progress and the final
+        # line-anchored JSON report on one stream so a partial test line cannot
+        # swallow the marker during log multiplexing.
+        result = unittest.TextTestRunner(stream=sys.stdout, verbosity=2).run(suite)
         report.update(counts(result, expected))
     except Exception as error:
-        traceback.print_exc()
+        traceback.print_exc(file=sys.stdout)
         report.update(setupError=f'{type(error).__name__}: {error}', tests=0, executed=0, passed=0,
                       failures=0, errors=1, skipped=0)
     print(MARKER + json.dumps(report, sort_keys=True), flush=True)

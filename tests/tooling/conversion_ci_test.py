@@ -1,11 +1,15 @@
 """Standard-library-only checks for conversion CI gates; no substitute converters."""
 import importlib.util
+import contextlib
+import io
+import json
 from pathlib import Path
 import tempfile
 import os
 import shutil
 import subprocess
 import unittest
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[2]/'scripts/ci/conversion.py'
 spec = importlib.util.spec_from_file_location('conversion_ci', SCRIPT)
@@ -60,6 +64,35 @@ class ConversionGate(unittest.TestCase):
             self.assertIsNone(module.read_report(path))
             path.write_text('build failed\n'); self.assertIsNone(module.read_report(path))
             path.write_text(module.MARKER+'bad json\n'); self.assertIsNone(module.read_report(path))
+            path.write_text('test progress ... '+module.MARKER+json.dumps({'valid': True})+'\n')
+            self.assertIsNone(module.read_report(path))
+
+    def test_progress_traceback_and_report_share_stdout_and_keep_failure_evidence(self):
+        def passing(): pass
+        def failing(): raise AssertionError('synthetic conversion failure')
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)/'result.log'
+            for fail in (False, True):
+                with self.subTest(fail=fail):
+                    suite = unittest.TestSuite([unittest.FunctionTestCase(passing), unittest.FunctionTestCase(passing), unittest.FunctionTestCase(failing if fail else passing)])
+                    stdout, stderr = io.StringIO(), io.StringIO()
+                    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr), patch.object(module, 'preflight', return_value={}), patch.object(unittest.TestLoader, 'discover', return_value=suite):
+                        status = module.run('dem')
+                    self.assertEqual(status, 1 if fail else 0)
+                    self.assertEqual(stderr.getvalue(), '')
+                    self.assertIn('Ran 3 tests', stdout.getvalue())
+                    self.assertEqual(sum(line.startswith(module.MARKER) for line in stdout.getvalue().splitlines()), 1)
+                    path.write_text(stdout.getvalue()); report = module.read_report(path)
+                    self.assertEqual(report['valid'], not fail)
+                    self.assertEqual(report['passed'], 2 if fail else 3)
+                    self.assertEqual(report['failures'], 1 if fail else 0)
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr), patch.object(module, 'preflight', side_effect=RuntimeError('synthetic setup failure')):
+                self.assertEqual(module.run('dem'), 1)
+            self.assertEqual(stderr.getvalue(), '')
+            self.assertIn('Traceback', stdout.getvalue())
+            path.write_text(stdout.getvalue()); report = module.read_report(path)
+            self.assertFalse(report['valid']); self.assertEqual(report['errors'], 1)
 
 
 if __name__ == '__main__':
