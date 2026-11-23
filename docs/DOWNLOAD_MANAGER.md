@@ -78,7 +78,7 @@ ArcGIS는 실제 exportTilesAllowed, 좌표계/타일 크기, LOD, maxExportTile
 
 이전 버전의 `현재 리더가 지원하지 않는 TPKX/기타 형식` 오류는 URL 확장자 검사만으로도 발생했으므로 실제 파일이 TPKX였다는 증거가 아니다. 최신 코드를 `git pull --ff-only origin main`으로 받은 뒤 **토큰을 설정한 같은 PowerShell 창**에서 기존 CLI를 다시 실행한다. CLI가 worker 이미지를 자동 빌드하며 `--refresh` 없이 검증된 고도 원본을 재사용한다. 기존 ZIP/원본은 삭제하거나 확장자를 바꾸지 않는다. 수정 지원과 합성 테스트 통과는 실제 공식 TPK 다운로드·앱 표시 성공과 구분한다.
 
-Compact V1은 60바이트 bundle header 뒤의 4바이트 길이 레코드를 `.bundlx`의 5바이트 column-major offset으로 찾는다. offset60의 길이0 레코드도 정상적인 빈 타일일 수 있다. V2의 64바이트 header/index 한도를 V1에 적용하지 않으며, V1의 60 미만 위치·잘린 길이·파일 밖 payload·크기 초과와 실제 타일이 없는 패키지는 계속 거부한다. 앱 리더도 같은 V1 최소 위치를 적용한다. 형식 차이는 [독립 구현과 검증 기록](VALIDATION.md#20-후속-compact-v1-header60과-등록-충돌)에서 확인한다.
+Compact V1은 60바이트 bundle header 뒤의 4바이트 길이 레코드를 `.bundlx`의 5바이트 column-major offset으로 찾는다. offset60의 길이0 레코드도 정상적인 빈 타일일 수 있다. V2의 64바이트 header/index 한도를 V1에 적용하지 않으며, V1의 60 미만 위치·잘린 길이·파일 밖 payload·크기 초과와 실제 타일이 없는 패키지는 계속 거부한다. 앱 리더도 같은 V1 최소 위치를 적용한다. 빈 bundle만 있는 LOD는 실제 수신 LOD에 포함하지 않으며 요청한 LOD 전체가 실제 타일을 포함하는지 검사한다. 형식 차이는 [독립 구현과 검증 기록](VALIDATION.md#20-후속-compact-v1-header60과-등록-충돌)에서 확인한다.
 
 `등록 revision 충돌`은 요청 이후 다른 등록으로 active 상태가 변경됐을 때 기존 지도를 보호하는 검사다. ZIP/준비 패키지가 만들어져도 **자동 등록은 완료되지 않은 상태**이며 재다운로드나 active.json 삭제로 해결하지 않는다. 진행 중인 다른 작업이 끝난 뒤 `/downloads`를 다시 조회하고 해당 작업의 **준비된 지도 다시 등록**을 명시적으로 선택한다. 위성 검사에 실패해 고도만 포함된 ZIP에는 이 동작으로 위성이 추가되지 않는다. 위성 리더 수정 후에는 기존 고도를 재사용하는 새 작업에서 위성 검증/등록을 확인한다.
 

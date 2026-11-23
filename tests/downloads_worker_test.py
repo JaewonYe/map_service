@@ -349,4 +349,20 @@ class DownloadsWorker(unittest.TestCase):
         offline=Worker(self.worker.root,ROOT,NoNetwork());q={'version':1,'type':'activate','id':str(uuid.uuid4()),'createdAt':now(),'packageId':r['id'],'registryRevision':before['revision']};offline.process(q)
         self.assertEqual(self.status(q)['state'],'completed');self.assertEqual(self.worker.registry()['layers'],{'elevation':original['id'],'satellite':r['id']});self.assertEqual(digest(archive),saved_hash)
 
+    def test_28_empty_v1_bundle_is_not_a_downloaded_lod(self):
+        data,_=self.v1_fixture();target=io.BytesIO()
+        with zipfile.ZipFile(io.BytesIO(data)) as source,zipfile.ZipFile(target,'w') as archive:
+            for entry in source.infolist():
+                content=source.read(entry)
+                if entry.filename.endswith('conf.xml'):content=content.replace(b'</LODInfos>',('<LODInfo><LevelID>1</LevelID><Resolution>'+str(156543.03392804097/2**15)+'</Resolution></LODInfo></LODInfos>').encode())
+                archive.writestr(entry.filename,content)
+            stem='Layers/_alllayers/L01/R0000C0000';index=bytearray(16+16384*5+16)
+            for i in range(16384):index[16+i*5:21+i*5]=(60+i*4).to_bytes(5,'little')
+            archive.writestr(stem+'.bundlx',index);archive.writestr(stem+'.bundle',bytes(60+16384*4))
+        self.server.export_enabled=True;self.server.tpk=target.getvalue();path=self.root/'partial-lods.tpk';path.write_bytes(self.server.tpk)
+        self.assertEqual(validate_tpk(path)['zoomLevels'],[16])
+        r=self.request(('satellite',),levels={'satellite':{'min':15,'max':16},'elevation':{'min':8,'max':13}})
+        with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-v1-token'}),patch('providers.capabilities',return_value={'lods':{'15':1,'16':0},'maxTiles':1000,'attribution':'CC0 fixture'}):state=self.run_job(r)
+        self.assertEqual(state['state'],'failed');self.assertIn('실제 LOD가 누락',state['items']['satellite']['reason']);self.assertEqual(self.worker.registry()['layers'],{})
+
 if __name__=='__main__':unittest.main()

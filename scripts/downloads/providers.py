@@ -101,7 +101,7 @@ def validate_tpk(path,check=lambda:None):
             if not 0<=z<=19 or abs(resolution-156543.03392804097/2**z)>resolution*1e-5:raise WorkError('지원하지 않는 TPK LOD')
             bundles=[(k,i) for k,i in entries.items() if re.search(r'/l0*'+str(level)+r'/r[0-9a-f]+c[0-9a-f]+\.bundle$',k) and k.startswith(prefix+'_alllayers/')]
             if not bundles:continue
-            levels.append(z)
+            previous_records=tile_records
             for key,i in bundles:
                 bundle_count+=1
                 if i.file_size>512*1024**2:raise WorkError('TPK bundle 크기 제한 초과')
@@ -131,6 +131,7 @@ def validate_tpk(path,check=lambda:None):
                         off,size=refs[0];f.seek(off);magic=f.read(min(size,24))
                         if not (magic.startswith(b'\xff\xd8\xff') or magic.startswith(b'\x89PNG\r\n\x1a\n')):raise WorkError('TPK tile image 형식 오류')
                         samples+=1
+            if tile_records>previous_records:levels.append(z)
         if not levels or not samples:raise WorkError('실제 타일이 없는 TPK')
         e=xml(prefix+'conf.cdi');number=lambda k:float(get(k,e));xmin,xmax,ymin,ymax=map(number,('XMin','XMax','YMin','YMax'))
         ewkid=get('LatestWKID',e) or get('WKID',e)
