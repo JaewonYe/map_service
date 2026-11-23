@@ -106,8 +106,9 @@ def validate_tpk(path,check=lambda:None):
                 bundle_count+=1
                 if i.file_size>512*1024**2:raise WorkError('TPK bundle 크기 제한 초과')
                 with archive.open(i) as f:
-                    header=f.read(64)
-                    if len(header)!=64:raise WorkError('손상된 TPK bundle')
+                    header_size=64 if storage.endswith('V2') else 60
+                    header=f.read(header_size)
+                    if len(header)!=header_size:raise WorkError('손상된 TPK bundle')
                     if storage.endswith('V2'):
                         if struct.unpack_from('<II',header)!=(3,16384):raise WorkError('잘못된 Compact V2 header')
                         index=f.read(16384*8)
@@ -120,7 +121,7 @@ def validate_tpk(path,check=lambda:None):
                         for j in range(16384):
                             off=int.from_bytes(raw[j*5:j*5+5],'little')
                             if off:
-                                if off<64 or off+4>i.file_size:raise WorkError('TPK V1 offset 범위 오류')
+                                if off<60 or off+4>i.file_size:raise WorkError('TPK V1 offset 범위 오류')
                                 f.seek(off);size=struct.unpack('<I',f.read(4))[0]
                                 if size:refs.append((off+4,size))
                     for off,size in refs:

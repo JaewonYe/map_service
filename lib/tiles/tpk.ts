@@ -193,6 +193,7 @@ export class Tpk {
       if(!length)return null;if(offset<64+16384*8)throw new TileError('Tile points into index');
     }else{
       offset=table.readUIntLE(16+index*5,5);if(!offset)return null;
+      if(offset<60)throw new TileError('Invalid Compact V1 record offset');
       length=(await this.range(bundle,offset,4)).readUInt32LE();offset+=4;if(!length)return null;
     }
     if(length>20*1024*1024)throw new TileError('Tile exceeds 20 MiB limit');

@@ -63,6 +63,7 @@ class DownloadsWorker(unittest.TestCase):
         xml='<CacheInfo><TileCacheInfo><SpatialReference><WKID>3857</WKID></SpatialReference><TileCols>256</TileCols><TileRows>256</TileRows><TileOrigin><X>-20037508.342789244</X><Y>20037508.342789244</Y></TileOrigin><LODInfos><LODInfo><LevelID>0</LevelID><Resolution>'+str(156543.03392804097/2**16)+'</Resolution></LODInfo></LODInfos></TileCacheInfo><StorageFormat>esriMapCacheStorageModeCompactV2</StorageFormat><PacketSize>128</PacketSize></CacheInfo>'
         tpk=io.BytesIO()
         with zipfile.ZipFile(tpk,'w') as z:z.writestr('Layers/conf.xml',xml);z.writestr('Layers/conf.cdi','<EnvelopeN><WKID>4326</WKID><XMin>126.22</XMin><XMax>126.26</XMax><YMin>36.58</YMin><YMax>36.62</YMax></EnvelopeN>');z.writestr(f'Layers/_alllayers/L00/R{y//128*128:04x}C{x//128*128:04x}.bundle',bundle)
+        cls.tpk_bytes=tpk.getvalue()
         cls.server=socketserver.TCPServer(('127.0.0.1',0),Handler);cls.server.pbf=cls.pbf;cls.server.dem=dem.read_bytes();cls.server.tpk=tpk.getvalue();cls.server.export_enabled=False;cls.server.required_referer=None;cls.server.seen_headers=[];cls.server.export_extension='tpk';cls.server.checksum=hashlib.md5(cls.pbf).hexdigest();cls.server.truncate=False
         cls.server.export_value=None;cls.server.export_directory='/arcgis/rest/directories/arcgisoutput/World_Imagery_MapServer/_agsfixture';cls.server.export_listing=b'';cls.server.required_export_token=None;cls.server.seen_queries=[]
         cls.server.export_results={'out':{'paramUrl':'results/out'}}
@@ -74,10 +75,29 @@ class DownloadsWorker(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.root=pathlib.Path(self.temp.name);self.addCleanup(self.temp.cleanup);self.worker=Worker(self.root/'downloads',ROOT,Transport(self.server));self.server.checksum=hashlib.md5(self.pbf).hexdigest();self.server.truncate=False;self.server.export_enabled=False;self.server.required_referer=None;self.server.seen_headers=[];self.server.export_extension='tpk'
         self.server.export_value=None;self.server.export_directory='/arcgis/rest/directories/arcgisoutput/World_Imagery_MapServer/_agsfixture';self.server.export_listing=b'';self.server.required_export_token=None;self.server.seen_queries=[]
         self.server.export_results={'out':{'paramUrl':'results/out'}}
+        self.server.tpk=self.tpk_bytes
     def request(self,kinds=('osm','elevation'),**extra):
         return {'version':1,'type':'download','id':str(uuid.uuid4()),'createdAt':now(),'name':'CC0 다운로드 검사','bounds':{'west':126.23,'south':36.59,'east':126.25,'north':36.61},'kinds':list(kinds),'region':'south-korea','demProvider':'aws','levels':{'satellite':{'min':0,'max':13},'elevation':{'min':12,'max':13}},'accepted':dict.fromkeys(kinds,True),'registryRevision':0,**extra}
     def status(self,request):return read_json(self.worker.root/'jobs'/(request['id']+'.state.json'))
     def run_job(self,request):self.worker.process(request);return self.status(request)
+    def v1_fixture(self,empty_records=True):
+        """CC0 pixels: 60-byte V1 header, optional nonzero zero-length pointers."""
+        x=math.floor((126.240136+180)/360*2**16);y=math.floor((1-math.asinh(math.tan(math.radians(36.597889)))/math.pi)/2*2**16)
+        header=bytearray(60+(16384*4 if empty_records else 0));struct.pack_into('<II',header,0,3,16384)
+        index=bytearray(16+16384*5+16)
+        if empty_records:
+            for i in range(16384):index[16+i*5:21+i*5]=(60+i*4).to_bytes(5,'little')
+        record=(x%128)*128+y%128;index[16+record*5:21+record*5]=len(header).to_bytes(5,'little')
+        jpg=(ROOT/'tests/fixtures/satellite.jpg').read_bytes();bundle=bytes(header)+struct.pack('<I',len(jpg))+jpg
+        output=io.BytesIO()
+        with zipfile.ZipFile(io.BytesIO(self.tpk_bytes)) as source,zipfile.ZipFile(output,'w',compression=zipfile.ZIP_DEFLATED) as target:
+            for entry in source.infolist():
+                data=source.read(entry)
+                if entry.filename.endswith('conf.xml'):data=data.replace(b'esriMapCacheStorageModeCompactV2',b'esriMapCacheStorageModeCompact')
+                if entry.filename.endswith('.bundle'):
+                    data=bundle;target.writestr(entry.filename[:-7]+'.bundlx',index)
+                target.writestr(entry.filename,data)
+        return output.getvalue(),record
     def test_01_real_fixture_download_prepare_activate_and_isolated_offline_import(self):
         r=self.request();s=self.run_job(r);self.assertEqual(s['state'],'completed',s);self.assertTrue(s['registered']);self.assertEqual(set(self.worker.registry()['layers']),{'osm','elevation'})
         source=self.worker.root/'packages'/s['packageId'];manifest=portable.validate(source,Context());self.assertEqual(manifest['items']['elevation']['units'],'m');self.assertEqual(manifest['items']['elevation']['verticalDatum'],'EGM2008 orthometric height')
@@ -287,5 +307,46 @@ class DownloadsWorker(unittest.TestCase):
         with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-token'}):state=self.run_job(r)
         self.assertEqual(state['state'],'failed');self.assertIn('TPKX',state['items']['satellite']['reason']);self.assertEqual(self.worker.registry()['layers'],{})
         self.assertTrue(any(path.endswith('/jobs/fixture-job/cancel') for path,_ in self.server.seen_queries));self.assertFalse(list(self.worker.root.rglob('*.tpk')))
+
+    def test_25_v1_header60_and_nonzero_empty_records_export_register_and_offline_reuse(self):
+        self.server.export_enabled=True;self.server.export_value='https://tiledbasemaps.arcgis.com'+self.server.export_directory
+        self.server.export_listing=b'{"files":[{"name":"layer.tpk"}]}'
+        for empty_records in (False,True):
+            with self.subTest(empty_records=empty_records):
+                self.worker=Worker(self.root/str(empty_records),ROOT,Transport(self.server));self.server.tpk,_=self.v1_fixture(empty_records)
+                r=self.request(('satellite',),levels={'satellite':{'min':16,'max':16},'elevation':{'min':8,'max':13}})
+                with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-v1-token'}):state=self.run_job(r)
+                self.assertEqual(state['state'],'completed',state);self.assertTrue(state['registered'])
+                metadata=state['items']['satellite']['result'];self.assertEqual(metadata['format'],'TPK CompactV1');self.assertEqual(metadata['nonEmptyTileRecords'],1);self.assertEqual(metadata['zoomLevels'],[16]);self.assertEqual(metadata['download']['bytes'],len(self.server.tpk))
+                portable.validate(self.worker.root/'packages'/r['id'],Context())
+                other=Worker(self.worker.root,ROOT,NoNetwork());q={**r,'id':str(uuid.uuid4()),'registryRevision':1};other.process(q);again=self.status(q)
+                self.assertEqual(again['state'],'completed',again);self.assertEqual(again['items']['satellite']['result']['download']['networkBytes'],0)
+
+    def test_26_v1_header_index_record_bounds_and_empty_cache_remain_rejected(self):
+        data,record=self.v1_fixture(False)
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:members={i.filename:archive.read(i) for i in archive.infolist()}
+        bundle=next(n for n in members if n.endswith('.bundle'));index=bundle[:-7]+'.bundlx'
+        for mode in ('header','index','low-offset','end-offset','large-size','end-size','empty'):
+            with self.subTest(mode=mode):
+                changed={k:bytearray(v) for k,v in members.items()}
+                if mode=='header':changed[bundle]=changed[bundle][:59]
+                elif mode=='index':changed[index]=changed[index][:-1]
+                elif mode in ('low-offset','end-offset'):changed[index][16+record*5:21+record*5]=(59 if mode=='low-offset' else len(changed[bundle])-3).to_bytes(5,'little')
+                elif mode in ('large-size','end-size'):struct.pack_into('<I',changed[bundle],60,20*1024**2+1 if mode=='large-size' else len(changed[bundle]))
+                else:struct.pack_into('<I',changed[bundle],60,0)
+                path=self.root/(mode+'.tpk')
+                with zipfile.ZipFile(path,'w') as target:
+                    for name,content in changed.items():target.writestr(name,content)
+                with self.assertRaises(WorkError):validate_tpk(path)
+
+    def test_27_registration_change_preserves_v1_package_zip_and_existing_active_map(self):
+        original=self.request(('elevation',));self.assertEqual(self.run_job(original)['state'],'completed');before=self.worker.registry()
+        self.server.export_enabled=True;self.server.tpk,_=self.v1_fixture()
+        r=self.request(('satellite',),levels={'satellite':{'min':16,'max':16},'elevation':{'min':8,'max':13}})
+        with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-v1-token'}):state=self.run_job(r)
+        self.assertEqual(state['state'],'partial',state);self.assertFalse(state.get('registered',False));self.assertEqual(state['items']['satellite']['state'],'completed');self.assertEqual(self.worker.registry(),before)
+        source=self.worker.root/'packages'/r['id'];archive=self.worker.root/'exports'/(r['id']+'.zip');saved_hash=digest(archive);portable.validate(source,Context())
+        offline=Worker(self.worker.root,ROOT,NoNetwork());q={'version':1,'type':'activate','id':str(uuid.uuid4()),'createdAt':now(),'packageId':r['id'],'registryRevision':before['revision']};offline.process(q)
+        self.assertEqual(self.status(q)['state'],'completed');self.assertEqual(self.worker.registry()['layers'],{'elevation':original['id'],'satellite':r['id']});self.assertEqual(digest(archive),saved_hash)
 
 if __name__=='__main__':unittest.main()

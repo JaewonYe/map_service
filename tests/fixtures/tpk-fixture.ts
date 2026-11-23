@@ -21,7 +21,7 @@ export function zip(files:Array<{name:string;bytes:Buffer}>,compressed=false){
   const directory=Buffer.concat(central),end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50);end.writeUInt16LE(files.length,8);end.writeUInt16LE(files.length,10);end.writeUInt32LE(directory.length,12);end.writeUInt32LE(offset,16);
   return Buffer.concat([...records,directory,end]);
 }
-export async function makeTpk(directory:string,version:1|2=2,compressed=false,badOffset=false){
+export async function makeTpk(directory:string,version:1|2=2,compressed=false,badOffset=false,v1MissingRecords=false){
   await mkdir(directory,{recursive:true});const jpeg=await readFile(new URL('./satellite.jpg',import.meta.url));const picture=png();
   const files:Array<{name:string;bytes:Buffer}>=[];
   const lods=[15,16,17].map((z,i)=>`<LODInfo><LevelID>${i}</LevelID><Resolution>${156543.03392804097/2**z}</Resolution></LODInfo>`).join('');
@@ -31,13 +31,14 @@ export async function makeTpk(directory:string,version:1|2=2,compressed=false,ba
   for(const [level,z] of [15,16,17].entries()){
     const {x,y}=coordinate(z),row=Math.floor(y/128)*128,col=Math.floor(x/128)*128;
     const stem=`v101/Layers/_alllayers/L${String(level).padStart(2,'0')}/R${row.toString(16).padStart(4,'0')}C${col.toString(16).padStart(4,'0')}`;
-    const header=Buffer.alloc(version===2?64+16384*8:64);header.writeUInt32LE(3);header.writeUInt32LE(16384,4);
+    const header=Buffer.alloc(version===2?64+16384*8:60+(v1MissingRecords?16384*4:0));header.writeUInt32LE(3);header.writeUInt32LE(16384,4);
     const bundlx=Buffer.alloc(16+16384*5+16);let offset=header.length;const parts:Buffer[]=[header];
+    if(version===1&&v1MissingRecords)for(let i=0;i<16384;i++)bundlx.writeUIntLE(60+i*4,16+i*5,5);
     for(const [dx,dy,bytes] of [[0,0,jpeg],[1,1,picture]] as Array<[number,number,Buffer]>){
       const index=version===1?((x+dx)%128)*128+(y+dy)%128:((y+dy)%128)*128+(x+dx)%128;
       const size=Buffer.alloc(4);size.writeUInt32LE(bytes.length);parts.push(size,bytes);
       if(version===2)header.writeBigUInt64LE((BigInt(bytes.length)<<40n)|BigInt(badOffset?header.length+99999999:offset+4),64+index*8);
-      else bundlx.writeUIntLE(offset,16+index*5,5);
+      else bundlx.writeUIntLE(badOffset?59:offset,16+index*5,5);
       offset+=4+bytes.length;
     }
     files.push({name:stem+'.bundle',bytes:Buffer.concat(parts)});if(version===1)files.push({name:stem+'.bundlx',bytes:bundlx});

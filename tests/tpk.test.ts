@@ -33,6 +33,23 @@ test('corrupt Compact V2 offsets cannot read outside the member',async()=>{
   try{const fixture=await makeTpk(directory,2,false,true);reader=await Tpk.load(fixture.path);process.env.TPK_USAGE_CONFIRMED='true';const c=coordinate(16);await assert.rejects(reader.tile(16,c.x,c.y),/offset/);}
   finally{reader?.close();await rm(directory,{recursive:true,force:true});}
 });
+for(const compressed of [false,true])test(`Compact V1 nonzero empty records return no tile, compressed=${compressed}`,async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'tpk-v1-empty-'));let reader:Tpk|undefined;
+  try{
+    const fixture=await makeTpk(directory,1,compressed,false,true);reader=await Tpk.load(fixture.path,join(directory,'cache'),{usageConfirmed:true});
+    const c=coordinate(16);
+    assert.deepEqual((await reader.tile(16,c.x,c.y))?.bytes,fixture.jpeg);
+    assert.equal(await reader.tile(16,c.x+1,c.y),null);
+    assert.deepEqual((await reader.tile(16,c.x+1,c.y+1))?.bytes,fixture.png);
+  }finally{reader?.close();await rm(directory,{recursive:true,force:true});}
+});
+test('Compact V1 records pointing inside the 60-byte header are rejected',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'tpk-v1-header-'));let reader:Tpk|undefined;
+  try{
+    const fixture=await makeTpk(directory,1,false,true);reader=await Tpk.load(fixture.path,join(directory,'cache'),{usageConfirmed:true});
+    const c=coordinate(16);await assert.rejects(reader.tile(16,c.x,c.y),/record offset/);
+  }finally{reader?.close();await rm(directory,{recursive:true,force:true});}
+});
 
 test('OSM is unavailable offline unless a permitted local tile directory is configured',async()=>{
   const {osmInfo,osmTile}=await import('../lib/tiles/osm');
