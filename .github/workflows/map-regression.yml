@@ -64,6 +64,10 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - name: Use official HTTPS Ubuntu mirror for browser dependencies
+        run: |
+          test -f /etc/apt/apt-mirrors.txt
+          printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
       - run: npx playwright install --with-deps chromium
       # Existing configuration creates synthetic fixtures, builds once, and manages five servers.
       - name: Run all Playwright projects
