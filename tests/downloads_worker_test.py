@@ -5,7 +5,7 @@ ROOT=pathlib.Path(os.getenv('DOWNLOAD_CODE_ROOT',pathlib.Path(__file__).resolve(
 sys.path.insert(0,str(ROOT/'scripts/downloads'));sys.path.insert(0,str(ROOT/'tests'))
 from common import *
 from worker import Worker
-from providers import validate_tpk, secret
+from providers import validate_tpk, secret, capabilities
 import export_result
 import package as portable
 from osm_fixture import write_fixture
@@ -21,7 +21,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.server.seen_queries.append((name,urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)))
         if self.server.required_export_token and (name==self.server.export_directory or name.endswith('.tpk')) and urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('token')!=[self.server.required_export_token]:data=b'{"error":{"code":499}}'
         elif self.server.required_referer and (name.startswith('/arcgis/') or name.endswith('.tpk')) and self.headers.get('Referer')!=self.server.required_referer:data=b'{"error":{"code":498}}'
-        elif self.server.export_enabled and name.endswith('/MapServer'):data=json.dumps({'exportTilesAllowed':True,'maxExportTilesCount':1000,'tileInfo':{'rows':256,'cols':256,'spatialReference':{'wkid':3857},'lods':[{'level':0,'resolution':156543.03392804097/2**16}]}}).encode()
+        elif self.server.export_enabled and name.endswith('/MapServer'):data=json.dumps({'exportTilesAllowed':True,'maxExportTilesCount':self.server.export_max_tiles,'tileInfo':{'rows':256,'cols':256,'spatialReference':{'wkid':3857},'lods':self.server.export_lods}}).encode()
         elif self.server.export_enabled and name.endswith('/exportTiles'):data=b'{"jobId":"fixture-job","jobStatus":"esriJobSubmitted"}'
         elif self.server.export_enabled and name.endswith('/jobs/fixture-job'):data=json.dumps({'jobStatus':'esriJobSucceeded','results':self.server.export_results}).encode()
         elif self.server.export_enabled and name.endswith('/results/out'):data=json.dumps({'value':self.server.export_value or {'url':'https://tiledbasemaps.arcgis.com/export/map.'+self.server.export_extension}}).encode()
@@ -67,6 +67,7 @@ class DownloadsWorker(unittest.TestCase):
         cls.server=socketserver.TCPServer(('127.0.0.1',0),Handler);cls.server.pbf=cls.pbf;cls.server.dem=dem.read_bytes();cls.server.tpk=tpk.getvalue();cls.server.export_enabled=False;cls.server.required_referer=None;cls.server.seen_headers=[];cls.server.export_extension='tpk';cls.server.checksum=hashlib.md5(cls.pbf).hexdigest();cls.server.truncate=False
         cls.server.export_value=None;cls.server.export_directory='/arcgis/rest/directories/arcgisoutput/World_Imagery_MapServer/_agsfixture';cls.server.export_listing=b'';cls.server.required_export_token=None;cls.server.seen_queries=[]
         cls.server.export_results={'out':{'paramUrl':'results/out'}}
+        cls.server.export_max_tiles=1000;cls.server.export_lods=[{'level':0,'resolution':156543.03392804097/2**16}]
         cls.thread=threading.Thread(target=cls.server.serve_forever,daemon=True);cls.thread.start()
     @classmethod
     def tearDownClass(cls):cls.server.shutdown();cls.server.server_close();cls.tmp.cleanup()
@@ -75,6 +76,7 @@ class DownloadsWorker(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.root=pathlib.Path(self.temp.name);self.addCleanup(self.temp.cleanup);self.worker=Worker(self.root/'downloads',ROOT,Transport(self.server));self.server.checksum=hashlib.md5(self.pbf).hexdigest();self.server.truncate=False;self.server.export_enabled=False;self.server.required_referer=None;self.server.seen_headers=[];self.server.export_extension='tpk'
         self.server.export_value=None;self.server.export_directory='/arcgis/rest/directories/arcgisoutput/World_Imagery_MapServer/_agsfixture';self.server.export_listing=b'';self.server.required_export_token=None;self.server.seen_queries=[]
         self.server.export_results={'out':{'paramUrl':'results/out'}}
+        self.server.export_max_tiles=1000;self.server.export_lods=[{'level':0,'resolution':156543.03392804097/2**16}]
         self.server.tpk=self.tpk_bytes
     def request(self,kinds=('osm','elevation'),**extra):
         return {'version':1,'type':'download','id':str(uuid.uuid4()),'createdAt':now(),'name':'CC0 다운로드 검사','bounds':{'west':126.23,'south':36.59,'east':126.25,'north':36.61},'kinds':list(kinds),'region':'south-korea','demProvider':'aws','levels':{'satellite':{'min':0,'max':13},'elevation':{'min':12,'max':13}},'accepted':dict.fromkeys(kinds,True),'registryRevision':0,**extra}
@@ -389,5 +391,34 @@ class DownloadsWorker(unittest.TestCase):
                     path=self.root/'bad-lods.tpk';path.write_bytes(metadata(data,resolution,actual))
                     with self.assertRaises(WorkError) as error:validate_tpk(path)
                     if actual:self.assertIn('XYZ=20',str(error.exception))
+
+    def test_30_national_satellite_export_uses_actual_service_limit_and_keeps_dem_limits(self):
+        country={'west':124,'south':33,'east':132,'north':39.5};lods=[{'level':z,'resolution':156543.03392804097/2**z} for z in range(14)]
+        request=self.request(('satellite',),bounds=country,levels={'satellite':{'min':0,'max':13},'elevation':{'min':8,'max':13}})
+        self.assertEqual(tile_count(country,0,13),45048);validate_request(copy.deepcopy(request))
+        excessive=copy.deepcopy(request);excessive['levels']['satellite']['max']=14
+        with self.assertRaisesRegex(WorkError,'150,000'):validate_request(excessive)
+        dem=copy.deepcopy(request);dem['kinds'].append('elevation');dem['accepted']['elevation']=True
+        with self.assertRaisesRegex(WorkError,'10,000'):validate_request(dem)
+        # Sparse CC0 fixtures exercise the national request; these are not
+        # 45,048 actual tiles and are never evidence of real Korean imagery.
+        lod_xml=''.join('<LODInfo><LevelID>'+str(l['level'])+'</LevelID><Resolution>'+str(l['resolution'])+'</Resolution></LODInfo>' for l in lods)
+        xml='<CacheInfo><TileCacheInfo><SpatialReference><WKID>3857</WKID></SpatialReference><TileCols>256</TileCols><TileRows>256</TileRows><TileOrigin><X>-20037508.342789244</X><Y>20037508.342789244</Y></TileOrigin><LODInfos>'+lod_xml+'</LODInfos></TileCacheInfo><StorageFormat>esriMapCacheStorageModeCompact</StorageFormat><PacketSize>128</PacketSize></CacheInfo>'
+        jpg=(ROOT/'tests/fixtures/satellite.jpg').read_bytes();header=bytearray(60);struct.pack_into('<II',header,0,3,16384);output=io.BytesIO()
+        with zipfile.ZipFile(output,'w',compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr('Layers/conf.xml',xml);archive.writestr('Layers/conf.cdi','<EnvelopeN><WKID>4326</WKID><XMin>124</XMin><XMax>132</XMax><YMin>33</YMin><YMax>39.5</YMax></EnvelopeN>')
+            for z in range(14):
+                x=math.floor((126.240136+180)/360*2**z);y=math.floor((1-math.asinh(math.tan(math.radians(36.597889)))/math.pi)/2*2**z)
+                index=bytearray(16+16384*5+16);i=(x%128)*128+y%128;index[16+i*5:21+i*5]=(60).to_bytes(5,'little')
+                stem=f'Layers/_alllayers/L{z:02d}/R{y//128*128:04x}C{x//128*128:04x}';archive.writestr(stem+'.bundlx',index);archive.writestr(stem+'.bundle',bytes(header)+struct.pack('<I',len(jpg))+jpg)
+        self.server.export_enabled=True;self.server.export_lods=lods;self.server.export_max_tiles=150000;self.server.tpk=output.getvalue()
+        with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-national-token'}):state=self.run_job(request)
+        self.assertEqual(state['state'],'completed',state);self.assertTrue(state['registered']);self.assertEqual(state['items']['satellite']['result']['zoomLevels'],list(range(14)));self.assertEqual(state['items']['satellite']['result']['nonEmptyTileRecords'],14)
+        self.assertEqual(self.server.last_form['levels'],[','.join(map(str,range(14)))]);self.assertEqual(json.loads(self.server.last_form['exportExtent'][0])['spatialReference']['wkid'],3857)
+        before=self.worker.registry();self.server.export_max_tiles=500000;self.assertEqual(capabilities(Transport(self.server),'fixture-national-token')['maxTiles'],150000)
+        self.server.export_max_tiles=20000;self.server.seen_queries=[]
+        lower={**request,'id':str(uuid.uuid4()),'registryRevision':before['revision'],'refresh':True}
+        with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-national-token'}):blocked=self.run_job(lower)
+        self.assertEqual(blocked['state'],'failed');self.assertIn('20,000',blocked['items']['satellite']['reason']);self.assertIn('45,048',blocked['items']['satellite']['reason']);self.assertFalse(any(p.endswith('/exportTiles') for p,_ in self.server.seen_queries));self.assertEqual(self.worker.registry(),before)
 
 if __name__=='__main__':unittest.main()

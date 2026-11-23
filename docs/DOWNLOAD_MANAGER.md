@@ -113,7 +113,23 @@ DEM은 단일 수치 밴드 GTiff인지 검사하며 RGB/Byte 영상을 받지 �
 
 기존 시설/경계, 원본 PBF/TPK/DEM/catalog와 OSM_EDITS_DIR를 수정하지 않는다. managed OSM의 source_key/fingerprint로 기존 수정 내역을 재적용하고 원본 변경/삭제 시 #18 충돌 흐름을 유지한다. ‘기존 파일 기반 지도 사용’은 활성 managed 선택을 해제하며 패키지/원본을 삭제하지 않는다. 백업은 다운로드 폴더, 원본 두 폴더, 기존 시설/OSM 수정 내역을 각각 포함한다. 실행 중 active/현재 package를 수동 정리하지 않는다.
 
-앱 자체 제한: bbox 각 축15도·위도±85도, 레이어별 후보10,000타일, OpenTopography 요청1,000km², AWS 원본4×4도, 원본/ZIP 단일2GiB·작업 수신/해제4GiB·여유512MiB, 작업2시간·개별 전송/도구/export대기30분·HTTP연결20초. 이 수치는 제공처의 계약/할당량이 아니다. 제공처 429 Retry-After는 디스크에 기록하고 대기 전 재요청을 차단한다. 대기/실행10개·보관 기록100개·업로드 동시2개, ZIP50,000파일·압축률1,000 한도다. 웹 업로드는 스트리밍·용량/디스크/중단 청소를 제공하지만 별도 유휴 업로드 제한/자동 보관기간 삭제는 없다.
+앱 자체 제한: bbox 각 축15도·위도±85도, **위성 후보150,000타일/고도 표시 후보10,000타일**, OpenTopography 요청1,000km², AWS 원본4×4도, 원본/ZIP 단일2GiB·작업 수신/해제4GiB·여유512MiB, 작업2시간·개별 전송/도구/export대기30분·HTTP연결20초. 실제 위성 export 한도는 `min(현재 서비스 maxExportTilesCount,150000)`이며 현재 계정/서비스를 worker가 매 요청에서 확인한다. 이 앱 제한은 제공처 계약/할당량을 대체하지 않는다. 제공처 429 Retry-After는 디스크에 기록하고 대기 전 재요청을 차단한다. 대기/실행10개·보관 기록100개·업로드 동시2개, ZIP50,000파일·압축률1,000 한도다. 웹 업로드는 스트리밍·용량/디스크/중단 청소를 제공하지만 별도 유휴 업로드 제한/자동 보관기간 삭제는 없다.
+
+### 대한민국 위성 level0–13
+
+기존 `위성 작업은 최대10,000타일`은 앱의 위성/고도 공통 상한이었다. 위성만 별도 상한으로 분리했으며 [공식 World Imagery export 항목](https://www.arcgis.com/home/item.html?id=226d23f076da478bba4589e7eae95952)은 요청당150,000타일을 안내한다. [일반 REST 문서](https://developers.arcgis.com/rest/services-reference/enterprise/export-tiles-map-service/)의 기본값100,000과 특정 서비스의 실제 값을 구분하고, worker는 실제 서비스가 더 작은 값을 반환하면 export 제출 전에 거부한다. 계정별 허용 범위와 기존 오프라인 표시/이전 조건은 그대로 적용한다. 한도 우회용 분할 export나 공개 타일 수집은 추가하지 않는다.
+
+`/downloads`에서 **위성만 선택**하고 기존 영역 선택/고급 좌표와 level 범위를 사용한다. 예를 들어 서124/남33/동132/북39.5 사각형은 level0–11=2,912,0–12=11,376,0–13=45,048 후보 타일이다. 국경 Polygon clip이 아니므로 주변 바다/일부 주변 지역도 포함한다. 실제 선택 좌표에 따라 개수가 달라지며 후보 수는 실제 파일 크기/수신량/시간/coverage 보장이 아니다. 이 범위의 level0–14는 앱150,000 한도를 초과한다. 서비스의 실제 한도가 충분하면0–13을 단일 공식 export로 요청한다. 고도를 함께 선택하면 기존 고도 타일/면적 한도가 별도로 적용된다.
+
+업데이트 후 web과 worker를 모두 새 코드로 빌드해야 한다. 기존 `.env`의 web 접속 포트와 데이터를 유지하며, worker 인증값은 같은 PowerShell 환경변수 또는 `.env.downloads`로 전달한다. 기본 다운로드 경로를 쓰는 경우 다음을 실행할 수 있다. 사용자 지정 경로가 있으면 web/worker의 MAP_DOWNLOADS_HOST_DIR가 같아야 한다.
+
+```powershell
+git pull --ff-only origin main
+docker compose up -d --build web
+docker compose --env-file .env.downloads --profile downloads up -d --build download-worker
+```
+
+worker가 갱신한 지원 LOD/최대 타일 정보를 확인하고 영역·작업량 확인 후 요청한다. 새 국가 패키지 등록은 현행 단일 active 위성 선택을 교체하며 이전 태안 원본/준비 패키지/ZIP을 삭제하지 않는다. 국가 개요와 태안 고해상도 패키지를 자동 병합하는 기능을 추가한 것은 아니다. 대한민국 전체 공식 원본 다운로드/coverage/앱 표시는 사용자 PC에서 별도 검증할 항목이다.
 
 ## 내부 API / 설정 호환성
 

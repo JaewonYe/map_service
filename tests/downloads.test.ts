@@ -4,10 +4,11 @@ import {mkdtemp,rm,readFile,writeFile,mkdir,symlink,readdir} from 'node:fs/promi
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {randomUUID,createHash} from 'node:crypto';
-import {parsePlan,parseBounds,tileCount,areaKm2} from '../lib/downloads/model';
+import {parsePlan,parseBounds,tileCount,areaKm2,regions,tileLimits} from '../lib/downloads/model';
 import {registry,managedDirectory} from '../lib/downloads/active';
 import {submit,listJobs,cancel,atomic,readJob,upload} from '../lib/downloads/server';
 import {GET,POST} from '../app/api/downloads/route';
+import {POST as PLAN} from '../app/api/downloads/plan/route';
 import {getOsmIndex} from '../lib/osm/index';
 import {editView,change} from '../lib/osm/edit-service';
 import {getElevation} from '../lib/maps/elevation';
@@ -22,6 +23,18 @@ test('bounded plan validates sources levels acceptance finite geometry precision
  assert.equal(parsePlan(plan()).name,'CC0 준비');assert.equal(tileCount({west:-1,south:-1,east:1,north:1},0,1),5);assert.ok(areaKm2({west:0,south:0,east:1,north:1})>12000);
  for(const patch of [{name:''},{region:'https://evil.test/a.pbf'},{kinds:['osm','osm']},{accepted:{}},{bounds:{west:0,south:0,east:50,north:1}},{kinds:['satellite'],accepted:{satellite:true},bounds:{west:126,south:36,east:127,north:37},levels:{satellite:{min:0,max:19},elevation:{min:8,max:13}}}])assert.throws(()=>parsePlan({...plan(),...patch}));
  assert.throws(()=>parseBounds({west:126,south:36,east:126.000000001,north:36.01}));
+});
+test('South Korea satellite levels0–13 pass the real plan and queue API while DEM and larger requests stay bounded',async t=>{
+ const root=await fixture(t),bounds=regions['south-korea'].bounds;
+ const korea={...plan(),name:'대한민국 위성 개요',bounds,kinds:['satellite'],accepted:{satellite:true},levels:{satellite:{min:0,max:13},elevation:{min:8,max:13}}};
+ assert.equal(tileCount(bounds,0,13),45048);assert.equal(tileCount(bounds,0,12),11376);assert.equal(tileLimits.satellite,150000);assert.equal(tileLimits.elevation,10000);
+ assert.deepEqual(parsePlan(korea).levels.satellite,{min:0,max:13});
+ const request=(data:any)=>new Request('http://localhost/api/downloads/plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+ const estimate=await PLAN(request(korea));assert.equal(estimate.status,200);const body=await estimate.json();assert.equal(body.tileCounts.satellite,45048);assert.equal(body.bytesEstimate,null);assert.equal(body.timeEstimate,null);
+ const queued=await POST(request(korea));assert.equal(queued.status,202);const job=await queued.json();assert.deepEqual(JSON.parse(await readFile(join(root,'jobs',job.id+'.request.json'),'utf8')).bounds,bounds);
+ const larger={...korea,levels:{...korea.levels,satellite:{min:0,max:14}}};const rejected=await PLAN(request(larger));assert.equal(rejected.status,422);assert.match((await rejected.json()).error,/150,000/);
+ const dem={...korea,kinds:['satellite','elevation'],accepted:{satellite:true,elevation:true}};assert.throws(()=>parsePlan(dem),/고도.*10,000/);
+ assert.equal((await listJobs()).length,1);
 });
 test('actual job API persists immutable queue requests across independent reads and enforces origin size and JSON',async t=>{
  const root=await fixture(t),request=(data:any,headers={})=>new Request('http://localhost/api/downloads',{method:'POST',headers:{'Content-Type':'application/json',...headers},body:typeof data==='string'?data:JSON.stringify(data)});

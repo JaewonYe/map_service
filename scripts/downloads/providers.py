@@ -51,7 +51,7 @@ def capabilities(net,token=None):
         if 0<=z<=19 and abs(resolution-156543.03392804097/2**z)<resolution*1e-5:lods[str(z)]=l['level']
     maximum=m.get('maxExportTilesCount')
     if not lods or type(maximum) is not int or maximum<1:raise WorkError('서비스의 실제 LOD/export 타일 한도를 확인할 수 없습니다.')
-    return {'state':'ready','lods':lods,'maxTiles':min(maximum,10000),'source':ARCGIS,'checkedAt':now(),'attribution':'Esri, Maxar, Earthstar Geographics, and the GIS User Community'}
+    return {'state':'ready','lods':lods,'maxTiles':min(maximum,TILE_LIMITS['satellite']),'source':ARCGIS,'checkedAt':now(),'attribution':'Esri, Maxar, Earthstar Geographics, and the GIS User Community'}
 
 def probe(net,heartbeat=lambda:None):
     try:satellite=capabilities(net,credentials())
@@ -225,7 +225,8 @@ def satellite(ctx,out):
     c=capabilities(ctx.net,token)
     levels=ctx.request['levels']['satellite'];b=ctx.request['bounds'];selected=list(range(levels['min'],levels['max']+1))
     if any(str(z) not in c['lods'] for z in selected):raise WorkError('선택 level은 서비스가 실제 지원하는 LOD가 아닙니다.')
-    if tile_count(b,levels['min'],levels['max'])>c['maxTiles']:raise WorkError('서비스 export 타일 수 제한 초과')
+    count=tile_count(b,levels['min'],levels['max'])
+    if count>c['maxTiles']:raise WorkError(f"위성 후보{count:,}타일이 현재 서비스·앱 export 한도{c['maxTiles']:,}타일을 초과합니다. 영역이나 상세도를 줄이세요.")
     ctx.stage('download','공식 exportTiles 작업 제출')
     response=arc(ctx.net,'/exportTiles',{'tilePackage':'true','storageFormatType':'esriMapCacheStorageModeCompact','exportBy':'LevelID','levels':','.join(str(c['lods'][str(z)]) for z in selected),'exportExtent':json.dumps({'xmin':b['west']/180*WORLD,'ymin':math.log(math.tan(math.pi/4+math.radians(b['south'])/2))*WORLD/math.pi,'xmax':b['east']/180*WORLD,'ymax':math.log(math.tan(math.pi/4+math.radians(b['north'])/2))*WORLD/math.pi,'spatialReference':{'wkid':3857}})},token,post=True)
     job=response.get('jobId')

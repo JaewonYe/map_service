@@ -2,6 +2,7 @@ import type {Bounds} from '../tiles/tpk';
 export const kinds=['satellite','osm','elevation'] as const;
 export type DownloadKind=typeof kinds[number];
 export const kindLabels:Record<DownloadKind,string>={satellite:'위성',osm:'일반 지도',elevation:'고도'};
+export const tileLimits={satellite:150000,elevation:10000} as const;
 export const regions={
  'south-korea':{name:'대한민국',bounds:{west:124,south:33,east:132,north:39.5},url:'https://download.geofabrik.de/asia/south-korea-latest.osm.pbf'},
  monaco:{name:'Monaco (작은 검증 지역)',bounds:{west:7.4,south:43.72,east:7.45,north:43.76},url:'https://download.geofabrik.de/europe/monaco-latest.osm.pbf'}
@@ -24,7 +25,7 @@ export function parsePlan(v:any,confirm=true):DownloadPlan{
  const levels={} as DownloadPlan['levels'];for(const k of ['satellite','elevation'] as const){const l=v.levels?.[k];if(!l||!Number.isInteger(l.min)||!Number.isInteger(l.max)||l.min<0||l.max>(k==='satellite'?19:15)||l.min>l.max)throw new DownloadError(`${kindLabels[k]} 표시 level 범위를 확인하세요.`);levels[k]={min:l.min,max:l.max};}
  if(!Number.isSafeInteger(v.registryRevision)||v.registryRevision<0)throw new DownloadError('현재 등록 revision을 다시 조회하세요.',409);
  const accepted:DownloadPlan['accepted']={};for(const k of v.kinds as DownloadKind[]){accepted[k]=v.accepted?.[k]===true;if(confirm&&!accepted[k])throw new DownloadError(`${kindLabels[k]} 제공처의 이용·오프라인 이전 조건을 확인하세요.`);}
- const tileLimit=10000;for(const k of ['satellite','elevation'] as const)if(v.kinds.includes(k)&&tileCount(bounds,levels[k].min,levels[k].max)>tileLimit)throw new DownloadError(`${kindLabels[k]} 작업은 최대10,000타일입니다. 영역이나 상세도를 줄이세요.`,422);
+ for(const k of ['satellite','elevation'] as const)if(v.kinds.includes(k)){const count=tileCount(bounds,levels[k].min,levels[k].max);if(count>tileLimits[k])throw new DownloadError(`${kindLabels[k]} 작업은 앱 한도 최대${tileLimits[k].toLocaleString('ko-KR')}타일입니다 (선택 영역 ${count.toLocaleString('ko-KR')}타일). 영역이나 상세도를 줄이세요.`,422);}
  if(v.kinds.includes('elevation')&&demProvider==='aws'&&(Math.ceil(bounds.east)-Math.floor(bounds.west)>4||Math.ceil(bounds.north)-Math.floor(bounds.south)>4))throw new DownloadError('고도 다운로드는 각 축 최대4개의 1도 원본 타일을 지원합니다.',422);
  if(v.kinds.includes('elevation')&&demProvider==='opentopography'&&areaKm2(bounds)>1000)throw new DownloadError('이 앱의 OpenTopography 작업 한도는1,000km²입니다. 영역을 줄이세요.',422);
  return {name:v.name.trim(),bounds,kinds:[...v.kinds],region:v.region,demProvider,refresh:v.refresh===true,levels,accepted,registryRevision:v.registryRevision};

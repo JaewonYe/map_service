@@ -2,6 +2,7 @@
 import datetime, email.utils, hashlib, json, math, os, re, shutil, time, urllib.error, urllib.parse, urllib.request, uuid
 from pathlib import Path
 KINDS=('satellite','osm','elevation')
+TILE_LIMITS={'satellite':150000,'elevation':10000}
 HOSTS={'download.geofabrik.de','copernicus-dem-30m.s3.amazonaws.com','tiledbasemaps.arcgis.com','portal.opentopography.org'}
 REGIONS={'south-korea':('대한민국','asia/south-korea',dict(west=124,south=33,east=132,north=39.5)), 'monaco':('Monaco','europe/monaco',dict(west=7.4,south=43.72,east=7.45,north=43.76))}
 MAX_FILE=2*1024**3
@@ -54,7 +55,7 @@ def validate_request(v):
     for kind,maximum in [('satellite',19),('elevation',15)]:
         l=v.get('levels',{}).get(kind,{})
         if type(l.get('min')) is not int or type(l.get('max')) is not int or not 0<=l['min']<=l['max']<=maximum:raise WorkError('Unsupported display LOD')
-        if kind in v['kinds'] and tile_count(b,l['min'],l['max'])>10000:raise WorkError('Too many display tiles (10,000 limit)')
+        if kind in v['kinds'] and tile_count(b,l['min'],l['max'])>TILE_LIMITS[kind]:raise WorkError(f"{kind} 후보 타일 수가 앱 한도{TILE_LIMITS[kind]:,}를 초과합니다.")
     if 'elevation' in v['kinds'] and v['demProvider']=='aws' and (math.ceil(b['east'])-math.floor(b['west'])>4 or math.ceil(b['north'])-math.floor(b['south'])>4):raise WorkError('DEM limited to 4 by 4 source tiles')
     area=6371.0088**2*abs(math.radians(b['east']-b['west'])*(math.sin(math.radians(b['north']))-math.sin(math.radians(b['south']))))
     if 'elevation' in v['kinds'] and v['demProvider']=='opentopography' and area>1000:raise WorkError('이 앱의 OpenTopography 작업 한도는1,000km²입니다.')

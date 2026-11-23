@@ -463,3 +463,13 @@ CLI는 미완료 요청이 있을 때 새 작업을 생성하지 않고, --resum
 최종 로컬 worker29·Node앱111+도구5=116(tiles26/downloads10)·typecheck·production image build/Compose4·디자인92자산/3스킬·Compose config·diff 검사 통과, 실패/오류/스킵0. 변환 보고 도구6·production DEM3/PBF7/summary도 앞선 stdout 보완에서 통과했다. 최초 CI 집계 실패와 설치 지연 중간 SHA를 최종 증거로 사용하지 않고, 최종 PR/main SHA/카운트/artifact를 #20에 기록한다. 실제 사용자 파일의 새 LOD 검사/위성 앱 표시는 후속 확인이 필요하며 #20 OPEN 유지한다.
 
 CI 설치 지연도 로그로 분리했다. 중간 run45168656001/job137672121305는 Playwright 의존성 설치의 Ubuntu mirror(http://us-east-2.ec2.archive.ubuntu.com)에서 지연돼 브라우저를 실행하지 못했다. /etc/apt/apt-mirrors.txt를 읽은 뒤 archive.ubuntu.com fallback 이후에도 index 전송이 진행되지 않은 로그가 있으며, [공식 runner-images 이슈](https://github.com/actions/runner-images/issues/14594)도 mirror fallback 정체를 다룬다. browser job은 해당 mirror 파일에 공식 https://archive.ubuntu.com/ubuntu/ 단일 주소를 지정하고 기존 install --with-deps를 실행한다. TLS/Ubuntu 서명·패키지/runner·테스트74/5프로젝트/2workers·timeout20분·retry/skip·gate는 유지한다. 사용자 PC·Cloud 허용 목록은 변경하지 않는다. 실제 최종 CI의 설치·실행 성공을 확인하며 중간 취소 run을 통과 증거로 쓰지 않는다.
+
+### #20 후속: 대한민국 위성 level0–13 타일 한도
+
+사용자가 대한민국0–13을 선택했을 때 기존 위성/고도 공통10,000 한도로 API 사전검사에서 차단됐다. South Korea 기본 사각형 west124/south33/east132/north39.5의 후보 수는0–11=2,912/0–12=11,376/0–13=45,048이다. 실제 사용자 선택 좌표와 국가 경계 Polygon은 이 예시와 같다고 단정하지 않는다. [World Imagery 항목](https://www.arcgis.com/home/item.html?id=226d23f076da478bba4589e7eae95952)은150,000/요청, [일반 REST](https://developers.arcgis.com/rest/services-reference/enterprise/export-tiles-map-service/)는 기본값100,000을 안내하므로 이를 구분하고 현재 인증된 서비스의 실제 응답 한도를 런타임에서 재확인한다.
+
+TS/Python 위성 앱 상한을150,000으로 분리하고 provider의 실제 한도는 min(maxExportTilesCount,150000)으로 검사한다. DEM10,000/면적/원본 수와 단일파일2GiB·작업4GiB·여유512MiB·timeout·인증·CRC/LOD/해시·등록CAS는 유지한다. batch/공개tile 수집/한도 우회는 추가하지 않는다. UI/공통API/저장 스키마·시설/OSM 수정·상위gitlink·Cloud 허용 목록 변경 없음.
+
+Node에서 실제 plan/queue API의 국가0–13 허용과45,048계산/bytes·시간미확정/요청저장,0–14의150,000초과/DEM10,000 유지/작업수 보존을 검사한다. worker는 합성 localhost HTTP export에서 같은 국가 요청·공식 POST EPSG3857/LOD0–13·실제 존재14개 CC0타일의 TPK 검사/등록을 확인하고, 서비스500,000응답은 앱150,000으로 clamp, 서비스20,000이면45,048요청을 export 제출 전 거부하며 이전 active를 보존한다. **합성 파일은14개 샘플 레코드이며45,048개의 실제 대한민국 타일이나 실제 coverage 증거가 아니다.** 초기 로컬 Node117(앱112+도구5, downloads11)·worker30·production image/Compose4·typecheck·디자인92자산/3스킬·Compose config·diff 검사 통과, 실패/오류/스킵0. 최종 PR/main 동일 SHA·run URL·count·artifact는 #20 댓글에 기록한다.
+
+이전 태안의 사용자 PC 작업6f79d3ac-65a3-4c3d-ad9d-b6d6c51fda18은 CLI 위성·고도 검사/ZIP/등록 completed 로그가 확인됐다([최종 증거](https://github.com/JaewonYe/map_service/issues/20#issuecomment-7100918723)). 그 성공을 국가 범위나 실제 앱 표시 검증으로 확대 해석하지 않는다. 국가 공식 수신/실타일 coverage·사용자 앱 표시는 별도 확인할 조건이며 #20 OPEN 유지한다.

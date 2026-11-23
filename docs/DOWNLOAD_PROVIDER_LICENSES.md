@@ -6,6 +6,7 @@
 
 - [공식 export 항목](https://www.arcgis.com/home/item.html?id=226d23f076da478bba4589e7eae95952), [서비스](https://tiledbasemaps.arcgis.com/arcgis/rest/services/World_Imagery/MapServer), [exportTiles REST](https://developers.arcgis.com/rest/services-reference/enterprise/export-tiles-map-service/).
 - 공식 오프라인 export 경로, async job/results, TPK/TPKX/저장 형식·LOD·서비스별 타일 한도와 관련된 문서를 확인했다. 공개 tile endpoint의 일괄 수집으로 대체하지 않는다. 구현은 매번 실제 capabilities와 현재 리더 지원 형식을 검사한다.
+- 2026-11-23 후속 확인: 공식 World Imagery 항목은 요청당150,000타일, 일반 exportTiles REST는 기본값100,000을 안내한다. 앱은 위성 상한150,000과 실제 서비스 `maxExportTilesCount` 중 작은 값으로 검사한다. 공식 문서의 수치를 현재 계정 응답의 실측값으로 간주하지 않으며, 국가 사각형0–13 후보 수가 이 안에 들어도 계정별 이용 범위·파일/시간/공간 한도와 실제 coverage 검증은 유지한다.
 - 사용자는 기존 ArcGIS 계정에서 ExportTiles POST / EPSG:3857 / levels15–17 / tilePackage=true로 TPK를 받은 경험을 확인했다. **현재 토큰·서비스 export 권한·Next.js/Leaflet 내부 표시 및 타 PC 이전 권한은 확인되지 않았다.** 공식 항목은 ArcGIS 앱/Runtime의 오프라인 사용 맥락을 설명하므로 임의의 웹 앱 사용을 포괄 승인한다고 해석하지 않는다. 계정 담당자/Esri의 해당 이용 조건에서 앱과 이전 대상 범위를 확인해야 한다.
 - 항목의 모든 동적 약관 본문을 이 환경에서 읽고 계정별 승인까지 확인한 것은 아니다. 지역별 영상 기여자·시점·상세 조건은 결과 메타데이터/계약에서 확인한다. 기본 출처는 Esri, Maxar, Earthstar Geographics, GIS User Community이며 개별 영상의 추가 credit을 대체하지 않는다.
 - XML Compact V1/V2 TPK + EPSG:3857 + 256px만 지원한다. TPKX나 다른 export 저장소는 지원 확대 검토 전 실패로 남긴다. 실제 영상 누락과 각 LOD를 확인하고 데이터 시점 미확정은 그대로 기록한다.
