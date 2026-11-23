@@ -120,13 +120,15 @@ def validate_tpk(path,check=lambda:None):
                     else:
                         index_entry=entries.get(key[:-7]+'.bundlx')
                         if not index_entry or index_entry.file_size!=16+16384*5+16:raise WorkError('손상된 TPK V1 index')
-                        raw=archive.read(index_entry)[16:-16];refs=[]
-                        for j in range(16384):
-                            off=int.from_bytes(raw[j*5:j*5+5],'little')
-                            if off:
-                                if off<60 or off+4>i.file_size:raise WorkError('TPK V1 offset 범위 오류')
-                                f.seek(off);size=struct.unpack('<I',f.read(4))[0]
-                                if size:refs.append((off+4,size))
+                        raw=archive.read(index_entry)[16:-16]
+                        offsets=[int.from_bytes(raw[j*5:j*5+5],'little') for j in range(16384)];sizes={}
+                        # Read compressed members forwards; rebuilding the refs
+                        # keeps index order, aliases and image sampling unchanged.
+                        for off in sorted(set(offsets)-{0}):
+                            check()
+                            if off<60 or off+4>i.file_size:raise WorkError('TPK V1 offset 범위 오류')
+                            f.seek(off);sizes[off]=struct.unpack('<I',f.read(4))[0]
+                        refs=[(off+4,sizes[off]) for off in offsets if off and sizes[off]]
                     for off,size in refs:
                         if off<(64+16384*8 if storage.endswith('V2') else 64) or size>20*1024**2 or off+size>i.file_size:raise WorkError('TPK tile offset/size 범위 오류')
                     tile_records+=len(refs)

@@ -472,4 +472,6 @@ TS/Python 위성 앱 상한을150,000으로 분리하고 provider의 실제 한�
 
 Node에서 실제 plan/queue API의 국가0–13 허용과45,048계산/bytes·시간미확정/요청저장,0–14의150,000초과/DEM10,000 유지/작업수 보존을 검사한다. worker는 합성 localhost HTTP export에서 같은 국가 요청·공식 POST EPSG3857/LOD0–13·실제 존재14개 CC0타일의 TPK 검사/등록을 확인하고, 서비스500,000응답은 앱150,000으로 clamp, 서비스20,000이면45,048요청을 export 제출 전 거부하며 이전 active를 보존한다. **합성 파일은14개 샘플 레코드이며45,048개의 실제 대한민국 타일이나 실제 coverage 증거가 아니다.** 초기 로컬 Node117(앱112+도구5, downloads11)·worker30·production image/Compose4·typecheck·디자인92자산/3스킬·Compose config·diff 검사 통과, 실패/오류/스킵0. 최종 PR/main 동일 SHA·run URL·count·artifact는 #20 댓글에 기록한다.
 
+V1 압축 bundle 검사는 유일한 record offset의 길이를 파일 오름차순으로 읽고 refs를 원래 index 순서/중복 개수로 재구성한다. 반복적인 역방향 seek의 재inflate를 줄이되 기존 image sample/타일 수/범위 검사 의미는 유지한다. 로컬 일회성 CC0 nonzero-empty-record fixture 비교에서8d7effb의 metadata와 원본 SHA가 수정 후와 같고 inflater 초기화가9→8로 줄었음을 확인했다. 이는 작은 합성 파일의 구조 확인이며 실제 국가 파일의 시간/메모리 benchmark로 보고하지 않는다. 변경 후 worker30·production image/Compose4·diff 검사를 다시 통과했다.
+
 이전 태안의 사용자 PC 작업6f79d3ac-65a3-4c3d-ad9d-b6d6c51fda18은 CLI 위성·고도 검사/ZIP/등록 completed 로그가 확인됐다([최종 증거](https://github.com/JaewonYe/map_service/issues/20#issuecomment-7100918723)). 그 성공을 국가 범위나 실제 앱 표시 검증으로 확대 해석하지 않는다. 국가 공식 수신/실타일 coverage·사용자 앱 표시는 별도 확인할 조건이며 #20 OPEN 유지한다.
