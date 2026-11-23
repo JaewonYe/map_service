@@ -421,4 +421,53 @@ class DownloadsWorker(unittest.TestCase):
         with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-national-token'}):blocked=self.run_job(lower)
         self.assertEqual(blocked['state'],'failed');self.assertIn('20,000',blocked['items']['satellite']['reason']);self.assertIn('45,048',blocked['items']['satellite']['reason']);self.assertFalse(any(p.endswith('/exportTiles') for p,_ in self.server.seen_queries));self.assertEqual(self.worker.registry(),before)
 
+    def test_31_satellite_activation_accumulates_legacy_selection_and_preserves_cas_limits_and_files(self):
+        self.server.export_enabled=True
+        levels={'satellite':{'min':16,'max':16},'elevation':{'min':12,'max':13}}
+        with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-multi'}):
+            first=self.request(('satellite','elevation'),levels=levels);a=self.run_job(first);self.assertEqual(a['state'],'completed',a)
+            # Upgrade a legacy active.json without guessing which historical packages were selected.
+            legacy=self.worker.registry();legacy.pop('satellitePackages');atomic(self.worker.root/'active.json',legacy)
+            second=self.request(('satellite',),levels=levels,registryRevision=legacy['revision'],refresh=True);b=self.run_job(second);self.assertEqual(b['state'],'completed',b)
+            stale=self.request(('satellite',),levels=levels,registryRevision=0,refresh=True);c=self.run_job(stale);self.assertEqual(c['state'],'partial',c)
+        self.assertEqual(self.worker.registry()['satellitePackages'],[first['id'],second['id']])
+        self.assertEqual(self.worker.registry()['layers'],{'elevation':first['id'],'satellite':second['id']})
+        saved={str(p):digest(p) for p in self.worker.root.rglob('*') if p.is_file() and ('packages' in p.parts or 'exports' in p.parts)}
+        self.worker=Worker(self.worker.root,ROOT,NoNetwork(),offline=True)
+        def activate(id,revision=None):
+            return self.run_job({'version':1,'id':str(uuid.uuid4()),'type':'activate','createdAt':now(),'packageId':id,'registryRevision':self.worker.registry()['revision'] if revision is None else revision})
+        # Re-registering an old package adds/moves it once; it never drops overview or detail.
+        self.assertEqual(activate(first['id'])['state'],'completed');self.assertEqual(self.worker.registry()['satellitePackages'],[second['id'],first['id']])
+        self.assertEqual(activate(first['id'])['state'],'completed');self.assertEqual(self.worker.registry()['satellitePackages'],[second['id'],first['id']])
+        self.assertEqual(activate(stale['id'])['state'],'completed');self.assertEqual(self.worker.registry()['satellitePackages'],[second['id'],first['id'],stale['id']])
+        before=self.worker.registry();self.assertEqual(activate(second['id'],0)['state'],'partial');self.assertEqual(self.worker.registry(),before)
+        # Capacity failures preserve the whole previous selection and prepared package/ZIP.
+        full={**before,'satellitePackages':[str(uuid.uuid4()) for _ in range(31)]+[stale['id']]};atomic(self.worker.root/'active.json',full)
+        failed=activate(second['id']);self.assertEqual(failed['state'],'partial');self.assertIn('최대32개',failed['error']);self.assertEqual(self.worker.registry(),full)
+        for invalid in [None,{},[stale['id'],stale['id']],[],['../escape'],[str(uuid.uuid4())]]:
+            atomic(self.worker.root/'active.json',{**before,'satellitePackages':invalid});raw=(self.worker.root/'active.json').read_bytes()
+            with self.assertRaises(WorkError):self.worker.registry()
+            self.assertEqual((self.worker.root/'active.json').read_bytes(),raw)
+        atomic(self.worker.root/'active.json',before)
+        reset={'version':1,'id':str(uuid.uuid4()),'type':'reset','createdAt':now(),'registryRevision':before['revision']};self.assertEqual(self.run_job(reset)['state'],'completed');self.assertEqual(self.worker.registry()['satellitePackages'],[]);self.assertEqual(self.worker.registry()['layers'],{})
+        for path,checksum in saved.items():self.assertEqual(digest(Path(path)),checksum)
+
+    def test_32_isolated_multiple_zip_import_and_restart_keep_all_selected_satellites(self):
+        self.server.export_enabled=True;levels={'satellite':{'min':16,'max':16},'elevation':{'min':12,'max':13}}
+        requests=[]
+        with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-offline-multi'}):
+            for revision in range(2):
+                request=self.request(('satellite',),levels=levels,registryRevision=revision);self.assertEqual(self.run_job(request)['state'],'completed');requests.append(request)
+        isolated=Worker(self.root/'offline',ROOT,NoNetwork(),offline=True);imported=[]
+        for request in requests:
+            upload=str(uuid.uuid4());shutil.copyfile(self.worker.root/'exports'/(request['id']+'.zip'),isolated.root/'incoming'/(upload+'.zip'))
+            q={'version':1,'id':str(uuid.uuid4()),'type':'import','createdAt':now(),'uploadId':upload,'confirmUsage':True,'registryRevision':isolated.registry()['revision']};isolated.process(q)
+            state=read_json(isolated.root/'jobs'/(q['id']+'.state.json'));self.assertEqual(state['state'],'completed',state);imported.append(q['id'])
+            self.assertEqual(portable.validate(isolated.root/'packages'/q['id'],Context())['files'],portable.validate(self.worker.root/'packages'/request['id'],Context())['files'])
+        self.assertEqual(isolated.registry()['satellitePackages'],imported)
+        # A committed older package still counts as registered after a crash, even when no longer primary.
+        state_path=isolated.root/'jobs'/(imported[0]+'.state.json');state=read_json(state_path);state.update(state='running',registered=False);atomic(state_path,state)
+        restarted=Worker(isolated.root,ROOT,NoNetwork(),offline=True);restarted.recover();self.assertEqual(restarted.registry()['satellitePackages'],imported)
+        self.assertTrue(read_json(state_path)['registered']);self.assertEqual(read_json(state_path)['state'],'completed')
+
 if __name__=='__main__':unittest.main()

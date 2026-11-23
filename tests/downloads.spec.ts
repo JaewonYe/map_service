@@ -47,3 +47,15 @@ test('portable import requires explicit rights and streams ZIP while checksum fa
 test('first installation uses local overview and query failure differs from no jobs with retry',async({page})=>{
  let failed=true;const info=overview();await offline(page);await page.route('**/api/map-info',r=>r.fulfill({json:{layers:{}}}));await page.route('**/api/downloads',r=>r.fulfill(failed?{status:503,json:{error:'합성 상태 조회 실패'}}:{json:info}));await page.goto('/downloads');await expect(page.locator('.download-page').getByRole('alert')).toContainText('상태 조회 실패');await expect(page.getByText(/아직 요청한 작업이 없습니다/)).toHaveCount(0);await expect(page.getByText(/오프라인 국가 개요입니다/)).toBeVisible();await expect(page.getByText('Natural Earth · Public domain (1:110m)',{exact:false})).toBeVisible();failed=false;await page.getByRole('button',{name:'조회 재시도',exact:true}).click();await expect(page.locator('.download-page').getByRole('alert')).toHaveCount(0);await expect(page.getByText(/아직 요청한 작업이 없습니다/)).toBeVisible();await expect(page.getByRole('button',{name:'현재 로컬 지도 보기'})).toHaveCount(0);
 });
+
+test('coexisting satellite selection is visible and re-register uses the current revision without another download',async({page})=>{
+ const info:any=overview(),base=randomUUID(),detail=randomUUID(),activation=randomUUID();info.registry={version:1,revision:5,layers:{satellite:base},satellitePackages:[base]};
+ info.jobs=[{id:detail,packageId:detail,request:{type:'download',name:'CC0 지역 상세'},state:'completed',stage:'등록 완료',registered:true,items:{satellite:{state:'completed',result:{provider:'CC0 fixture',format:'TPK'}}}}];
+ let posts=0;await offline(page);await page.route('**/api/downloads',async r=>{
+  if(r.request().method()==='POST'){posts++;expect(r.request().postDataJSON()).toEqual({action:'activate',packageId:detail,registryRevision:5});info.registry={version:1,revision:6,layers:{satellite:detail},satellitePackages:[base,detail]};await r.fulfill({status:202,json:{id:activation}});}
+  else await r.fulfill({json:info});
+ });
+ await page.goto('/downloads');const selection=page.getByLabel('함께 표시할 위성 지도',{exact:true});await expect(selection).toContainText('위성 패키지: 1개');await expect(selection).toContainText('재다운로드 없이 추가');await expect(page.getByText('현재 위성 합성에 포함된 패키지입니다.',{exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'준비된 지도 다시 등록',exact:true}).focus();await page.keyboard.press('Enter');await expect(selection).toContainText('위성 패키지: 2개');await expect(page.getByText('현재 위성 합성에 포함된 패키지입니다.',{exact:true})).toBeVisible();expect(posts).toBe(1);
+ await page.reload();await expect(selection).toContainText('위성 패키지: 2개');
+});

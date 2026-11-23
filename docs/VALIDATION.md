@@ -475,3 +475,14 @@ Node에서 실제 plan/queue API의 국가0–13 허용과45,048계산/bytes·�
 V1 압축 bundle 검사는 유일한 record offset의 길이를 파일 오름차순으로 읽고 refs를 원래 index 순서/중복 개수로 재구성한다. 반복적인 역방향 seek의 재inflate를 줄이되 기존 image sample/타일 수/범위 검사 의미는 유지한다. 로컬 일회성 CC0 nonzero-empty-record fixture 비교에서8d7effb의 metadata와 원본 SHA가 수정 후와 같고 inflater 초기화가9→8로 줄었음을 확인했다. 이는 작은 합성 파일의 구조 확인이며 실제 국가 파일의 시간/메모리 benchmark로 보고하지 않는다. 변경 후 worker30·production image/Compose4·diff 검사를 다시 통과했다.
 
 이전 태안의 사용자 PC 작업6f79d3ac-65a3-4c3d-ad9d-b6d6c51fda18은 CLI 위성·고도 검사/ZIP/등록 completed 로그가 확인됐다([최종 증거](https://github.com/JaewonYe/map_service/issues/20#issuecomment-7100918723)). 그 성공을 국가 범위나 실제 앱 표시 검증으로 확대 해석하지 않는다. 국가 공식 수신/실타일 coverage·사용자 앱 표시는 별도 확인할 조건이며 #20 OPEN 유지한다.
+
+### 위성 다운로드 패키지 동시 표시
+
+사용자 요구: 전국0–13을 등록하면 과거 지역14–19가 표시되지 않는 현상. 코드에서 active.json의 단일 satellite ID 교체를 확인했다. 지도 모듈 내부 등록부에 선택 목록을 추가하고 각 패키지 카탈로그를 자체 상대 경로 경계 안에서 함께 읽는다. 기존 단일 ID 호환·native 해상도 우선·같은 줌 최근 등록 순서·빈 타일/지역 밖 fallback·권한 미확인 제외·목록 변경 캐시 갱신을 검증했다. 공통 플랫폼 API/상위 gitlink·원본·ZIP·시설/OSM 수정 데이터는 변경하지 않는다.
+
+- Node: typecheck, 앱114 + CI도구5=119. downloads13에는 실제 getCatalog·TPK PNG 픽셀·타일 HTTP 헤더/상태, 전국이 최근 등록돼도 상세 우선, 부족한 상세 줌14 대체/지역 밖13 대체, 동일 최신ID의 목록 변경, 같은 줌의 순서 변경, 권한 미확인 제외와 상대 경로 이동·등록부 손상 거부를 포함한다. 기존 tiles26/buildings24/layers6/osm14/measure9/launcher22도 통과했다.
+- production worker32: 기존30 + 단일 ID 등록부 업그레이드·위성 재등록/중복/CAS/32개 상한·잘못된 목록·reset·패키지/ZIP 해시 보존, NoNetwork 격리 환경에 ZIP 두 개 가져오기·재시작 시 주 ID가 아닌 선택 패키지 복구. Docker read-only/network-none로 실행했다. Compose 비밀값 전달 회귀4도 통과했다.
+- 브라우저75: single4/multi15/osm10/layers11/buildings35, failed/flaky/skipped0. 현재 revision으로 명시 재등록한 뒤 개수1→2·포함 표시/새로고침 유지 회귀를 추가했다. 최초 로컬 실행은 기본 Playwright 다운로드 브라우저가 없어 시작 실패했으며, 설치된 `/usr/bin/chromium` 경로로 전체75개를 다시 실행해 통과했다. 판정 기준/테스트를 줄이지 않았다.
+- 실제 Next.js production + CC0 reader fixture의 HTTP13/14/16/19 픽셀/헤더, 지역 밖 fallback, 외부 요청0 및 Light/Dark×Desktop/Mobile 화면은 [UI 검토](DOWNLOAD_UI_REVIEW.md#위성-패키지-동시-표시-후속-검토)와 manifest에 기록한다. 최초 file URL 참고 화면 접근이 차단돼 로컬 HTTP로 바꿔 양 테마 비교를 완료했다. 별도 로컬 production build는 처음에 읽기 전용 HOME의 Next telemetry 설정 쓰기에서 실패했으며, 기존 CI와 같은 NEXT_TELEMETRY_DISABLED=1로 다시 빌드해 통과했다.
+
+사용자 전국 작업8c9a5c80-2348-4a34-a880-7c910b3ac773은 API 조회에서 completed/registered=true, worker currentJob 비어 있음, 주 satellite ID 일치가 보고됐다. 위성3,985타일/40.5MiB 화면과 이 등록 결과는 전체 국토·각 줌의 coverage나 이번 다중 패키지 실제 앱 표시를 직접 검사한 증거가 아니다. 후속 사용자 환경에서 web/worker 함께 업데이트 후 이전 지역 작업을 명시 재등록하고 두 자료의 실제 확대 표시를 확인해야 한다. #20 전체 완료 조건은 아직 남아 있다. 최종 PR/main 동일 SHA CI 링크는 이슈 댓글에 기록한다.

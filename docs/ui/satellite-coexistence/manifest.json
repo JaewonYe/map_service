@@ -1,0 +1,78 @@
+{
+  "source": "CC0 self-generated catalog fixtures; synthetic completed job labels; no official provider/worker evidence",
+  "baseURL": "http://127.0.0.1:3125",
+  "selected": [
+    "22222222-2222-4222-8222-222222222222",
+    "11111111-1111-4111-8111-111111111111"
+  ],
+  "checks": [
+    {
+      "zoom": 13,
+      "nativeZoom": "13",
+      "source": "11111111-1111-4111-8111-111111111111-downloaded",
+      "fallback": false
+    },
+    {
+      "zoom": 14,
+      "nativeZoom": "14",
+      "source": "22222222-2222-4222-8222-222222222222-downloaded",
+      "fallback": false
+    },
+    {
+      "zoom": 16,
+      "nativeZoom": "16",
+      "source": "22222222-2222-4222-8222-222222222222-downloaded",
+      "fallback": false
+    },
+    {
+      "zoom": 19,
+      "nativeZoom": "19",
+      "source": "22222222-2222-4222-8222-222222222222-downloaded",
+      "fallback": false
+    },
+    {
+      "outside": true,
+      "nativeZoom": 13,
+      "fallback": true
+    }
+  ],
+  "captures": [
+    {
+      "file": "desktop-light.png",
+      "device": "desktop",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "desktop-dark.png",
+      "device": "desktop",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "mobile-light.png",
+      "device": "mobile",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "mobile-dark.png",
+      "device": "mobile",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  ],
+  "externalRequests": 0
+}

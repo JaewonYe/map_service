@@ -1,5 +1,6 @@
 import {createHash} from 'node:crypto';
-import {managedDirectory} from '../downloads/active';
+import {managedSatellitePackages} from '../downloads/active';
+import {jobId} from '../downloads/model';
 import {readFile, realpath, stat} from 'node:fs/promises';
 import {dirname, isAbsolute, join, relative, resolve, win32} from 'node:path';
 import sharp from 'sharp';
@@ -47,9 +48,9 @@ export type CatalogTile = {
   fallback: boolean;
   contributingSources: string[];
 };
-type LoadedSource = {info: SourceInfo; reader: Tpk};
+type LoadedSource = {info: SourceInfo; reader: Tpk; registrationOrder?: number};
 type Candidate = {source: LoadedSource; zoom: number; x: number; y: number};
-type LoadOptions = {configPath?: string; legacyPath?: string; cache?: string; configFile?: string; usageConfirmed?: boolean};
+type LoadOptions = {configPath?: string; packageCatalogs?: Array<{id:string;path:string}>; legacyPath?: string; cache?: string; configFile?: string; usageConfirmed?: boolean};
 const DEFAULT_CONFIG = 'maps.json';
 const TILE_LIMIT = 32 * 1024 * 1024;
 
@@ -162,30 +163,49 @@ export class MapCatalog {
     const configFile = options.configFile ?? process.env.MAP_CONFIG_FILE ?? DEFAULT_CONFIG;
     const configPath = resolve(/*turbopackIgnore: true*/ options.configPath || join(/*turbopackIgnore: true*/ dirname(legacyPath), configFile));
     const cache = resolve(/*turbopackIgnore: true*/ options.cache || process.env.TPK_CACHE_DIR || '.cache/tpk');
-    await this.track(configPath);
-    if (this.tracked.get(configPath) === 'missing') {
-      if (options.configPath || configFile !== DEFAULT_CONFIG) {
-        throw new TileError('Map catalog file missing. Check MAP_CONFIG_FILE.', 503);
-      }
-      await this.track(legacyPath);
-      if (this.tracked.get(legacyPath) === 'missing') throw new TileError('No maps.json or TPK file found. Place data in data/tpk/.', 503);
-      const reader = await Tpk.load(legacyPath, cache, {usageConfirmed: options.usageConfirmed});
-      const metadata = reader.info();
-      const info: SourceInfo = {id: 'legacy', name: '위성영상', role: 'detail', priority: 0, status: 'ready',
-        usageConfirmed: metadata.usageConfirmed, bounds: metadata.bounds, minZoom: metadata.minZoom,
-        maxZoom: metadata.maxZoom, zoomLevels: metadata.zoomLevels, metadata};
-      this.loaded.push({reader, info}); this.sources.push(info);
-      this.metadata = {...metadata, mode: 'single', sources: this.sources, warnings: []};
-      return;
+    if (options.packageCatalogs && (!options.packageCatalogs.length || options.packageCatalogs.length > 32)) {
+      throw new TileError('Select 1–32 satellite package catalogs');
     }
-    if ((await stat(/*turbopackIgnore: true*/ configPath)).size > 1024 * 1024) throw new TileError('Map catalog exceeds 1 MiB');
-    let input: unknown;
-    try { input = JSON.parse(await readFile(/*turbopackIgnore: true*/ configPath, 'utf8')); }
-    catch (error) { if (error instanceof SyntaxError) throw new TileError('Invalid JSON in map catalog'); throw error; }
-    const configs = parseConfig(input);
-    const root = await realpath(/*turbopackIgnore: true*/ dirname(configPath));
+    if (options.packageCatalogs) {
+      const ids = options.packageCatalogs.map(source => jobId(source.id));
+      if (new Set(ids).size !== ids.length) throw new TileError('Duplicate satellite packages');
+    }
+    if (!options.packageCatalogs) {
+      await this.track(configPath);
+      if (this.tracked.get(configPath) === 'missing') {
+        if (options.configPath || configFile !== DEFAULT_CONFIG) {
+          throw new TileError('Map catalog file missing. Check MAP_CONFIG_FILE.', 503);
+        }
+        await this.track(legacyPath);
+        if (this.tracked.get(legacyPath) === 'missing') throw new TileError('No maps.json or TPK file found. Place data in data/tpk/.', 503);
+        const reader = await Tpk.load(legacyPath, cache, {usageConfirmed: options.usageConfirmed});
+        const metadata = reader.info();
+        const info: SourceInfo = {id: 'legacy', name: '위성영상', role: 'detail', priority: 0, status: 'ready',
+          usageConfirmed: metadata.usageConfirmed, bounds: metadata.bounds, minZoom: metadata.minZoom,
+          maxZoom: metadata.maxZoom, zoomLevels: metadata.zoomLevels, metadata};
+        this.loaded.push({reader, info}); this.sources.push(info);
+        this.metadata = {...metadata, mode: 'single', sources: this.sources, warnings: []};
+        return;
+      }
+    }
+    // Each selected package keeps its own relative-path boundary and permission settings.
+    // Never write a synthetic maps.json with ../ paths or scan historical packages.
+    const configs: Array<SourceConfig & {root: string; registrationOrder: number}> = [];
+    for (const [order, {id, path}] of (options.packageCatalogs || [{id:'',path:configPath}]).entries()) {
+      await this.track(path);
+      if ((await stat(/*turbopackIgnore: true*/ path)).size > 1024 * 1024) throw new TileError('Map catalog exceeds 1 MiB');
+      let input: unknown;
+      try { input = JSON.parse(await readFile(/*turbopackIgnore: true*/ path, 'utf8')); }
+      catch (error) { if (error instanceof SyntaxError) throw new TileError('Invalid JSON in map catalog'); throw error; }
+      const root = await realpath(/*turbopackIgnore: true*/ dirname(path));
+      for (const config of parseConfig(input)) {
+        configs.push({...config, root, registrationOrder: order,
+          id: options.packageCatalogs ? `${id}-${config.id}` : config.id});
+      }
+      if (configs.length > 32) throw new TileError('Select at most 32 satellite sources');
+    }
     const warnings: string[] = [];
-    for (const config of configs) {
+    for (const {root, registrationOrder, ...config} of configs) {
       const info: SourceInfo = {...config, status: config.enabled ? 'unavailable' : 'disabled', zoomLevels: []};
       // Do not expose host paths or configuration filenames through the API.
       delete (info as any).file; delete (info as any).enabled;
@@ -209,7 +229,7 @@ export class MapCatalog {
         info.zoomLevels = metadata.zoomLevels.filter(z => z >= config.minZoom && z <= config.maxZoom);
         if (!info.zoomLevels.length) throw new TileError('No downloaded TPK levels intersect the configured zoom range');
         info.minZoom = info.zoomLevels[0]; info.maxZoom = info.zoomLevels.at(-1)!;
-        info.status = 'ready'; this.loaded.push({info, reader}); reader = undefined;
+        info.status = 'ready'; this.loaded.push({info, reader, registrationOrder}); reader = undefined;
         if (!config.usageConfirmed) warnings.push(`${info.name}: 사용 권한 미확인 — 메타데이터만 제공합니다.`);
         const absent = Array.from({length: config.maxZoom - config.minZoom + 1}, (_, i) => i + config.minZoom).filter(z => !info.zoomLevels.includes(z));
         if (absent.length) warnings.push(`${info.name}: 미포함 줌 ${absent.join(', ')} — 낮은 줌 타일로 대체합니다.`);
@@ -275,6 +295,7 @@ export class MapCatalog {
         candidates.sort((a, b) => b.zoom - a.zoom ||
           Number(b.source.info.role === 'detail') - Number(a.source.info.role === 'detail') ||
           b.source.info.priority - a.source.info.priority ||
+          (b.source.registrationOrder ?? 0) - (a.source.registrationOrder ?? 0) ||
           (a.source.info.id < b.source.info.id ? -1 : a.source.info.id > b.source.info.id ? 1 : 0));
         return await this.select(candidates, 0, z, x, y);
       } finally { const next = this.waiters.shift(); if (next) next(); else this.running--; }
@@ -335,11 +356,12 @@ export class MapCatalog {
 }
 
 let active: Promise<MapCatalog> | undefined;
-let managed: {directory:string;value:Promise<MapCatalog>} | undefined;
+let managed: {key:string;value:Promise<MapCatalog>} | undefined;
 export async function getCatalog() {
-  const directory=await managedDirectory('satellite');
-  if(directory){
-    if(managed?.directory!==directory){const value=MapCatalog.load({configPath:join(directory,'maps.json')});managed={directory,value};value.catch(()=>{if(managed?.value===value)managed=undefined;});}
+  const packages=await managedSatellitePackages();
+  if(packages.length){
+    const key=JSON.stringify(packages);
+    if(managed?.key!==key){const value=MapCatalog.load({packageCatalogs:packages.map(({id,directory})=>({id,path:join(directory,'maps.json')}))});managed={key,value};value.catch(()=>{if(managed?.value===value)managed=undefined;});}
     const catalog=await managed!.value;await catalog.checkUnchanged();return catalog;
   }
   if (!active) { active = MapCatalog.load(); active.catch(() => { active = undefined; }); }

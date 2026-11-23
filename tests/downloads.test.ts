@@ -101,3 +101,43 @@ test('Taean CLI resumes a Docker startup failure without another request or chan
  await rm(join(root,'jobs',request.id+'.state.json'));const other=randomUUID();await atomic(join(root,'jobs',other+'.request.json'),{...request,id:other});const multiple=await run(['--resume']);assert.equal(multiple.code,1);assert.equal((await files()).length,2);assert.equal((await readFile(join(root,'calls.jsonl'),'utf8')).trim().split('\n').length,2);
  await rm(join(root,'jobs',other+'.request.json'));await atomic(join(root,'jobs',file),{...request,name:'another task'});const unrelated=await run(['--resume']);assert.equal(unrelated.code,1);assert.equal((await readFile(join(root,'calls.jsonl'),'utf8')).trim().split('\n').length,2);
 });
+
+test('managed satellite packages combine overview and native detail without losing fallback or serving unconfirmed history',async t=>{
+ const root=await fixture(t),{copyFile}=await import('node:fs/promises');
+ const {makeCatalogFixture,pixels}=await import('./fixtures/catalog-fixture');
+ const fixtureData=join(root,'fixture'),f=await makeCatalogFixture(fixtureData),base=randomUUID(),detail=randomUUID(),unconfirmed=randomUUID();
+ for(const [id,file,minZoom,maxZoom,usageConfirmed]of [[base,'korea/base.tpk',0,13,true],[detail,'regions/taean.tpk',14,19,true],[unconfirmed,'regions/port.tpk',16,16,false]] as const){
+  const dir=join(root,'packages',id,'satellite');await mkdir(dir,{recursive:true});await copyFile(join(fixtureData,file),join(dir,'map.tpk'));
+  await atomic(join(dir,'maps.json'),{version:1,sources:[{id:'downloaded',name:id,file:'map.tpk',role:'base',minZoom,maxZoom,usageConfirmed}]});
+ }
+ const select=async(ids:string[])=>atomic(join(root,'active.json'),{version:1,revision:1,layers:{satellite:ids.at(-1)},satellitePackages:ids});
+ // Loading a legacy one-ID registry remains compatible, with no history scan.
+ await atomic(join(root,'active.json'),{version:1,revision:0,layers:{satellite:base}});
+ const overview=await getCatalog(),c16=coordinate(16);assert.equal((await overview.tile(16,c16.x,c16.y))!.nativeZoom,13);
+ // Latest national overview must not override older regional native LODs.
+ await select([detail,base]);const combined=await getCatalog();assert.notEqual(combined,overview);assert.equal(combined.info().sources.length,2);
+ const {GET:tileResponse}=await import('../app/api/tiles/[z]/[x]/[y]/route');
+ const response=await tileResponse(new Request('http://localhost/api/tiles/16/'+c16.x+'/'+c16.y),{params:Promise.resolve({z:'16',x:String(c16.x),y:String(c16.y)})});
+ assert.equal(response.status,200);assert.equal(response.headers.get('X-Map-Native-Zoom'),'16');assert.equal(response.headers.get('X-Map-Fallback'),'false');assert.ok(response.headers.get('X-Map-Source')!.startsWith(detail+'-'));
+ for(const z of [13,14,16,19]){const c=coordinate(z),tile=(await combined.tile(z,c.x,c.y))!;assert.equal(tile.nativeZoom,z);assert.equal(tile.fallback,false);assert.ok(tile.sourceId.startsWith((z<=13?base:detail)+'-'));assert.deepEqual(await pixels(tile.bytes),z<=13?[30,130,60]:[30,70,200]);}
+ // A missing native record uses the best available regional parent; outside uses national.
+ const missing=(await combined.tile(16,c16.x+2,c16.y))!;assert.equal(missing.nativeZoom,14);assert.ok(missing.sourceId.startsWith(detail+'-'));
+ const outside=coordinate(14),far=(await combined.tile(14,outside.x+2,outside.y))!;assert.equal(far.nativeZoom,13);
+ // Changing the set even with the same latest ID invalidates the catalog cache.
+ await select([base]);const onlyBase=await getCatalog();assert.notEqual(onlyBase,combined);assert.equal((await onlyBase.tile(16,c16.x,c16.y))!.nativeZoom,13);
+ await select([detail,base,unconfirmed]);const permitted=await getCatalog(),selected=(await permitted.tile(16,c16.x,c16.y))!;assert.ok(selected.sourceId.startsWith(detail+'-'));assert.deepEqual(await pixels(selected.bytes),[30,70,200]);assert.ok(permitted.info().warnings.some(w=>w.includes('권한 미확인')));
+ await atomic(join(root,'packages',unconfirmed,'satellite','maps.json'),{version:1,sources:[{id:'downloaded',file:'map.tpk',role:'base',minZoom:16,maxZoom:16,usageConfirmed:true}]});
+ await select([base,detail,unconfirmed]);const newest=await getCatalog();assert.deepEqual(await pixels((await newest.tile(16,c16.x,c16.y))!.bytes),[220,30,30]);
+ await select([base,unconfirmed,detail]);const reordered=await getCatalog();assert.deepEqual(await pixels((await reordered.tile(16,c16.x,c16.y))!.bytes),[30,70,200]);
+ // Every package retains its own boundary: a traversal never borrows another package's TPK.
+ await atomic(join(root,'packages',unconfirmed,'satellite','maps.json'),{version:1,sources:[{id:'downloaded',file:'../../'+base+'/satellite/map.tpk',role:'base',usageConfirmed:true}]});
+ await select([base,detail,unconfirmed]);await assert.rejects(getCatalog(),/relative .tpk path/);
+});
+
+test('satellite registry rejects invalid sets without modifying the operator file',async t=>{
+ const root=await fixture(t),a=randomUUID(),b=randomUUID();
+ for(const satellites of [null,{},[a,a],[b],[],['../escape'],Array.from({length:33},()=>randomUUID())]){
+  const value={version:1,revision:2,layers:{satellite:a},satellitePackages:satellites};await atomic(join(root,'active.json'),value);const before=await readFile(join(root,'active.json'));await assert.rejects(registry());assert.deepEqual(await readFile(join(root,'active.json')),before);
+ }
+ await atomic(join(root,'active.json'),{version:1,revision:3,layers:{},satellitePackages:[]});assert.deepEqual((await registry()).satellitePackages,[]);
+});

@@ -20,7 +20,13 @@ class Worker:
         for kind,id in v['layers'].items():
             if kind not in KINDS:raise WorkError('Invalid registry kind')
             identity(id)
+        if 'satellitePackages' in v:
+            ids=v['satellitePackages']
+            if not isinstance(ids,list) or len(ids)>32:raise WorkError('Invalid satellite package list')
+            for id in ids:identity(id)
+            if len(set(ids))!=len(ids) or (ids[-1] if ids else None)!=v['layers'].get('satellite'):raise WorkError('Invalid satellite package selection')
         return v
+    def satellite_packages(self,r):return r.get('satellitePackages',[r['layers']['satellite']] if r['layers'].get('satellite') else [])
     def save(self):self.state['updatedAt']=now();atomic(self.root/'jobs'/(self.request['id']+'.state.json'),self.state);self.heartbeat()
     def check(self):
         if time.monotonic()-self.last_heartbeat>5:self.heartbeat()
@@ -74,11 +80,15 @@ class Worker:
         self.check();r=self.registry()
         if r['revision']!=self.request['registryRevision']:raise WorkError('등록 revision 충돌. 준비 파일은 보존했습니다. 현재 등록 상태를 확인하고 명시적으로 다시 등록하세요.')
         layers={} if id is None else dict(r['layers'])
+        satellites=[] if id is None else list(self.satellite_packages(r))
         if id:
             m=packages.validate(self.root/'packages'/identity(id),self)
+            if 'satellite' in m['items']:
+                satellites=[old for old in satellites if old!=id]+[id]
+                if len(satellites)>32:raise WorkError('위성 패키지는 최대32개를 함께 표시할 수 있습니다. 기존 파일 기반 지도로 돌아간 뒤 필요한 패키지만 다시 등록하세요. 준비 파일은 보존했습니다.')
             layers.update({kind:id for kind in m['items']})
         atomic(self.root/'history'/f'{r["revision"]}.json',r)
-        self.check();atomic(self.root/'active.json',{'version':1,'revision':r['revision']+1,'layers':layers});self.committed=True;self.state['registered']=True
+        self.check();atomic(self.root/'active.json',{'version':1,'revision':r['revision']+1,'layers':layers,'satellitePackages':satellites});self.committed=True;self.state['registered']=True
     def recover(self):
         for p in (self.root/'jobs').glob('*.state.json'):
             s=read_json(p)
@@ -86,7 +96,7 @@ class Worker:
                 id=identity(s['id']);s.update(state='interrupted',stage='worker 재시작으로 중단됨',error='작업이 중단됐습니다. 기존 완료 파일을 보존하고 재시도하세요.',updatedAt=now())
                 # Activation is a commit point: recover a published result even if the last state write was interrupted.
                 r=self.registry()
-                if s.get('packageId') and s['packageId'] in r['layers'].values():s.update(state='partial' if any(i.get('state')!='completed' for i in s.get('items',{}).values()) else 'completed',stage='등록 결과 복구',registered=True)
+                if s.get('packageId') and s['packageId'] in [*r['layers'].values(),*self.satellite_packages(r)]:s.update(state='partial' if any(i.get('state')!='completed' for i in s.get('items',{}).values()) else 'completed',stage='등록 결과 복구',registered=True)
                 atomic(p,s);shutil.rmtree(self.root/'staging'/id,ignore_errors=True)
         for p in (self.root/'staging').glob('*.part'):p.unlink(missing_ok=True)
         # Only this locked worker writes export parts; incoming uploads may still be live in web.

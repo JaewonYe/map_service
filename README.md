@@ -28,6 +28,8 @@ docker compose up -d --build
 
 별도 **`http://localhost:3001/downloads`** 페이지에서 사각형/시설 범위와 위성·일반·고도를 선택해 다운로드→검사·준비→등록을 요청하고, 진행·취소·재시도·이전 ZIP을 관리합니다. 최초 설치에도 번들 국가 개요가 있어 좌표를 외부 지도에서 복사할 필요가 없습니다. 상세 지도 미리보기는 현재 설치된 로컬 자료만 사용합니다.
 
+전국 개요와 지역 상세 **다운로드 위성 패키지는 함께 등록**하며 실제 고해상도 타일을 우선 표시합니다. 이전 버전에서 교체돼 빠진 지역은 `/downloads`의 해당 작업에서 **준비된 지도 다시 등록**으로 재다운로드 없이 추가하세요. 화면의 함께 표시할 패키지 수를 확인한 뒤 지도를 새로고침합니다. ZIP은 작업별 데이터이므로 PC 이전 시 필요한 ZIP을 각각 가져오세요. [위성 합성·업데이트 호환성](docs/DOWNLOAD_MANAGER.md#전국-개요와-지역-상세를-함께-표시하기)을 참고하세요.
+
 태안 기본값은 사용자 지정 영역의 **World Imagery for Export POST / EPSG:3857 / TPK level15–17**, **OpenTopography COP30 GeoTIFF**입니다. 원본은 `data/imagery`, `data/dem`, 작업·준비 패키지·ZIP은 `data/downloads`에 저장합니다. 검증한 기존 원본을 재사용하며 기존 시설/경계·OSM 수정·원본 폴더를 덮어쓰지 않습니다. 위성 export/이 앱의 오프라인 표시·이전 권한과 개인/Enterprise API Key 조건을 먼저 확인하세요.
 
 Windows/Ubuntu 공용 CLI: `downloads.worker.env.example`을 기존 파일이 없을 때만 로컬 `.env.downloads`로 복사합니다. 인증값은 Git에서 제외된 이 파일 또는 **실행할 같은 터미널의 환경변수**에 안전하게 설정합니다. PowerShell 로그인 블록이 설정한 토큰/Referer는 파일에 다시 쓰지 않아도 됩니다. 현재 터미널의 값이 env-file보다 우선합니다. Docker 실행 후:

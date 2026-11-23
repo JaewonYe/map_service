@@ -43,3 +43,15 @@
 ## 재현
 
 production worker 이미지로 `tests/fixtures/downloads-proof.py <새 격리 폴더> --progress`를 실행하고 해당 isolated 디렉터리를 MAP_DOWNLOADS_DIR로 지정한 실제 앱을 띄운다. `scripts/capture-download-review.mjs`의 고정 증거 경로/포트3120에 맞춰 캡처한다. 완료된 fixture의 다른 상태를 다시 캡처할 때만 `--reuse-progress`를 사용한다. 동일 progressJob의 기존 네 실제 진행 이미지만 유지하며 새 가짜 진행 상태를 만들지 않는다. localhost 외 요청을 차단·계수하고 실제 지도 이미지는 opacity/네트워크 완료를 기다린다. 단위/API mock 시나리오와 이 수동 격리 앱 증거, 공식 제공처 연결 실패는 서로 다른 검증이다.
+
+## 위성 패키지 동시 표시 후속 검토
+
+다운로드 화면의 ‘함께 표시할 위성 패키지’ 수·합성 기준·이전 지역 재등록 안내와 선택 작업의 현재 합성 포함 여부를 추가했다. 기존 남색/청록 토큰·조회/등록 버튼·키보드 동작을 사용하고 지도 픽셀/CSS/테마 구현은 변경하지 않았다. `platform-ui-design`과 MASTER/IMPLEMENTATION/로컬 reference 양 테마, `UI UX Pro Max`의 status feedback 검색(제출 결과 표시), Web Design Guidelines 번들 기준을 적용했다.
+
+| Desktop Light | Desktop Dark | Mobile Light | Mobile Dark |
+| --- | --- | --- | --- |
+| [화면](ui/satellite-coexistence/desktop-light.png) | [화면](ui/satellite-coexistence/desktop-dark.png) | [화면](ui/satellite-coexistence/mobile-light.png) | [화면](ui/satellite-coexistence/mobile-dark.png) |
+
+[캡처 manifest](ui/satellite-coexistence/manifest.json), 재현 스크립트 `npx tsx scripts/capture-satellite-review.ts`(먼저 production build). 실제 Next.js/로컬 카탈로그/타일 API를 사용하지만 패키지는 CC0 합성 PNG와 수동 구성한 등록부/완료 작업 fixture다. 이 화면의 completed는 worker 실행 증거가 아니며, worker32 시험과 구분한다. worker를 띄우지 않아 미연결 경고가 그대로 보인다. HTTP에서13레벨 개요/14·16·19레벨 상세의 픽셀과 native zoom 헤더, 지역 밖13레벨 대체를 확인했다. 외부 요청0,1440×900/390×844에서 가로 넘침 없음. 실제 전국·태안 원본을 합성해 캡처한 화면은 아니다.
+
+검토: `components/DownloadManager.tsx` 새 named section은 개수·선택 기준을 색과 무관한 텍스트로 전달하고 기존 카드/작업 목록·터치 높이·네이티브 버튼·포커스를 유지한다. 안내/목록/선택 카드가 양 테마·모바일에서 겹치거나 잘리지 않는 것을 확인했다. 재등록은 키보드 Enter로 현재 revision의 activate 요청 한 건만 전송하며 완료 후 개수·포함 상태가 갱신되고 재조회/새로고침에도 유지되는 브라우저 회귀를 추가했다. 기존 테마 저장/시스템 변경/저장 불가/초기 hydration/지도·폼 보존·모바일 키보드 회귀도 통과했다. 공통 디자인 자산92개/스킬3개 검사는 별도 통과했다.
