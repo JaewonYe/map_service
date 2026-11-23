@@ -30,7 +30,7 @@ docker compose up -d --build
 
 태안 기본값은 사용자 지정 영역의 **World Imagery for Export POST / EPSG:3857 / TPK level15–17**, **OpenTopography COP30 GeoTIFF**입니다. 원본은 `data/imagery`, `data/dem`, 작업·준비 패키지·ZIP은 `data/downloads`에 저장합니다. 검증한 기존 원본을 재사용하며 기존 시설/경계·OSM 수정·원본 폴더를 덮어쓰지 않습니다. 위성 export/이 앱의 오프라인 표시·이전 권한과 개인/Enterprise API Key 조건을 먼저 확인하세요.
 
-Windows/Ubuntu 공용 CLI: `downloads.worker.env.example`을 기존 파일이 없을 때만 로컬 `.env.downloads`로 복사하고 유효한 ArcGIS 토큰/OpenTopography Key를 **그 파일에만** 설정합니다. Docker 실행 후:
+Windows/Ubuntu 공용 CLI: `downloads.worker.env.example`을 기존 파일이 없을 때만 로컬 `.env.downloads`로 복사합니다. 인증값은 Git에서 제외된 이 파일 또는 **실행할 같은 터미널의 환경변수**에 안전하게 설정합니다. PowerShell 로그인 블록이 설정한 토큰/Referer는 파일에 다시 쓰지 않아도 됩니다. 현재 터미널의 값이 env-file보다 우선합니다. Docker 실행 후:
 
 ```sh
 node --env-file=.env.downloads scripts/download-taean.mjs --accept-usage
@@ -38,7 +38,7 @@ node --env-file=.env.downloads scripts/download-taean.mjs --accept-usage
 
 기본 위성+고도, `--osm`은 대한민국 지역 PBF **전체 수신**을 추가하고 `--refresh`는 원본을 다시 받습니다. 웹 관리용 worker 실행·안전한 인증/수동 로그인·오프라인 복원·제한은 [다운로드 운영 안내](docs/DOWNLOAD_MANAGER.md), 라이선스와 계정별 선행 조건은 [제공처 확인](docs/DOWNLOAD_PROVIDER_LICENSES.md)을 참고하세요. 토큰/키를 채팅에 보낼 필요는 없습니다. 계정 API는 정상인데 위성 서비스가498을 반환하면 [ArcGIS 조직·Referer 로그인 안내](docs/ARCGIS_AUTH_POWERSHELL.md)를 따라 서비스 접근부터 확인하세요.
 
-**현재 공식 원본 다운로드 검증은 미완료입니다.** 클라우드의 네 공식 호스트가 프록시 CONNECT403으로 차단됐고 인증값도 연결되지 않았습니다. 합성 HTTP/변환·격리 복원/앱 표시 테스트 통과를 실제 Esri·OSM·DEM 수신 성공으로 보고하지 않습니다. [검증 기록](docs/VALIDATION.md#이슈-20-지도-다운로드관리)과 [화면 검토](docs/DOWNLOAD_UI_REVIEW.md)를 참고하세요. 클라우드의 비활성 설정 버튼을 조작하지 않아도 위 로컬 절차를 사용할 수 있습니다.
+**현재 공식 원본 다운로드 검증은 미완료입니다.** 클라우드의 네 공식 호스트는 프록시 CONNECT403으로 차단됐고 인증값도 연결되지 않았습니다. 사용자 Windows PC에서는 공식 TPK1,567,737바이트 수신과 DEM 준비가 보고됐으나 위성 형식·LOD 검사와 실제 앱 표시는 아직 확인이 필요합니다. 합성 테스트·사용자 보고·직접 파일/앱 검증을 구분합니다. [검증 기록](docs/VALIDATION.md#이슈-20-지도-다운로드관리)과 [화면 검토](docs/DOWNLOAD_UI_REVIEW.md)를 참고하세요. 클라우드의 비활성 설정 버튼을 조작하지 않아도 위 로컬 절차를 사용할 수 있습니다.
 
 ## 일반 지도·고도 지도 추가
 
