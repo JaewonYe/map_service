@@ -1,11 +1,15 @@
+import {assertNoMaintenance,registry} from '../downloads/active';
 import {resolve,join} from 'node:path';
 import {getCatalog,MapCatalog} from '../tiles/catalog';
 import {osmInfo,type OsmInfo} from '../tiles/osm';
 import {getElevation} from './elevation';
 import type {LayerId,LayerInfo} from './types';
 let street: Promise<MapCatalog> | undefined;
+let streetRevision:number|undefined;
 export async function getStreet() {
-  if (!street) {
+  await assertNoMaintenance();const revision=(await registry()).revision;await assertNoMaintenance();
+  if (!street || streetRevision!==revision) {
+    streetRevision=revision;
     const directory = resolve(/*turbopackIgnore: true*/ process.env.STREET_TPK_DIR || 'data/street');
     street = MapCatalog.load({legacyPath:join(directory,'map.tpk'),configFile:'maps.json',
       cache:join(process.env.TPK_CACHE_DIR || '.cache/tpk','street'),usageConfirmed:process.env.STREET_USAGE_CONFIRMED === 'true'});
@@ -35,3 +39,5 @@ export async function mapLayers() {
   if(!layers.street.available&&osmMetadata.reason)layers.street.reason=osmMetadata.reason;
   return {catalog:satellite.status === 'fulfilled'?satellite.value.info():null,layers,osm:osmMetadata};
 }
+
+export async function releaseStreetCatalog(){if(street)await street.catch(()=>{});street=undefined;streetRevision=undefined;}

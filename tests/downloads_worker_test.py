@@ -470,4 +470,103 @@ class DownloadsWorker(unittest.TestCase):
         restarted=Worker(isolated.root,ROOT,NoNetwork(),offline=True);restarted.recover();self.assertEqual(restarted.registry()['satellitePackages'],imported)
         self.assertTrue(read_json(state_path)['registered']);self.assertEqual(read_json(state_path)['state'],'completed')
 
+    def maintenance_request(self,operation,**extra):
+        from maintenance import PHRASES
+        return {'version':1,'type':'maintenance','id':str(uuid.uuid4()),'operation':operation,'confirmation':PHRASES[operation],'createdAt':now(),'registryRevision':self.worker.registry()['revision'],'ready':True,**extra}
+    def run_maintenance(self,q):
+        from maintenance import marker
+        atomic(marker(self.worker.root),q);self.worker.offline=True;self.worker.net=NoNetwork();self.worker.run(once=True)
+        return read_json(self.worker.root/'maintenance'/(q['id']+'.state.json'))
+    def saved_job(self,r):
+        state=self.run_job(r);atomic(self.worker.root/'jobs'/(r['id']+'.request.json'),r);return state
+    def test_33_delete_active_package_and_its_activation_records_then_restore_without_network(self):
+        self.server.export_enabled=True;levels={'satellite':{'min':16,'max':16},'elevation':{'min':12,'max':13}}
+        with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-maintenance'}):
+            first=self.request(('satellite','elevation'),levels=levels);self.assertEqual(self.saved_job(first)['state'],'completed')
+            second=self.request(('satellite',),levels=levels,registryRevision=1);self.assertEqual(self.saved_job(second)['state'],'completed')
+        alias={'version':1,'type':'activate','id':str(uuid.uuid4()),'createdAt':now(),'packageId':first['id'],'registryRevision':2};self.assertEqual(self.saved_job(alias)['state'],'completed')
+        before=self.worker.registry();source=self.worker.root/'packages'/first['id'];manifest=portable.validate(source,Context());raw={str(p):digest(p) for p in (self.worker.root/'originals').rglob('*') if p.is_file()}
+        q=self.maintenance_request('delete',targetId=first['id']);state=self.run_maintenance(q);self.assertEqual(state['state'],'completed',state)
+        self.assertEqual(self.worker.registry()['layers'],{'satellite':second['id']});self.assertEqual(self.worker.registry()['satellitePackages'],[second['id']]);self.assertFalse(source.exists())
+        self.assertFalse((self.worker.root/'jobs'/(alias['id']+'.request.json')).exists());self.assertTrue((self.worker.root/'packages'/second['id']).exists())
+        for p,h in raw.items():self.assertEqual(digest(Path(p)),h)
+        restore=self.maintenance_request('restore',backupId=q['id']);result=self.run_maintenance(restore);self.assertEqual(result['state'],'completed',result)
+        self.assertEqual(self.worker.registry()['layers'],before['layers']);self.assertEqual(self.worker.registry()['satellitePackages'],before['satellitePackages']);self.assertEqual(portable.validate(source,Context())['files'],manifest['files'])
+        self.assertTrue((self.worker.root/'jobs'/(alias['id']+'.request.json')).exists())
+    def test_34_full_clear_and_restore_include_manual_maps_and_cancel_queued_downloads(self):
+        request=self.request();self.assertEqual(self.saved_job(request)['state'],'completed')
+        manual={k:self.root/('manual-'+k) for k in ('tpk','osm','street','elevation')};self.worker.maintenance_dirs=manual
+        for d in manual.values():d.mkdir();(d/'map.bin').write_bytes(b'manual-preserve');(d/'README.md').write_text('keep scaffold')
+        (manual['elevation']/'source').mkdir();(manual['elevation']/'source/.gitkeep').write_bytes(b'');(manual['elevation']/'source/dem.tif').write_bytes(b'synthetic-source')
+        protected=self.root/'facilities';protected.mkdir();(protected/'boundaries.json').write_bytes(b'facility-boundary');edits=self.root/'osm-edits.json';edits.write_bytes(b'user-osm-edits')
+        gold={str(p):digest(p) for p in self.worker.root.rglob('*') if p.is_file() and ('packages' in p.parts or 'exports' in p.parts or 'originals' in p.parts)}
+        pending=self.request(registryRevision=1);atomic(self.worker.root/'jobs'/(pending['id']+'.request.json'),pending)
+        before=self.worker.registry();q=self.maintenance_request('clear',includeLegacy=True);state=self.run_maintenance(q);self.assertEqual(state['state'],'completed',state)
+        self.assertEqual(self.worker.registry()['layers'],{});self.assertFalse(list((self.worker.root/'jobs').glob('*.request.json')))
+        for d in manual.values():self.assertFalse((d/'map.bin').exists());self.assertEqual((d/'README.md').read_text(),'keep scaffold')
+        self.assertEqual((protected/'boundaries.json').read_bytes(),b'facility-boundary');self.assertEqual(edits.read_bytes(),b'user-osm-edits');self.assertTrue((manual['elevation']/'source/.gitkeep').exists());self.assertFalse((manual['elevation']/'source/dem.tif').exists())
+        restore=self.maintenance_request('restore',backupId=q['id']);state=self.run_maintenance(restore);self.assertEqual(state['state'],'completed',state)
+        self.assertEqual(self.worker.registry()['layers'],before['layers'])
+        for p,h in gold.items():self.assertEqual(digest(Path(p)),h)
+        for d in manual.values():self.assertEqual((d/'map.bin').read_bytes(),b'manual-preserve')
+        self.assertEqual(self.status(pending)['state'],'cancelled');self.worker.run(once=True);self.assertEqual(self.status(pending)['state'],'cancelled')
+    def test_35_clear_interrupts_active_download_before_registration(self):
+        q=self.maintenance_request('clear');request=self.request(('osm',));atomic(self.worker.root/'jobs'/(request['id']+'.request.json'),request);progress=self.worker.progress
+        def interrupt(n,total):
+            progress(n,total);atomic(self.worker.root/'maintenance.pending.json',q);self.worker.last_maintenance_check=0;self.worker.check()
+        self.worker.progress=interrupt;state=self.run_job(request);self.assertEqual(state['state'],'cancelled',state);self.assertEqual(self.worker.registry()['layers'],{})
+        self.assertEqual(self.run_maintenance(q)['state'],'completed');self.assertFalse(list((self.worker.root/'jobs').glob('*.request.json')))
+    def test_36_restart_rolls_forward_detached_registry_and_rename_before_journal_write(self):
+        from maintenance import Maintenance,marker
+        for crash in ('detach','rename'):
+            with self.subTest(crash=crash):
+                self.worker=Worker(self.root/crash,ROOT,NoNetwork(),offline=True);p=self.worker.root/'packages'/str(uuid.uuid4());p.mkdir();(p/'sentinel').write_bytes(b'never-lose')
+                q=self.maintenance_request('clear');atomic(marker(self.worker.root),q);m=Maintenance(self.worker);journal=m.prepare(q);jp=m.base/(q['id']+'.journal.json');atomic(jp,journal)
+                if crash=='detach':
+                    atomic(self.worker.root/'active.json',{'version':1,'revision':1,**journal['after']})
+                else:
+                    replace=os.replace
+                    def stop(source,destination):
+                        replace(source,destination)
+                        if str(destination).endswith('/packages'):raise SystemExit('simulated process death')
+                    with patch('maintenance.os.replace',side_effect=stop):
+                        with self.assertRaises(SystemExit):m.apply(journal)
+                self.worker=Worker(self.worker.root,ROOT,NoNetwork(),offline=True);self.worker.run(once=True)
+                state=read_json(self.worker.root/'maintenance'/(q['id']+'.state.json'));self.assertEqual(state['state'],'completed',state)
+                self.assertFalse(marker(self.worker.root).exists());self.assertEqual((self.worker.root/'.map-trash'/q['id']/'packages'/p.name/'sentinel').read_bytes(),b'never-lose')
+    def test_37_delete_symlink_escape_and_restore_collision_preserve_files(self):
+        request=self.request(('osm',));self.assertEqual(self.saved_job(request)['state'],'completed');before=self.worker.registry();outside=self.root/'outside';outside.mkdir();(outside/'sentinel').write_bytes(b'outside')
+        package=self.worker.root/'packages'/request['id'];saved=self.root/'original-package';package.rename(saved);package.symlink_to(outside,target_is_directory=True)
+        q=self.maintenance_request('delete',targetId=request['id']);state=self.run_maintenance(q);self.assertEqual(state['state'],'failed');self.assertEqual(self.worker.registry(),before);self.assertEqual((outside/'sentinel').read_bytes(),b'outside')
+        package.unlink();saved.rename(package);q=self.maintenance_request('delete',targetId=request['id']);self.assertEqual(self.run_maintenance(q)['state'],'completed')
+        package.mkdir();(package/'new-file').write_bytes(b'new data');before=self.worker.registry();restore=self.maintenance_request('restore',backupId=q['id']);state=self.run_maintenance(restore);self.assertEqual(state['state'],'failed',state);self.assertEqual(self.worker.registry(),before);self.assertEqual((package/'new-file').read_bytes(),b'new data')
+        shutil.rmtree(package);restore=self.maintenance_request('restore',backupId=q['id']);self.assertEqual(self.run_maintenance(restore)['state'],'completed')
+    def test_38_maintenance_rejects_stale_revision_missing_mount_and_wrong_confirmation(self):
+        from maintenance import Maintenance,validate
+        q=self.maintenance_request('clear');before=self.worker.registry();m=Maintenance(self.worker)
+        for patch_values in ({'confirmation':'wrong'},{'operation':'../delete'},{'registryRevision':-1},{'id':'../bad'}):
+            with self.assertRaises(WorkError):validate({**q,**patch_values})
+        for patch_values in ({'registryRevision':999},{'includeLegacy':True}):
+            state=self.run_maintenance({**q,'id':str(uuid.uuid4()),**patch_values});self.assertEqual(state['state'],'failed');self.assertEqual(self.worker.registry(),before)
+        # Secret files explicitly configured under a map directory block that clear before detach.
+        secret=self.worker.root/'private-token';secret.write_bytes(b'credential-sentinel')
+        with patch.dict(os.environ,{'MAP_DOWNLOAD_ARCGIS_TOKEN_FILE':str(secret)}):state=self.run_maintenance({**q,'id':str(uuid.uuid4())})
+        self.assertEqual(state['state'],'failed');self.assertEqual(secret.read_bytes(),b'credential-sentinel');self.assertEqual(self.worker.registry(),before)
+    def test_40_corrupt_backup_is_rejected_before_restore_publishes_any_selection(self):
+        request=self.request(('osm',));self.assertEqual(self.saved_job(request)['state'],'completed');q=self.maintenance_request('delete',targetId=request['id']);self.assertEqual(self.run_maintenance(q)['state'],'completed');before=self.worker.registry()
+        backup=self.worker.root/'.map-trash'/q['id']/'packages'/request['id'];manifest=read_json(backup/'manifest.json');target=backup/manifest['files'][0]['path'];original=target.read_bytes();target.write_bytes(b'corrupt backup')
+        restore=self.maintenance_request('restore',backupId=q['id']);state=self.run_maintenance(restore);self.assertEqual(state['state'],'failed',state);self.assertIn('checksum',state['error']);self.assertEqual(self.worker.registry(),before);self.assertFalse((self.worker.root/'packages'/request['id']).exists());self.assertTrue(backup.exists())
+        target.write_bytes(original);(self.worker.root/'.map-trash'/q['id']/'exports'/(request['id']+'.zip')).unlink();restore=self.maintenance_request('restore',backupId=q['id']);state=self.run_maintenance(restore);self.assertEqual(state['state'],'failed');self.assertIn('누락',state['error']);self.assertEqual(self.worker.registry(),before)
+
+    def test_39_failed_mid_move_holds_gate_and_retries_preserved_journal(self):
+        from maintenance import Maintenance,marker
+        p=self.worker.root/'packages'/str(uuid.uuid4());p.mkdir();(p/'sentinel').write_bytes(b'keep-me');q=self.maintenance_request('clear');atomic(marker(self.worker.root),q)
+        replace=os.replace
+        def locked(source,destination):
+            if str(destination).endswith('/packages'):raise PermissionError('simulated file lock')
+            replace(source,destination)
+        with patch('maintenance.os.replace',side_effect=locked):state=Maintenance(self.worker).run(q)
+        self.assertEqual(state['state'],'failed');self.assertTrue(state['recoveryRequired']);self.assertTrue(marker(self.worker.root).exists());self.assertEqual((p/'sentinel').read_bytes(),b'keep-me')
+        self.assertEqual(Maintenance(self.worker).run(q)['state'],'completed');self.assertFalse(marker(self.worker.root).exists());self.assertEqual((self.worker.root/'.map-trash'/q['id']/'packages'/p.name/'sentinel').read_bytes(),b'keep-me')
+
 if __name__=='__main__':unittest.main()

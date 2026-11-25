@@ -486,3 +486,15 @@ V1 압축 bundle 검사는 유일한 record offset의 길이를 파일 오름차
 - 실제 Next.js production + CC0 reader fixture의 HTTP13/14/16/19 픽셀/헤더, 지역 밖 fallback, 외부 요청0 및 Light/Dark×Desktop/Mobile 화면은 [UI 검토](DOWNLOAD_UI_REVIEW.md#위성-패키지-동시-표시-후속-검토)와 manifest에 기록한다. 최초 file URL 참고 화면 접근이 차단돼 로컬 HTTP로 바꿔 양 테마 비교를 완료했다. 별도 로컬 production build는 처음에 읽기 전용 HOME의 Next telemetry 설정 쓰기에서 실패했으며, 기존 CI와 같은 NEXT_TELEMETRY_DISABLED=1로 다시 빌드해 통과했다.
 
 사용자 전국 작업8c9a5c80-2348-4a34-a880-7c910b3ac773은 API 조회에서 completed/registered=true, worker currentJob 비어 있음, 주 satellite ID 일치가 보고됐다. 위성3,985타일/40.5MiB 화면과 이 등록 결과는 전체 국토·각 줌의 coverage나 이번 다중 패키지 실제 앱 표시를 직접 검사한 증거가 아니다. 후속 사용자 환경에서 web/worker 함께 업데이트 후 이전 지역 작업을 명시 재등록하고 두 자료의 실제 확대 표시를 확인해야 한다. #20 전체 완료 조건은 아직 남아 있다. 최종 PR/main 동일 SHA CI 링크는 이슈 댓글에 기록한다.
+
+### 웹 지도 삭제·전체 초기화·백업 복원
+
+사용자 요청에 따라 웹 `/downloads`에 작업/패키지 삭제·다운로드/원본/적용 전체 초기화·선택적 수동 지도 정리·백업 복원을 추가했다. 같은 파일시스템의 `.map-trash` 이동이므로 영구 삭제/용량 확보와 구분한다. web은 원본 read-only, worker만 지도 전용 쓰기 마운트를 사용하고 시설·경계·OSM 수정·인증/환경·상위 gitlink·공통 API/네트워크 허용 목록은 보존한다.
+
+- Node123(앱118+CI도구5): 기존 tiles26/buildings24/layers6/osm14/measure9/launcher22, downloads17. 실제 API의 확인 문구·same-origin·UUID·CAS·worker capability/heartbeat·pending gate·부적절한 경로/명령 필드 미전달·종료 작업/복원 대상·지도 읽기/새 등록/업로드 차단·CLI 차단을 검증했다. 실제 ReadableStream ZIP 업로드가 완료되기 전 초기화가 거부되고, durable queue 저장 후 정리 요청이 가능해지는 동시성 시험을 포함한다. 제출·취소·업로드 시작·정리 요청은 같은 web writer의 직렬 구간을 사용한다.
+- worker40(read-only container/network none): 기존32 + 활성 패키지/관련 재등록 기록 삭제·잔여 위성/공유 원본 보존·NoNetwork 복원, 수동 지도 포함 전체 초기화·대기 취소/복원 후 자동 실행 방지·시설/OSM 수정/README/.gitkeep 보존, 실제 다운로드 중단, detach 후/rename 직후 프로세스 중단 복구, symlink 탈출·복원 충돌·잘못된 확인/마운트/CAS 거부, 잠금 오류 후 같은 저널 재시도, 손상·누락 백업의 복원 전 거부를 검증했다. 복원할 활성 managed 패키지는 manifest SHA/크기/형식/권한을 검사한다. 추가 mount를 적용한 실제 Compose 인증 전달4도 통과했다.
+- Playwright78: single4/multi15/osm10/layers14/buildings35, 실패/flaky/skip0. 문구·취소 포커스·확인 제목·저장 중/충돌·입력 및 captured revision 유지·초기화 진행/신규 작업 차단·복원 흐름을 추가했다. 3초 지연 조회가2.5초 주기 조회에 무효화되지 않는 것도 검증했다. 기존 시설/경계/OSM/측정/레이어/테마 회귀를 유지한다.
+- 실제 Next.js production에서 업로드 중인 HTTP ZIP 스트림과 별도 초기화 요청의409/부분 파일 청소도 확인했다. production Docker worker의 UI 초기화→복원→개별 삭제→복원을 CC0 자료로 실행했다. jobs2→0→2→1→2, 적용0/잔여1/복원2, 복원한19레벨 타일의 실제 픽셀·헤더, 보호한 원본/수동 지도/시설/OSM 수정/설정 sentinel과 외부 요청0을 확인했다. [화면·재현/범위](DOWNLOAD_UI_REVIEW.md#웹-지도-삭제초기화복원-검토), [manifest](ui/map-maintenance/manifest.json)에 기록한다. 합성 최초 지도 준비 상태와 실제 정리 작업 실행을 구분한다.
+- typecheck/production build/Compose config/diff-check와 공통 디자인92개/스킬3개 검사를 별도 실행했다. 첫 전체 복원 시험은 worker가 재생성한 빈 중첩 폴더를 새 파일 충돌로 판단해 실패했으며, 파일/링크가 없는 빈 디렉터리만 허용·비우도록 고쳐 동일40개/HTTP 경로를 재검증했다. 충돌 검사·누락/해시 검사·저널 복구를 제거하지 않았다.
+
+사용자 Windows PC의 실제 자료/파일 잠금·HOST_DIR 및 사이트 접속 문제는 이 Linux/합성 검증과 별도다. 실행 중인 외부 CLI/준비 도구는 종료해야 하며 다중 web writer는 지원하지 않는다. 백업20개/정리 기록100개·이동 항목1000개·리더 종료120초·중간 실패30초 재시도 경계를 문서화했다. 기존 #20의 공식 원본·실제 앱/고도값 전체 완료 조건은 유지한다. 최종 동일 SHA의 PR/main CI 증거는 #20 댓글에 기록한다.

@@ -5,13 +5,16 @@ from pathlib import Path
 from common import *
 from providers import ADAPTERS, Network, probe
 import package as packages
+import maintenance
 
 class Worker:
-    def __init__(self,root,code=None,net=None,offline=False,imagery_dir=None,dem_dir=None):
+    def __init__(self,root,code=None,net=None,offline=False,imagery_dir=None,dem_dir=None,maintenance_dirs=None):
         self.root=Path(root).resolve();self.code=Path(code or Path(__file__).resolve().parents[2]);self.net=net or Network(self.root/'network-backoff.json');self.offline=offline;self.request=None;self.state=None;self.item=None;self.received=0;self.last_progress=0;self.last_heartbeat=0;self.committed=False
+        self.maintenance_dirs={k:Path(v) for k,v in (maintenance_dirs or {}).items()};self.maintenance_failed=0;self.last_maintenance_check=0
+        self.maintenance_original_dirs={'imagery':Path(imagery_dir) if imagery_dir else self.root/'originals/imagery','dem':Path(dem_dir) if dem_dir else self.root/'originals/dem'}
         self.original_dirs={'satellite':Path(imagery_dir).resolve() if imagery_dir else self.root/'originals/imagery','elevation':Path(dem_dir).resolve() if dem_dir else self.root/'originals/dem'}
-        for folder in ('jobs','staging','packages','exports','incoming','history'): (self.root/folder).mkdir(parents=True,exist_ok=True)
-    def heartbeat(self):atomic(self.root/'worker.json',{'version':1,'updatedAt':now(),'singleWriter':True,'currentJob':self.request['id'] if self.request else None});self.last_heartbeat=time.monotonic()
+        for folder in ('jobs','staging','packages','exports','incoming','history','maintenance'): (self.root/folder).mkdir(parents=True,exist_ok=True)
+    def heartbeat(self):atomic(self.root/'worker.json',{'version':1,'updatedAt':now(),'singleWriter':True,'maintenanceVersion':1,'legacyReset':set(self.maintenance_dirs)=={'tpk','osm','street','elevation'},'currentJob':self.request['id'] if self.request else None});self.last_heartbeat=time.monotonic()
     def registry(self):
         p=self.root/'active.json'
         if not p.exists():return {'version':1,'revision':0,'layers':{}}
@@ -28,7 +31,21 @@ class Worker:
         return v
     def satellite_packages(self,r):return r.get('satellitePackages',[r['layers']['satellite']] if r['layers'].get('satellite') else [])
     def save(self):self.state['updatedAt']=now();atomic(self.root/'jobs'/(self.request['id']+'.state.json'),self.state);self.heartbeat()
+    def run_maintenance(self):
+        if not maintenance.marker(self.root).exists():return False
+        request=read_json(maintenance.marker(self.root),16384)
+        if request.get('ready') is not True:
+            age=time.time()-__import__('datetime').datetime.fromisoformat(request['createdAt'].replace('Z','+00:00')).timestamp()
+            if age>120:
+                atomic(maintenance.folder(self.root)/(identity(request['id'])+'.state.json'),{'id':request['id'],'request':request,'createdAt':request['createdAt'],'state':'failed','stage':'파일 리더 종료 확인 시간 초과','error':'정리를 다시 요청하세요. 지도 파일은 변경하지 않았습니다.'});maintenance.marker(self.root).unlink()
+            return True
+        if time.monotonic()>=self.maintenance_failed:
+            state=maintenance.Maintenance(self).run(read_json(maintenance.marker(self.root),16384));self.maintenance_failed=time.monotonic()+30 if state.get('recoveryRequired') else 0
+        return True
     def check(self):
+        if not self.committed and time.monotonic()-self.last_maintenance_check>.25:
+            self.last_maintenance_check=time.monotonic()
+            if maintenance.marker(self.root).exists() and read_json(maintenance.marker(self.root),16384).get('operation')=='clear':raise Cancelled('전체 초기화 요청으로 다운로드를 취소했습니다.')
         if time.monotonic()-self.last_heartbeat>5:self.heartbeat()
         if not self.committed and (self.root/'jobs'/(self.request['id']+'.cancel.json')).exists():raise Cancelled('작업을 취소했습니다. 기존 활성 지도는 유지합니다.')
         if self.request and time.monotonic()-self.started>7200:raise WorkError('전체 작업 제한2시간 초과')
@@ -147,8 +164,13 @@ class Worker:
             except BlockingIOError:raise WorkerBusy('한 데이터 폴더에는 worker 한 개만 실행할 수 있습니다.')
             self.recover();self.heartbeat();atomic(self.root/'providers.json',{'version':1,'satellite':{'state':'blocked','reason':'오프라인 worker: 원본 다운로드는 비활성입니다. 이전/복원은 사용할 수 있습니다.','lods':{}}} if self.offline else probe(self.net,self.heartbeat))
             while True:
-                self.heartbeat();requests=sorted((self.root/'jobs').glob('*.request.json'),key=lambda p:p.stat().st_mtime_ns)
+                self.heartbeat()
+                if self.run_maintenance():
+                    if once:return
+                    time.sleep(1);continue
+                requests=sorted((self.root/'jobs').glob('*.request.json'),key=lambda p:p.stat().st_mtime_ns)
                 for p in requests:
+                    if maintenance.marker(self.root).exists():break
                     id=identity(p.name[:-13])
                     if not (self.root/'jobs'/(id+'.state.json')).exists():
                         try:
@@ -157,11 +179,12 @@ class Worker:
                             if self.offline and request.get('type')=='download':raise WorkError('Offline worker cannot download')
                             self.process(request)
                         except Exception:atomic(self.root/'jobs'/(id+'.state.json'),{'version':1,'id':id,'state':'failed','stage':'잘못된 작업 요청','createdAt':now(),'updatedAt':now(),'items':{}})
+                if maintenance.marker(self.root).exists():self.run_maintenance()
                 if once:return
                 time.sleep(1)
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--directory',default=os.getenv('MAP_DOWNLOADS_DIR','data/downloads'));p.add_argument('--once',action='store_true');p.add_argument('--offline',action='store_true',default=os.getenv('MAP_DOWNLOADS_OFFLINE')=='true');a=p.parse_args()
-    try:Worker(a.directory,offline=a.offline,imagery_dir=os.getenv('MAP_IMAGERY_DIR','data/imagery'),dem_dir=os.getenv('MAP_DEM_DIR','data/dem')).run(a.once)
+    try:Worker(a.directory,offline=a.offline,imagery_dir=os.getenv('MAP_IMAGERY_DIR','data/imagery'),dem_dir=os.getenv('MAP_DEM_DIR','data/dem'),maintenance_dirs={k:os.environ['MAP_MAINTENANCE_'+k.upper()+'_DIR'] for k in ('tpk','osm','street','elevation') if os.getenv('MAP_MAINTENANCE_'+k.upper()+'_DIR')}).run(a.once)
     except WorkerBusy as e:print(str(e),file=sys.stderr);sys.exit(75)
     except WorkError as e:print(str(e),file=sys.stderr);sys.exit(1)

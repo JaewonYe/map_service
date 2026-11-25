@@ -75,6 +75,10 @@ services:
       OPENTOPOGRAPHY_API_KEY: ${OPENTOPOGRAPHY_API_KEY:-}
       MAP_IMAGERY_DIR: /data/imagery
       MAP_DEM_DIR: /data/dem
+      MAP_MAINTENANCE_TPK_DIR: /data/legacy-tpk
+      MAP_MAINTENANCE_OSM_DIR: /data/legacy-osm
+      MAP_MAINTENANCE_STREET_DIR: /data/legacy-street
+      MAP_MAINTENANCE_ELEVATION_DIR: /data/legacy-elevation
     volumes:
       - type: bind
         source: ${MAP_DOWNLOADS_HOST_DIR:-./data/downloads}
@@ -91,6 +95,27 @@ services:
         target: /data/dem
         bind:
           create_host_path: false
+      - type: bind
+        source: ${TPK_HOST_DIR:-./data/tpk}
+        target: /data/legacy-tpk
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${OSM_HOST_DIR:-./data/osm}
+        target: /data/legacy-osm
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${STREET_HOST_DIR:-./data/street}
+        target: /data/legacy-street
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ELEVATION_HOST_DIR:-./data/elevation}
+        target: /data/legacy-elevation
+        bind:
+          create_host_path: false
+    # Map-only maintenance mounts; facilities, edits, secrets and Docker socket are excluded.
     # Optional private files: explicitly set the *_FILE container paths and mount them read-only via an override.
     # No Docker socket, host command endpoint, or legacy source mounts.
     restart: unless-stopped

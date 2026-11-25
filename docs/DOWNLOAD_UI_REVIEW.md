@@ -55,3 +55,17 @@ production worker 이미지로 `tests/fixtures/downloads-proof.py <새 격리 �
 [캡처 manifest](ui/satellite-coexistence/manifest.json), 재현 스크립트 `npx tsx scripts/capture-satellite-review.ts`(먼저 production build). 실제 Next.js/로컬 카탈로그/타일 API를 사용하지만 패키지는 CC0 합성 PNG와 수동 구성한 등록부/완료 작업 fixture다. 이 화면의 completed는 worker 실행 증거가 아니며, worker32 시험과 구분한다. worker를 띄우지 않아 미연결 경고가 그대로 보인다. HTTP에서13레벨 개요/14·16·19레벨 상세의 픽셀과 native zoom 헤더, 지역 밖13레벨 대체를 확인했다. 외부 요청0,1440×900/390×844에서 가로 넘침 없음. 실제 전국·태안 원본을 합성해 캡처한 화면은 아니다.
 
 검토: `components/DownloadManager.tsx` 새 named section은 개수·선택 기준을 색과 무관한 텍스트로 전달하고 기존 카드/작업 목록·터치 높이·네이티브 버튼·포커스를 유지한다. 안내/목록/선택 카드가 양 테마·모바일에서 겹치거나 잘리지 않는 것을 확인했다. 재등록은 키보드 Enter로 현재 revision의 activate 요청 한 건만 전송하며 완료 후 개수·포함 상태가 갱신되고 재조회/새로고침에도 유지되는 브라우저 회귀를 추가했다. 기존 테마 저장/시스템 변경/저장 불가/초기 hydration/지도·폼 보존·모바일 키보드 회귀도 통과했다. 공통 디자인 자산92개/스킬3개 검사는 별도 통과했다.
+
+## 웹 지도 삭제·초기화·복원 검토
+
+프로젝트 platform-ui-design과 MASTER/IMPLEMENTATION, 로컬 reference 양 테마/크기, UI UX Pro Max의 `destructive action undo confirmation` 검색(확인·결과 전달), Web Design Guidelines 번들 기준을 적용했다. 공통 디자인 자산/토큰은 변경하지 않았다.
+
+| Desktop Light | Desktop Dark | Mobile Light | Mobile Dark |
+| --- | --- | --- | --- |
+| [초기화 확인](ui/map-maintenance/desktop-light-confirm.png) | [초기화 확인](ui/map-maintenance/desktop-dark-confirm.png) | [초기화 확인](ui/map-maintenance/mobile-light-confirm.png) | [초기화 확인](ui/map-maintenance/mobile-dark-confirm.png) |
+
+[Manifest](ui/map-maintenance/manifest.json) / `scripts/capture-map-maintenance-review.ts`: production build의 실제 Next.js HTTP와 **production Docker worker(network none/read-only image)**를 연결했다. CC0 합성 TPK·manifest·초기 작업/등록부를 만든 뒤 UI에서 전체 초기화→백업 복원→개별 삭제→복원을 실제 실행했다. 초기화 뒤 jobs0/활성0/수동 위성 unavailable, 복원 뒤 jobs2/위성2/19레벨 실제 PNG 픽셀, 개별 삭제 뒤 jobs1/위성1과 다시 복원을 확인했다. 원본·수동 지도·시설·OSM 수정·설정 sentinel은 보존됐다. 실제 production의 ZIP 업로드 route와 초기화 route를 동시에 호출해409·중단 업로드의 부분 파일 청소도 확인했다. 최초 지도 준비 작업의 completed는 fixture이며, 이번 정리/복원 상태는 실제 worker 결과다. 공식 imagery 다운로드 증거가 아니다. 외부 요청0,1440×900/390×844 가로 넘침 없음.
+
+재현: `docker build -f scripts/downloads/Dockerfile -t map-service-download-worker:maintenance .`, `NEXT_TELEMETRY_DISABLED=1 npm run build`, `npx tsx scripts/capture-map-maintenance-review.ts`. 자체 `.cache/map-maintenance-review` 자료만 정리하고 테스트 컨테이너를 종료한다. 호스트에 Docker·Chromium이 필요하며 기존 실제 data 폴더를 초기화하는 스크립트가 아니다.
+
+검토 결과: `components/MapDataMaintenance.tsx`의 named section/heading/inline confirmation group·연결된 label/name/자동완성 off·정확한 확인 문구·disabled/진행/실패 텍스트·aria-live·danger/on-danger·visible focus를 확인했다. 확인창을 열면 제목으로, 취소하면 실행 버튼으로 포커스가 돌아간다. 충돌 시 문구/스냅샷 revision을 보존하고 오류에 포커스한다. 초기화 범위·적용 중 선택 해제·관련 재등록 기록·백업이 공간을 사용한다는 설명이 실제 처리와 일치한다. 터치44px·체크 라벨·모바일 줄바꿈과 양 테마 명암비를 유지했다. 전체 초기화는 외부 CLI/준비 도구를 먼저 종료하도록 안내한다. 서버가 연결되지 않거나 구 worker이면 지원 조건과 disabled 상태를 표시한다. 테마 전환·OS 변경·저장 불가·초기 hydration·지도/폼 상태·시설/경계/OSM 편집 회귀를 기존 브라우저 전체 검증에 포함한다.

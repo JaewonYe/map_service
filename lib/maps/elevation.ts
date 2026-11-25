@@ -1,5 +1,5 @@
 import {readFile, realpath, stat} from 'node:fs/promises';
-import {managedDirectory} from '../downloads/active';
+import {managedDirectory,registry,assertNoMaintenance} from '../downloads/active';
 import {createHash} from 'node:crypto';
 import {isAbsolute, relative, resolve, win32, join} from 'node:path';
 import sharp from 'sharp';
@@ -109,19 +109,23 @@ export class Elevation {
     return {elevationMeters:null,reason:'missing'};
   }
 }
-let current: {key:string;stamp:string;at:number;value:Promise<Elevation>} | undefined;
+let current: {key:string;stamp:string;revision:number;at:number;value:Promise<Elevation>} | undefined;
 export async function getElevation() {
+  const revision=(await registry()).revision;
   const directory = await managedDirectory('elevation') || resolve(/*turbopackIgnore: true*/ process.env.ELEVATION_DIR || 'data/elevation');
-  if (current?.key === directory && Date.now() - current.at < 1000) return current.value;
+  if (current?.key === directory && current.revision===revision && Date.now() - current.at < 1000) return current.value;
   const details = await stat(/*turbopackIgnore: true*/ join(directory,'metadata.json')).catch(error => {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new TileError('No prepared DEM dataset. Prepare data/elevation/source/dem.tif first.',503);
     throw error;
   });
   const stamp = `${details.size}:${details.mtimeMs}:${details.ctimeMs}`;
-  if (current?.key === directory && current.stamp === stamp) { current.at = Date.now(); return current.value; }
+  if (current?.key === directory && current.revision===revision && current.stamp === stamp) { current.at = Date.now(); return current.value; }
+  await assertNoMaintenance();
   const value = Elevation.load(directory);
-  current = {key:directory,stamp,at:Date.now(),value};
+  current = {key:directory,stamp,revision,at:Date.now(),value};
   // No unhandled rejection when metadata is missing or invalid.
   value.catch(() => { if (current?.value === value) current = undefined; });
   return value;
 }
+
+export function releaseElevationReader(){current=undefined;}

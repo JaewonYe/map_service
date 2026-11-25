@@ -10,7 +10,9 @@ if(flags.some(x=>!allowed.includes(x)))throw Error('지원 옵션: --accept-usag
 if(flags.includes('--help')||!flags.includes('--accept-usage')){console.log('공식 이용 조건과 이 앱의 오프라인 표시·이전 권한을 확인한 뒤 실행하세요.\nnode --env-file=.env.downloads scripts/download-taean.mjs --accept-usage [--refresh] [--osm]\n--resume --accept-usage: 단일 미완료 태안 작업을 새 요청 없이 재개합니다.\n기본: 지정 태안 영역 / World Imagery export POST EPSG:3857 level15–17 + OpenTopography COP30 GTiff. --osm은 대한민국 지역 PBF 전체 다운로드를 추가합니다.');process.exit(flags.includes('--help')?0:2);}
 if(flags.includes('--resume')&&(flags.includes('--refresh')||flags.includes('--osm')))throw Error('--resume은 기존 요청을 유지합니다. --refresh/--osm과 함께 사용할 수 없습니다.');
 console.log('인증 설정 유무 (값·계정 권한은 표시하지 않음): '+JSON.stringify(Object.fromEntries(['ARCGIS_TOKEN','ARCGIS_REFERER','OPENTOPOGRAPHY_API_KEY','MAP_DOWNLOAD_ARCGIS_TOKEN_FILE','MAP_DOWNLOAD_OPENTOPOGRAPHY_KEY_FILE'].map(k=>[k,Boolean(process.env[k])]))));
-const directory=resolve(root,process.env.MAP_DOWNLOADS_HOST_DIR||'data/downloads');await mkdir(join(directory,'jobs'),{recursive:true});
+const directory=resolve(root,process.env.MAP_DOWNLOADS_HOST_DIR||'data/downloads');
+async function assertNoCleanup(){try{await stat(join(directory,'maintenance.pending.json'));}catch(e){if(e.code==='ENOENT')return;throw e;}throw Error('웹에서 지도 삭제·초기화·복원 중입니다. 완료 후 CLI를 실행하세요.');}
+await assertNoCleanup();await mkdir(join(directory,'jobs'),{recursive:true});
 for(const p of [process.env.IMAGERY_HOST_DIR||'data/imagery',process.env.DEM_HOST_DIR||'data/dem'])await mkdir(resolve(root,p),{recursive:true});
 const files=(await readdir(join(directory,'jobs'))).filter(x=>x.endsWith('.request.json'));if(files.length>100)throw Error('작업 기록100개 한도입니다. 백업 후 정리하세요.');
 const pending=[];
@@ -27,11 +29,11 @@ if(flags.includes('--resume')){
  let registry={revision:0};try{registry=JSON.parse(await readFile(join(directory,'active.json'),'utf8'));}catch(e){if(e.code!=='ENOENT')throw Error('등록 정보 오류: 기존 파일을 보존하고 복구하세요.');}
  id=randomUUID();const kinds=['satellite','elevation',...(flags.includes('--osm')?['osm']:[])];
  const request={version:1,type:'download',id,createdAt:new Date().toISOString(),name:taskName,bounds:{south:36.585138820015565,north:36.61063932151162,west:126.230336932571,east:126.24993476192829},kinds,region:'south-korea',demProvider:'opentopography',refresh:flags.includes('--refresh'),levels:{satellite:{min:15,max:17},elevation:{min:8,max:13}},accepted:Object.fromEntries(kinds.map(k=>[k,true])),registryRevision:registry.revision};
- const temporary=join(directory,'jobs',id+'.tmp');await writeFile(temporary,JSON.stringify(request)+'\n',{flag:'wx',mode:0o600});await rename(temporary,join(directory,'jobs',id+'.request.json'));console.log('태안 준비 작업 '+id+'를 저장했습니다. 원본은 data/imagery·data/dem, 준비/상태는 별도 다운로드 폴더에 보존합니다.');
+ await assertNoCleanup();const temporary=join(directory,'jobs',id+'.tmp');await writeFile(temporary,JSON.stringify(request)+'\n',{flag:'wx',mode:0o600});await rename(temporary,join(directory,'jobs',id+'.request.json'));console.log('태안 준비 작업 '+id+'를 저장했습니다. 원본은 data/imagery·data/dem, 준비/상태는 별도 다운로드 폴더에 보존합니다.');
 }
 let exit=null;
 const args=['compose','--profile','downloads','run','--rm','--build','download-worker','--once'];
-const child=spawn('docker',args,{cwd:root,env:process.env,shell:false,stdio:['ignore','inherit','inherit']});
+await assertNoCleanup();const child=spawn('docker',args,{cwd:root,env:process.env,shell:false,stdio:['ignore','inherit','inherit']});
 child.on('error',()=>{exit=127;});child.on('close',code=>{exit=code;});
 let last='',deadline=Date.now()+2*60*60*1000;
 while(Date.now()<deadline){

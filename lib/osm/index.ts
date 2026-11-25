@@ -1,5 +1,5 @@
 import {readFile,realpath,stat} from 'node:fs/promises';
-import {managedDirectory} from '../downloads/active';
+import {managedDirectory,registry,assertNoMaintenance} from '../downloads/active';
 import {join,resolve,relative,isAbsolute} from 'node:path';
 import {DatabaseSync,type StatementSync} from 'node:sqlite';
 import {createHash} from 'node:crypto';
@@ -123,14 +123,18 @@ export class OsmIndex{
     try{return await task;}finally{this.pending.delete(key);if(this.closed&&!this.pending.size)this.db.close();}
   }
 }
-let active:{directory:string;stamp:string;time:number;reader:OsmIndex}|undefined;
+let active:{directory:string;stamp:string;time:number;revision:number;reader:OsmIndex}|undefined;
 let loading:Promise<OsmIndex>|undefined;
 export async function getOsmIndex(force=false){
+  const revision=(await registry()).revision;
   const directory=await managedDirectory('osm')||resolve(/*turbopackIgnore: true*/ process.env.OSM_TILE_DIR||'data/osm');
-  if(!force&&active?.directory===directory&&Date.now()-active.time<1000)return active.reader;
+  if(!force&&active?.directory===directory&&active.revision===revision&&Date.now()-active.time<1000)return active.reader;
   const details=await stat(/*turbopackIgnore: true*/ join(directory,'metadata.json'));
   const stamp=`${details.size}:${details.mtimeMs}:${details.ctimeMs}`;
-  if(active?.directory===directory&&active.stamp===stamp){active.time=Date.now();return active.reader;}
-  if(!loading)loading=OsmIndex.load(directory).then(reader=>{active?.reader.close();active={directory,stamp,time:Date.now(),reader};return reader;});
+  if(active?.directory===directory&&active.revision===revision&&active.stamp===stamp){active.time=Date.now();return active.reader;}
+  await assertNoMaintenance();
+  if(!loading)loading=OsmIndex.load(directory).then(reader=>{active?.reader.close();active={directory,stamp,time:Date.now(),revision,reader};return reader;});
   try{return await loading;}finally{loading=undefined;}
 }
+
+export async function releaseOsmReader(){if(loading)await loading.catch(()=>{});active?.reader.close();active=undefined;}

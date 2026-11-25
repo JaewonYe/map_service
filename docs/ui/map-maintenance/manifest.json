@@ -1,0 +1,82 @@
+{
+  "source": "Self-generated CC0 reader/job fixtures; real Next.js HTTP and production Docker maintenance worker; no official provider imagery/download claim",
+  "image": "map-service-download-worker:maintenance",
+  "captures": [
+    {
+      "file": "desktop-light-confirm.png",
+      "device": "desktop",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "desktop-dark-confirm.png",
+      "device": "desktop",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "mobile-light-confirm.png",
+      "device": "mobile",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "mobile-dark-confirm.png",
+      "device": "mobile",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  ],
+  "checks": [
+    {
+      "action": "concurrent-upload",
+      "clearStatus": 409,
+      "partialCleaned": true
+    },
+    {
+      "action": "clear",
+      "state": "completed",
+      "jobs": 0,
+      "activeLayers": 0,
+      "manualSatelliteAvailable": false,
+      "backupId": "db774f9c-b520-4b95-a4cb-218c8a8f46d8"
+    },
+    {
+      "action": "restore",
+      "state": "completed",
+      "jobs": 2,
+      "satellitePackages": 2,
+      "nativeZoom": 19,
+      "preserved": [
+        "raw/manual maps",
+        "facilities",
+        "OSM edits",
+        "configuration fixture"
+      ]
+    },
+    {
+      "action": "delete",
+      "state": "completed",
+      "jobs": 1,
+      "satellitePackages": 1
+    },
+    {
+      "action": "undo-delete",
+      "state": "completed",
+      "jobs": 2
+    }
+  ],
+  "externalRequests": 0
+}

@@ -141,3 +141,43 @@ test('satellite registry rejects invalid sets without modifying the operator fil
  }
  await atomic(join(root,'active.json'),{version:1,revision:3,layers:{},satellitePackages:[]});assert.deepEqual((await registry()).satellitePackages,[]);
 });
+
+test('maintenance API validates explicit confirmation revision worker support and locks writes while preserving map files',async t=>{
+ const root=await fixture(t),request=(data:any,extra={})=>new Request('http://localhost/api/downloads',{method:'POST',headers:{'Content-Type':'application/json',...extra},body:JSON.stringify(data)});
+ const clear={action:'maintenance',operation:'clear',confirmation:'전체 초기화',includeLegacy:true,registryRevision:0};
+ assert.equal((await POST(request({...clear,confirmation:''}))).status,400);assert.equal((await POST(request(clear))).status,503);
+ await atomic(join(root,'worker.json'),{maintenanceVersion:1,legacyReset:true,updatedAt:new Date().toISOString()});
+ assert.equal((await POST(request({...clear,registryRevision:3}))).status,409);assert.equal((await POST(request(clear,{Origin:'https://evil.test'}))).status,403);
+ const queued=await POST(request(clear));assert.equal(queued.status,202);const q=await queued.json(),pending=JSON.parse(await readFile(join(root,'maintenance.pending.json'),'utf8'));assert.equal(pending.id,q.id);assert.equal(pending.ready,true);assert.equal(pending.includeLegacy,true);assert.equal('path'in pending,false);
+ assert.equal((await POST(request(plan()))).status,503);assert.equal((await POST(request(clear))).status,503);await assert.rejects(cancel(randomUUID()),{status:503});await assert.rejects(getCatalog(),/정리가 끝난/);await assert.rejects(getOsmIndex(),/정리가 끝난/);await assert.rejects(getElevation(),/정리가 끝난/);
+ await assert.rejects(upload(new Request('http://localhost/api/downloads/import',{method:'POST',headers:{'Content-Type':'application/zip','If-Match':'"0"','X-Map-Confirm-Usage':'true'},body:Buffer.from('PK')})),{status:503});
+ const info=await(await GET()).json();assert.equal(info.maintenance.pending,q.id);assert.equal(info.maintenance.operations[0].state,'queued');assert.equal((await listJobs()).length,0);
+});
+
+test('maintenance deletion requires terminal jobs and backup API never accepts arbitrary filesystem paths',async t=>{
+ const root=await fixture(t),request=(data:any)=>new Request('http://localhost/api/downloads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+ await atomic(join(root,'worker.json'),{maintenanceVersion:1,legacyReset:false,updatedAt:new Date().toISOString()});
+ const created=await submit(plan());let action={action:'maintenance',operation:'delete',confirmation:'지도 삭제',targetId:created.id,registryRevision:0};assert.equal((await POST(request(action))).status,409);
+ await atomic(join(root,'jobs',created.id+'.state.json'),{id:created.id,request:plan(),createdAt:new Date().toISOString(),state:'failed',items:{}});
+ assert.equal((await POST(request({...action,targetId:'../../outside'}))).status,400);
+ assert.equal((await POST(request({action:'maintenance',operation:'restore',confirmation:'백업 복원',backupId:randomUUID(),registryRevision:0}))).status,409);
+ assert.equal((await POST(request({action:'maintenance',operation:'clear',confirmation:'전체 초기화',includeLegacy:true,registryRevision:0}))).status,409);
+ const result=await POST(request({...action,path:'/etc/passwd',shell:'rm -rf /',includeLegacy:false}));assert.equal(result.status,202);const pending=JSON.parse(await readFile(join(root,'maintenance.pending.json'),'utf8'));assert.equal(pending.targetId,created.id);assert.equal(pending.path,undefined);assert.equal(pending.shell,undefined);
+});
+
+test('Taean CLI refuses a pending web cleanup before creating a request or starting Docker',async t=>{
+ const root=await fixture(t);await atomic(join(root,'maintenance.pending.json'),{id:randomUUID(),operation:'clear'});
+ const {execFile}=await import('node:child_process'),{promisify}=await import('node:util');
+ await assert.rejects(promisify(execFile)(process.execPath,['scripts/download-taean.mjs','--accept-usage'],{cwd:process.cwd(),env:{...process.env,MAP_DOWNLOADS_HOST_DIR:root,IMAGERY_HOST_DIR:join(root,'imagery'),DEM_HOST_DIR:join(root,'dem')}}),(e:any)=>{assert.equal(e.code,1);assert.match(e.stderr,/삭제·초기화·복원 중/);return true;});
+ assert.equal((await listJobs()).length,0);assert.ok(!(await readdir(root)).includes('jobs'));
+});
+
+test('an in-flight ZIP upload blocks maintenance until its durable queue write completes',async t=>{
+ const root=await fixture(t);await atomic(join(root,'worker.json'),{maintenanceVersion:1,legacyReset:true,updatedAt:new Date().toISOString()});let streamController!:ReadableStreamDefaultController<Uint8Array>;
+ const stream=new ReadableStream<Uint8Array>({start(c){streamController=c;c.enqueue(new Uint8Array([80,75]));}});
+ const uploading=upload(new Request('http://localhost/api/downloads/import',{method:'POST',headers:{'Content-Type':'application/zip','If-Match':'"0"','X-Map-Confirm-Usage':'true'},body:stream,duplex:'half'} as any));
+ let started=false;for(let i=0;i<100;i++){try{started=(await readdir(join(root,'incoming'))).some(n=>n.endsWith('.part'));}catch{}if(started)break;await new Promise(ok=>setTimeout(ok,10));}assert.ok(started);
+ const request=()=>new Request('http://localhost/api/downloads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'maintenance',operation:'clear',confirmation:'전체 초기화',registryRevision:0,includeLegacy:true})});
+ const blocked=await POST(request());assert.equal(blocked.status,409);assert.match((await blocked.json()).error,/업로드/);assert.ok(!(await readdir(root)).includes('maintenance.pending.json'));
+ streamController.close();await uploading;assert.equal((await listJobs()).length,1);assert.equal((await POST(request())).status,202);
+});

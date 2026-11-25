@@ -167,3 +167,39 @@ ZIP manifest version1은 id/createdAt/requestedBounds/items, 제공처·license�
 인터넷이 있는 PC에서 앱/worker 이미지도 먼저 준비한다. 다른 PC에서 같은 버전 앱/worker를 설치하고 ZIP을 `/downloads`에 가져온다. import/activate/reset에는 원본 네트워크가 필요 없다. 완전히 오프라인인 worker는 `--offline`과 Docker `--network none`을 함께 사용해 provider probe도 끈다. 예: 준비된 `map-service-download-worker:local` 이미지에 다운로드 폴더를 `/data/downloads`로 bind한 뒤 `docker run --rm --network none ... map-service-download-worker:local --offline`. 앱 자체는 MAP_MODE=offline을 유지한다.
 
 ZIP은 해시·형식·버전·상대 경로·중복/대소문자 중복·symlink·해제 크기·압축률·계정 URL을 검사한 뒤 새 UUID 폴더에 복원한다. 기존 설정/사용자 파일을 덮어쓰지 않는다. 현재 도구 이미지에 검증용 GDAL/osmium/Python이 필요하지만 재다운로드나 재변환은 하지 않는다. 모든 복원 후 앱에서 각 레이어·범위·고도값을 확인한다. 원본 이용 조건상 다른 PC 이전이 허용되지 않으면 ZIP을 이전하지 않는다.
+
+## 웹에서 지도 삭제·전체 초기화·복원
+
+`/downloads`의 **지도 데이터 삭제·초기화**에서 다음을 실행한다. worker가 `maintenanceVersion:1`로 연결돼야 버튼이 활성화된다. 기존 **기존 파일 기반 지도로 돌아가기**는 적용 선택만 해제하며 파일을 정리하지 않는 동작으로 유지한다.
+
+| 기능 | 정리 범위 | 확인 문구 |
+| --- | --- | --- |
+| 선택 작업·지도 삭제 | 선택한 종료 작업의 패키지·이전 ZIP·연결된 재등록 기록. 적용 중이면 해당 선택 해제, 남은 위성 유지. 패키지가 없는 실패 작업은 기록만 정리 | `지도 삭제` |
+| 지도 데이터 전체 초기화 | 진행/대기 다운로드 취소, 다운로드 이력·패키지·이전 ZIP·원본 캐시/인덱스·위성/DEM 원본·적용 상태 | `전체 초기화` |
+| 직접 설치한 지도도 포함(초기화 옵션) | 기존 TPK/일반 지도/고도/PBF 폴더의 데이터 추가 정리. 기본 선택됨 | 위와 같음 |
+| 이 백업 복원 | 백업 파일과 당시 적용 선택. 취소된 다운로드는 취소 상태로 복원 | `백업 복원` |
+
+파일은 **각 지도 폴더의 `.map-trash/<정리ID>/`로 같은 파일시스템 안에서 이동**한다. 물리 삭제·디스크 공간 확보 기능은 아니며 자동 백업 삭제/영구 삭제 버튼은 제공하지 않는다. 다운로드 폴더의 `maintenance/<ID>.journal.json`과 `.state.json`이 이동 목록·복원 상태를 보관하므로 각 지도 폴더와 다운로드 폴더를 함께 백업한다. README/maps.example/`.gitkeep`와 `.env*`는 남기며 시설·경계·OSM 수정 폴더와 인증/환경 파일은 정리 대상 마운트에 포함하지 않는다. 명시한 비밀 파일이 정리 대상에 들어 있으면 중단한다. 개별 삭제는 공유 원본 캐시를 지우지 않는다. 한 패키지를 참조하는 종료된 재등록 기록은 함께 정리한다.
+
+개별 삭제·복원은 다른 다운로드가 완료/취소된 뒤 실행한다. 전체 초기화는 현재 worker 다운로드를 취소하고 대기 요청도 취소 상태로 백업한다. **별도로 실행한 CLI/OSM·고도 준비 도구를 먼저 종료한다.** 외부 파일 변경이나 여러 web writer를 동시에 운용하는 구성은 지원하지 않는다. CLI도 진행 중인 웹 정리 표시가 있으면 새 요청/worker 실행을 거부한다. 긴 상태 조회는 한 번에 하나만 실행해 느린 Windows bind에서도 주기 조회가 앞선 응답을 계속 무효화하지 않게 한다.
+
+정리 요청은 same-origin/16KiB/UUID·확인 문구·registryRevision을 검사하고 내부 allowlist 경로만 worker에 전달한다. 임의 경로·shell·Docker socket은 받지 않는다. `maintenance.pending.json`이 새 웹 다운로드/등록/업로드와 지도 읽기를 일시 중지한다. web이 TPK/OSM 리더를 닫고 `ready`를 기록한 뒤 worker가 단일 flock 안에서 처리한다. 리더 종료 확인이120초 내 끝나지 않으면 파일을 바꾸지 않고 요청을 실패 처리한다. 변경 전 revision 검사, 변경 중 이동 저널, 각 파일의 atomic rename을 사용한다. 충돌/심볼릭 링크/권한·파일 잠금 실패는 파일을 덮어쓰지 않는다. 이미 시작한 이동은 읽기/쓰기 중지를 유지하고30초마다 또는 worker 재시작 후 같은 저널로 재시도한다. 저널을 임의 삭제해 강제로 잠금을 풀지 않는다.
+
+복원은 복원할 위치의 새 파일·변경된 적용 상태·백업 누락을 먼저 검사한다. 당시 적용할 managed 패키지의 manifest SHA/크기/형식·이용 확인도 다시 검증한 뒤 이동/등록한다. 수동 설치 원본 전체의 독립 checksum을 새로 만들지는 않으며 기존 리더 검사를 사용한다. 원본 백업을 보존한 채 중단하므로 새 자료를 지우며 강제 복원하지 않는다. 정리 후 홈 지도를 새로고침한다. 백업20개/정리 기록100개/이동 항목1000개 한도이며 자동 보관 정책은 없다. 보관 파일을 관리자가 정리할 때는 정리 작업이 없는 상태에서 전체 경로/저널 세트를 함께 확인한다.
+
+### 업데이트
+
+web은 기존 원본 read-only bind를 유지한다. worker에만 `TPK_HOST_DIR`, `OSM_HOST_DIR`, `STREET_HOST_DIR`, `ELEVATION_HOST_DIR`의 지도 전용 쓰기 bind를 추가한다. 시설·OSM 수정·인증/환경 폴더를 이 지도 경로로 지정하지 않는다. 지도 전용 경로는 서로 겹치지 않게 구성한다. 기존 `.env`의 포트·HOST_DIR와 `.env.downloads` 인증을 함께 유지해 **web/worker를 모두 업데이트**한다. 아래는 프로젝트 폴더의 PowerShell 예시다.
+
+```powershell
+git pull --ff-only origin main
+docker compose up -d --build web
+$downloadEnvArgs = @()
+if (Test-Path .env) { $downloadEnvArgs += @('--env-file', '.env') }
+$downloadEnvArgs += @('--env-file', '.env.downloads')
+docker compose @downloadEnvArgs --profile downloads up -d --build download-worker
+```
+
+`.env.downloads`의 동일 HOST_DIR 항목이 `.env`보다 우선하므로 서로 같은 실제 데이터 경로인지 확인한다. 기존 사용자 web 주소는 `http://127.0.0.1:8085/downloads`다. 초기화는 접속 자체를 복구하는 기능이 아니므로 web 미실행/포트 오류가 있으면 먼저 `docker compose ps -a web`, `docker compose port web 3001`, web 로그로 확인한다.
+
+내부 POST `/api/downloads`: `action=maintenance`, `operation=delete|clear|restore`, `confirmation`, `registryRevision`, delete의 `targetId`, clear의 `includeLegacy`, restore의 `backupId`. GET 응답의 `maintenance.pending`, `maintenance.operations`가 요청·진행·성공/실패/복구 필요 상태를 제공한다. 기존 작업 목록은 유지·삭제 대상의 실제 작업만 보여주며 정리 결과는 별도 영역에 남는다. 공통 플랫폼 API 계약 변경은 아니다.

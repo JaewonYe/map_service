@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import {managedSatellitePackages} from '../downloads/active';
+import {managedSatellitePackages,registry,assertNoMaintenance} from '../downloads/active';
 import {jobId} from '../downloads/model';
 import {readFile, realpath, stat} from 'node:fs/promises';
 import {dirname, isAbsolute, join, relative, resolve, win32} from 'node:path';
@@ -129,6 +129,8 @@ function parseConfig(input: unknown): SourceConfig[] {
 
 /** One catalog per server process. Metadata inspection never reads tile records. */
 export class MapCatalog {
+  private static instances=new Set<MapCatalog>();
+  static async releaseAll(){const values=[...this.instances];await Promise.all(values.map(async c=>{await Promise.allSettled([...c.pending.values()]);c.close();}));}
   private loaded: LoadedSource[] = [];
   private sources: SourceInfo[] = [];
   private metadata!: CatalogInfo;
@@ -143,11 +145,11 @@ export class MapCatalog {
   private reported = new Set<string>();
 
   static async load(options: LoadOptions = {}) {
-    const catalog = new MapCatalog();
+    const catalog = new MapCatalog();this.instances.add(catalog);
     try { await catalog.load(options); return catalog; }
     catch (error) { catalog.close(); throw error; }
   }
-  close() { for (const source of this.loaded) source.reader.close(); }
+  close() { MapCatalog.instances.delete(this);for (const source of this.loaded) source.reader.close(); }
   info(): CatalogInfo {
     // Legacy permission remains controlled by the existing environment variable.
     if (this.metadata.mode === 'single') {
@@ -356,16 +358,20 @@ export class MapCatalog {
 }
 
 let active: Promise<MapCatalog> | undefined;
+let activeRevision: number | undefined;
 let managed: {key:string;value:Promise<MapCatalog>} | undefined;
 export async function getCatalog() {
-  const packages=await managedSatellitePackages();
+  const packages=await managedSatellitePackages(),revision=(await registry()).revision;
+  await assertNoMaintenance();
   if(packages.length){
-    const key=JSON.stringify(packages);
+    const key=JSON.stringify({packages,revision});
     if(managed?.key!==key){const value=MapCatalog.load({packageCatalogs:packages.map(({id,directory})=>({id,path:join(directory,'maps.json')}))});managed={key,value};value.catch(()=>{if(managed?.value===value)managed=undefined;});}
     const catalog=await managed!.value;await catalog.checkUnchanged();return catalog;
   }
-  if (!active) { active = MapCatalog.load(); active.catch(() => { active = undefined; }); }
+  if (!active || activeRevision!==revision) { activeRevision=revision;active = MapCatalog.load(); active.catch(() => { active = undefined; }); }
   const catalog = await active;
   await catalog.checkUnchanged();
   return catalog;
 }
+
+export async function releaseCatalogs(){await Promise.allSettled([active,managed?.value].filter(Boolean) as Promise<MapCatalog>[]);active=undefined;managed=undefined;activeRevision=undefined;await MapCatalog.releaseAll();}

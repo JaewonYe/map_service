@@ -537,3 +537,5 @@ CI는 `conversion-diagnostics-<run_id>-<attempt>`에 빌드·테스트·버전·
 [공통 디자인 기준](design-system/platform/MASTER.md)을 읽고 `.agents/skills/ui-ux-pro-max`로 디자인 권고를 검색한 뒤 `.agents/skills/web-design-guidelines`로 UI를 검토합니다. `python3 scripts/check_design_skills.py`로 설치를 검증합니다. Python 3 표준 라이브러리만 필요하며 런타임 웹 의존성은 추가하지 않습니다.
 
 대표 지점 이동·정점 편집·기존 삭제 확인의 양 테마/크기 실제 앱 캡처와 접근성 검토는 [DIRECT_EDIT_REVIEW](docs/DIRECT_EDIT_REVIEW.md), 실행 수·실패 보완·원격 증거는 [VALIDATION](docs/VALIDATION.md) 및 이슈 #16 완료 기록을 참조하세요.
+
+`/downloads`의 **지도 데이터 삭제·초기화**에서 선택 작업·패키지 삭제, 전체 초기화, 백업 복원을 실행할 수 있습니다. 확인 문구를 입력한 뒤 worker가 처리하며 시설·경계·OSM 수정·인증 설정은 보존합니다. 파일은 백업으로 옮기므로 디스크 공간은 계속 사용합니다. [정리 범위·복원·web/worker 업데이트](docs/DOWNLOAD_MANAGER.md#웹에서-지도-삭제전체-초기화복원)를 먼저 확인하세요.

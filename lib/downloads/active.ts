@@ -14,10 +14,14 @@ export async function registry():Promise<Registry>{
 async function packageDirectory(id:string,kind:DownloadKind):Promise<string>{
  const root=await realpath(/*turbopackIgnore: true*/ downloadRoot()),directory=await realpath(/*turbopackIgnore: true*/ join(root,'packages',id,kind));const rel=relative(root,directory);if(rel.startsWith('..')||isAbsolute(rel))throw new DownloadError('등록된 지도 경로가 데이터 폴더를 벗어납니다.',503);return directory;
 }
+export async function assertNoMaintenance(){
+ try{await lstat(/*turbopackIgnore: true*/ join(downloadRoot(),'maintenance.pending.json'));}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return;throw e;}
+ throw new DownloadError('지도 삭제·초기화·복원 중입니다. 정리가 끝난 뒤 다시 조회하세요.',503);
+}
 export async function managedSatellitePackages():Promise<Array<{id:string;directory:string}>>{
- const r=await registry();return Promise.all(satellitePackages(r).map(async id=>({id,directory:await packageDirectory(id,'satellite')})));
+ await assertNoMaintenance();const r=await registry();return Promise.all(satellitePackages(r).map(async id=>({id,directory:await packageDirectory(id,'satellite')})));
 }
 export async function managedDirectory(kind:DownloadKind):Promise<string|null>{
- const r=await registry(),id=r.layers[kind];if(!id)return null;
+ await assertNoMaintenance();const r=await registry(),id=r.layers[kind];if(!id)return null;
  return packageDirectory(id,kind);
 }
