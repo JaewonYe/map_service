@@ -1,5 +1,6 @@
 import {createHash} from 'node:crypto';
 import {managedSatellitePackages,registry,assertNoMaintenance} from '../downloads/active';
+import {preparedSatellites} from '../downloads/prepared';
 import {jobId} from '../downloads/model';
 import {readFile, realpath, stat} from 'node:fs/promises';
 import {dirname, isAbsolute, join, relative, resolve, win32} from 'node:path';
@@ -48,9 +49,9 @@ export type CatalogTile = {
   fallback: boolean;
   contributingSources: string[];
 };
-type LoadedSource = {info: SourceInfo; reader: Tpk; registrationOrder?: number};
+type LoadedSource = {info: SourceInfo; reader: Tpk; registrationOrder?: number; managed?: boolean};
 type Candidate = {source: LoadedSource; zoom: number; x: number; y: number};
-type LoadOptions = {configPath?: string; packageCatalogs?: Array<{id:string;path:string}>; legacyPath?: string; cache?: string; configFile?: string; usageConfirmed?: boolean};
+type LoadOptions = {configPath?: string; packageCatalogs?: Array<{id:string;path:string;coverage?:Bounds}>; legacyPath?: string; cache?: string; configFile?: string; usageConfirmed?: boolean};
 const DEFAULT_CONFIG = 'maps.json';
 const TILE_LIMIT = 32 * 1024 * 1024;
 
@@ -192,8 +193,8 @@ export class MapCatalog {
     }
     // Each selected package keeps its own relative-path boundary and permission settings.
     // Never write a synthetic maps.json with ../ paths or scan historical packages.
-    const configs: Array<SourceConfig & {root: string; registrationOrder: number}> = [];
-    for (const [order, {id, path}] of (options.packageCatalogs || [{id:'',path:configPath}]).entries()) {
+    const configs: Array<SourceConfig & {root: string; registrationOrder: number; coverage?: Bounds; managed: boolean}> = [];
+    for (const [order, {id, path, coverage}] of (options.packageCatalogs || [{id:'',path:configPath,coverage:undefined}]).entries()) {
       await this.track(path);
       if ((await stat(/*turbopackIgnore: true*/ path)).size > 1024 * 1024) throw new TileError('Map catalog exceeds 1 MiB');
       let input: unknown;
@@ -201,13 +202,13 @@ export class MapCatalog {
       catch (error) { if (error instanceof SyntaxError) throw new TileError('Invalid JSON in map catalog'); throw error; }
       const root = await realpath(/*turbopackIgnore: true*/ dirname(path));
       for (const config of parseConfig(input)) {
-        configs.push({...config, root, registrationOrder: order,
+        configs.push({...config, root, registrationOrder: order, coverage:coverage?bounds(coverage):undefined, managed:!!options.packageCatalogs,
           id: options.packageCatalogs ? `${id}-${config.id}` : config.id});
       }
       if (configs.length > 32) throw new TileError('Select at most 32 satellite sources');
     }
     const warnings: string[] = [];
-    for (const {root, registrationOrder, ...config} of configs) {
+    for (const {root, registrationOrder, coverage, managed, ...config} of configs) {
       const info: SourceInfo = {...config, status: config.enabled ? 'unavailable' : 'disabled', zoomLevels: []};
       // Do not expose host paths or configuration filenames through the API.
       delete (info as any).file; delete (info as any).enabled;
@@ -228,10 +229,11 @@ export class MapCatalog {
         }
         info.metadata = metadata;
         info.bounds = config.bounds || metadata.bounds;
+        if(coverage){if(!overlap(info.bounds,coverage))throw new TileError('Package extent does not intersect its actual TPK bounds');info.bounds={south:Math.max(info.bounds.south,coverage.south),north:Math.min(info.bounds.north,coverage.north),west:Math.max(info.bounds.west,coverage.west),east:Math.min(info.bounds.east,coverage.east)};}
         info.zoomLevels = metadata.zoomLevels.filter(z => z >= config.minZoom && z <= config.maxZoom);
         if (!info.zoomLevels.length) throw new TileError('No downloaded TPK levels intersect the configured zoom range');
         info.minZoom = info.zoomLevels[0]; info.maxZoom = info.zoomLevels.at(-1)!;
-        info.status = 'ready'; this.loaded.push({info, reader, registrationOrder}); reader = undefined;
+        info.status = 'ready'; this.loaded.push({info, reader, registrationOrder, managed}); reader = undefined;
         if (!config.usageConfirmed) warnings.push(`${info.name}: 사용 권한 미확인 — 메타데이터만 제공합니다.`);
         const absent = Array.from({length: config.maxZoom - config.minZoom + 1}, (_, i) => i + config.minZoom).filter(z => !info.zoomLevels.includes(z));
         if (absent.length) warnings.push(`${info.name}: 미포함 줌 ${absent.join(', ')} — 낮은 줌 타일로 대체합니다.`);
@@ -297,6 +299,7 @@ export class MapCatalog {
         candidates.sort((a, b) => b.zoom - a.zoom ||
           Number(b.source.info.role === 'detail') - Number(a.source.info.role === 'detail') ||
           b.source.info.priority - a.source.info.priority ||
+          (a.source.managed&&b.source.managed?((a.source.info.bounds!.east-a.source.info.bounds!.west)*(a.source.info.bounds!.north-a.source.info.bounds!.south)-(b.source.info.bounds!.east-b.source.info.bounds!.west)*(b.source.info.bounds!.north-b.source.info.bounds!.south)):0) ||
           (b.source.registrationOrder ?? 0) - (a.source.registrationOrder ?? 0) ||
           (a.source.info.id < b.source.info.id ? -1 : a.source.info.id > b.source.info.id ? 1 : 0));
         return await this.select(candidates, 0, z, x, y);
@@ -365,7 +368,7 @@ export async function getCatalog() {
   await assertNoMaintenance();
   if(packages.length){
     const key=JSON.stringify({packages,revision});
-    if(managed?.key!==key){const value=MapCatalog.load({packageCatalogs:packages.map(({id,directory})=>({id,path:join(directory,'maps.json')}))});managed={key,value};value.catch(()=>{if(managed?.value===value)managed=undefined;});}
+    if(managed?.key!==key){const value=(async()=>{const summaries=await preparedSatellites();return MapCatalog.load({packageCatalogs:packages.map(({id,directory})=>({id,path:join(directory,'maps.json'),coverage:summaries.find(p=>p.id===id)?.bounds}))});})();managed={key,value};value.catch(()=>{if(managed?.value===value)managed=undefined;});}
     const catalog=await managed!.value;await catalog.checkUnchanged();return catalog;
   }
   if (!active || activeRevision!==revision) { activeRevision=revision;active = MapCatalog.load(); active.catch(() => { active = undefined; }); }

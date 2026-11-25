@@ -69,3 +69,19 @@ production worker 이미지로 `tests/fixtures/downloads-proof.py <새 격리 �
 재현: `docker build -f scripts/downloads/Dockerfile -t map-service-download-worker:maintenance .`, `NEXT_TELEMETRY_DISABLED=1 npm run build`, `npx tsx scripts/capture-map-maintenance-review.ts`. 자체 `.cache/map-maintenance-review` 자료만 정리하고 테스트 컨테이너를 종료한다. 호스트에 Docker·Chromium이 필요하며 기존 실제 data 폴더를 초기화하는 스크립트가 아니다.
 
 검토 결과: `components/MapDataMaintenance.tsx`의 named section/heading/inline confirmation group·연결된 label/name/자동완성 off·정확한 확인 문구·disabled/진행/실패 텍스트·aria-live·danger/on-danger·visible focus를 확인했다. 확인창을 열면 제목으로, 취소하면 실행 버튼으로 포커스가 돌아간다. 충돌 시 문구/스냅샷 revision을 보존하고 오류에 포커스한다. 초기화 범위·적용 중 선택 해제·관련 재등록 기록·백업이 공간을 사용한다는 설명이 실제 처리와 일치한다. 터치44px·체크 라벨·모바일 줄바꿈과 양 테마 명암비를 유지했다. 전체 초기화는 외부 CLI/준비 도구를 먼저 종료하도록 안내한다. 서버가 연결되지 않거나 구 worker이면 지원 조건과 disabled 상태를 표시한다. 테마 전환·OS 변경·저장 불가·초기 hydration·지도/폼 상태·시설/경계/OSM 편집 회귀를 기존 브라우저 전체 검증에 포함한다.
+
+## 위성 표시 선택·전체 선택/해제 검토
+
+사용자 확인 범위는 위성 지도 우선이다. platform-ui-design/MASTER/IMPLEMENTATION과 로컬 reference의 양 테마·크기를 비교했다. UI UX Pro Max의 `selection status feedback` 검색 중 Submit Feedback 권고(요청 중→성공/오류 전달)와 Web Design Guidelines 번들 규칙을 적용했다. 공통 토큰·디자인 자산은 변경하지 않았다.
+
+| Desktop Light | Desktop Dark | Mobile Light | Mobile Dark |
+| --- | --- | --- | --- |
+| [선택 화면](ui/map-selection/desktop-light-selection.png) | [선택 화면](ui/map-selection/desktop-dark-selection.png) | [선택 화면](ui/map-selection/mobile-light-selection.png) | [선택 화면](ui/map-selection/mobile-dark-selection.png) |
+
+[Manifest](ui/map-selection/manifest.json), `scripts/capture-map-selection-review.ts`: 실제 production Next.js HTTP와 production Docker worker(network none/read-only)를 사용했다. CC0 전국0–13·지역14/16/19·중첩16 패키지/초기 완료 기록 fixture를 만든 뒤 실제 UI에서 전체 선택→적용→전체 해제→적용→새로고침→지역만 선택을 실행했다. 초기 completed는 fixture, select 작업은 실제 worker 결과다. 14/19 지역 파랑, 같은 범위16의 나중 선택 빨강, 지역 밖13 초록의 HTTP 실제 PNG/native 헤더를 확인했다. 단색 지도는 CC0 합성 영상이며 공식 위성 수신/coverage 증거가 아니다.
+
+전체 해제 뒤 미리보기 타일0/위성 unavailable/수동 TPK 자동 대체 없음, 새로고침 상태 유지, 지역만 선택 시 미선택 중첩 자료 제외를 확인했다. 선택 적용 중 지도 카메라·줌·입력 좌표·사각형 유지, 영역 보기 뒤 입력 사각형 유지, manifest/TPK/maps.json 해시·원본/ZIP·시설/OSM 수정 sentinel 보존을 확인했다. 외부 요청0,1440×900/390×844에서 가로 넘침 없음. 첫 캡처 실행은 스크립트의 잘못된 CSS selector로 중단됐으며 실제 `.download-map`으로 수정 후 전 동작/4장 캡처를 통과했다.
+
+검토: named section/순서 있는 제목·네이티브 체크박스와 클릭 라벨/name·버튼/링크 구분·visible focus·44px 컨트롤·비활성/진행/오류 상태·aria-live 개수·오류 포커스를 유지한다. 체크 초안/적용 상태를 문자로 구분하고 충돌 시 입력과 원래 revision을 보존한다. 많은 패키지는 스크롤 목록/content-visibility로 처리하고 긴 이름은 줄바꿈한다. 모바일에서도 적용 버튼을 목록 앞에 두고 상단 미리보기 이동 링크를 제공한다. 빈 목록/권한 미확인/구 worker 조건을 설명한다. 회귀80개는 두 선택 시나리오와 기존 테마/지도/시설/경계/OSM 편집을 포함한다.
+
+재현: `docker build -f scripts/downloads/Dockerfile -t map-service-download-worker:selection .`, `npm run build`, `npx tsx scripts/capture-map-selection-review.ts`. 자체 `.cache/map-selection-review`만 사용하며 실제 data 폴더를 변경하지 않는다. Docker/Chromium이 필요하고 테스트 컨테이너는 종료한다.

@@ -31,7 +31,7 @@ def remove_empty(path):
 
 def marker(root):return Path(root)/'maintenance.pending.json'
 def folder(root):return Path(root)/'maintenance'
-def layers(r):return {'layers':r['layers'],'satellitePackages':r.get('satellitePackages',[r['layers']['satellite']] if r['layers'].get('satellite') else [])}
+def layers(r):return {'layers':r['layers'],'satellitePackages':r.get('satellitePackages',[r['layers']['satellite']] if r['layers'].get('satellite') else []),**{k:r[k] for k in ('satelliteVisible','satelliteSelectionJob') if k in r}}
 
 class Maintenance:
     def __init__(self,w):self.w=w;self.base=folder(w.root);self.base.mkdir(exist_ok=True)
@@ -97,6 +97,7 @@ class Maintenance:
                     if after['layers'][kind]==package:del after['layers'][kind]
                 after['satellitePackages']=[p for p in after['satellitePackages'] if p!=package]
                 if after['satellitePackages']:after['layers']['satellite']=after['satellitePackages'][-1]
+                elif 'satelliteVisible' in after:after['satelliteVisible']=False
                 self.add(entries,'downloads','packages/'+package,id);self.add(entries,'downloads','exports/'+package+'.zip',id)
             for job in sorted(related):
                 for suffix in ('request.json','state.json','cancel.json'):self.add(entries,'downloads','jobs/'+job+'.'+suffix,id)

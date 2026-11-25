@@ -569,4 +569,44 @@ class DownloadsWorker(unittest.TestCase):
         self.assertEqual(state['state'],'failed');self.assertTrue(state['recoveryRequired']);self.assertTrue(marker(self.worker.root).exists());self.assertEqual((p/'sentinel').read_bytes(),b'keep-me')
         self.assertEqual(Maintenance(self.worker).run(q)['state'],'completed');self.assertFalse(marker(self.worker.root).exists());self.assertEqual((self.worker.root/'.map-trash'/q['id']/'packages'/p.name/'sentinel').read_bytes(),b'keep-me')
 
+    def selection_request(self,ids,**extra):
+        return {'version':1,'type':'select','id':str(uuid.uuid4()),'name':'표시할 위성 지도 선택','createdAt':now(),'registryRevision':self.worker.registry()['revision'],'packageIds':ids,**extra}
+    def test_41_multiple_satellite_selection_none_and_legacy_reset_preserve_other_layers_and_files(self):
+        self.server.export_enabled=True;levels={'satellite':{'min':16,'max':16},'elevation':{'min':12,'max':13}}
+        with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-selection'}):
+            first=self.request(('satellite','elevation'),levels=levels);self.assertEqual(self.saved_job(first)['state'],'completed')
+            second=self.request(('satellite',),levels=levels,registryRevision=1);self.assertEqual(self.saved_job(second)['state'],'completed')
+        before={str(p):digest(p) for p in self.worker.root.rglob('*') if p.is_file() and ('packages' in p.parts or 'exports' in p.parts)};self.worker.net=NoNetwork()
+        q=self.selection_request([first['id'],second['id']]);state=self.saved_job(q);self.assertEqual(state['state'],'completed',state);self.assertTrue(state['selectionApplied']);self.assertEqual(self.worker.registry()['satellitePackages'],q['packageIds']);self.assertEqual(self.worker.registry()['layers']['elevation'],first['id'])
+        none=self.selection_request([]);self.assertEqual(self.saved_job(none)['state'],'completed');self.assertFalse(self.worker.registry()['satelliteVisible']);self.assertNotIn('satellite',self.worker.registry()['layers']);self.assertEqual(self.worker.registry()['layers']['elevation'],first['id'])
+        restore=self.selection_request([second['id']]);self.assertEqual(self.saved_job(restore)['state'],'completed');self.assertTrue(self.worker.registry()['satelliteVisible']);self.assertEqual(self.worker.registry()['satellitePackages'],[second['id']])
+        for path,checksum in before.items():self.assertEqual(digest(Path(path)),checksum)
+        reset={'version':1,'type':'reset','id':str(uuid.uuid4()),'createdAt':now(),'registryRevision':self.worker.registry()['revision']};self.assertEqual(self.run_job(reset)['state'],'completed');self.assertNotIn('satelliteVisible',self.worker.registry());self.assertEqual(self.worker.registry()['layers'],{})
+    def test_42_selection_cas_corruption_wrong_layer_and_invalid_ids_never_replace_active_data(self):
+        request=self.request(('osm',));self.assertEqual(self.saved_job(request)['state'],'completed');before=self.worker.registry()
+        wrong=self.selection_request([request['id']]);self.assertEqual(self.run_job(wrong)['state'],'failed');self.assertEqual(self.worker.registry(),before)
+        for ids in [[request['id'],request['id']],[str(uuid.uuid4()) for _ in range(33)],['../outside'],[{}]]:
+            with self.assertRaises(WorkError):validate_request(self.selection_request(ids))
+        self.server.export_enabled=True
+        satellite=self.request(('satellite',),levels={'satellite':{'min':16,'max':16},'elevation':{'min':12,'max':13}},registryRevision=before['revision'])
+        with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-select-corrupt'}):self.assertEqual(self.saved_job(satellite)['state'],'completed')
+        self.worker.net=NoNetwork();before=self.worker.registry();stale=self.selection_request([],registryRevision=0);self.assertEqual(self.run_job(stale)['state'],'failed');self.assertEqual(self.worker.registry(),before)
+        file=self.worker.root/'packages'/satellite['id']/'satellite/map.tpk';original=file.read_bytes();file.write_bytes(b'broken');state=self.run_job(self.selection_request([satellite['id']]));self.assertEqual(state['state'],'failed');self.assertIn('checksum',state['error']);self.assertEqual(self.worker.registry(),before);file.write_bytes(original)
+    def test_43_committed_selection_recovers_and_delete_restore_keep_explicit_visibility(self):
+        self.server.export_enabled=True;request=self.request(('satellite',),levels={'satellite':{'min':16,'max':16},'elevation':{'min':12,'max':13}})
+        with patch.dict(os.environ,{'ARCGIS_TOKEN':'fixture-selection-recover'}):self.assertEqual(self.saved_job(request)['state'],'completed')
+        select=self.selection_request([request['id']]);self.assertEqual(self.saved_job(select)['state'],'completed');path=self.worker.root/'jobs'/(select['id']+'.state.json');state=read_json(path);state.update(state='running',selectionApplied=False);atomic(path,state)
+        self.worker=Worker(self.worker.root,ROOT,NoNetwork(),offline=True);self.worker.recover();state=read_json(path);self.assertEqual(state['state'],'completed');self.assertTrue(state['selectionApplied']);self.assertEqual(state['selectedPackageIds'],[request['id']])
+        delete=self.maintenance_request('delete',targetId=request['id']);self.assertEqual(self.run_maintenance(delete)['state'],'completed');self.assertFalse(self.worker.registry()['satelliteVisible'])
+        restore=self.maintenance_request('restore',backupId=delete['id']);self.assertEqual(self.run_maintenance(restore)['state'],'completed');self.assertTrue(self.worker.registry()['satelliteVisible']);self.assertEqual(self.worker.registry()['satelliteSelectionJob'],select['id'])
+        none=self.selection_request([]);self.assertEqual(self.saved_job(none)['state'],'completed');self.assertFalse(self.worker.registry()['satelliteVisible'])
+        ordinary={'version':1,'type':'activate','id':str(uuid.uuid4()),'createdAt':now(),'packageId':request['id'],'registryRevision':self.worker.registry()['revision']};self.assertEqual(self.run_job(ordinary)['state'],'completed');self.assertTrue(self.worker.registry()['satelliteVisible'])
+    def test_44_invalid_visibility_metadata_is_rejected_and_all_off_survives_clear_restore(self):
+        for patch_values in [{'satelliteVisible':'false'},{'satelliteVisible':False,'layers':{'satellite':str(uuid.uuid4())}},{'satelliteSelectionJob':'../outside'}]:
+            atomic(self.worker.root/'active.json',{'version':1,'revision':0,'layers':{},**patch_values})
+            with self.assertRaises(WorkError):self.worker.registry()
+        atomic(self.worker.root/'active.json',{'version':1,'revision':0,'layers':{}});none=self.selection_request([]);self.assertEqual(self.saved_job(none)['state'],'completed')
+        clear=self.maintenance_request('clear');self.assertEqual(self.run_maintenance(clear)['state'],'completed');self.assertNotIn('satelliteVisible',self.worker.registry())
+        restore=self.maintenance_request('restore',backupId=clear['id']);self.assertEqual(self.run_maintenance(restore)['state'],'completed');self.assertFalse(self.worker.registry()['satelliteVisible'])
+
 if __name__=='__main__':unittest.main()

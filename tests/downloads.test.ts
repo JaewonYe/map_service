@@ -181,3 +181,31 @@ test('an in-flight ZIP upload blocks maintenance until its durable queue write c
  const blocked=await POST(request());assert.equal(blocked.status,409);assert.match((await blocked.json()).error,/업로드/);assert.ok(!(await readdir(root)).includes('maintenance.pending.json'));
  streamController.close();await uploading;assert.equal((await listJobs()).length,1);assert.equal((await POST(request())).status,202);
 });
+
+test('prepared satellite inventory and select API use bounded summaries, explicit IDs and worker capabilities',async t=>{
+ const root=await fixture(t),id=randomUUID(),dir=join(root,'packages',id);await mkdir(join(dir,'satellite'),{recursive:true});
+ const manifest={version:1,id,name:'CC0 선택 지도',createdAt:'2026-11-25T00:00:00Z',requestedBounds:{west:126.23,south:36.59,east:126.25,north:36.61},items:{satellite:{usageConfirmed:true,zoomLevels:[19,16,16,99,'bad'],provider:'CC0',privatePath:'/not-exposed'}},files:[{path:'satellite/private-file'}]};await atomic(join(dir,'manifest.json'),manifest);
+ const {preparedSatellites}=await import('../lib/downloads/prepared');let maps=await preparedSatellites();assert.equal(maps.length,1);assert.deepEqual(maps[0].zoomLevels,[16,19]);assert.equal(maps[0].name,'CC0 선택 지도');assert.equal(JSON.stringify(maps).includes('/not-exposed'),false);assert.equal(JSON.stringify(maps).includes('private-file'),false);
+ await atomic(join(dir,'manifest.json'),{...manifest,name:'CC0 선택 지도 변경'});assert.equal((await preparedSatellites())[0].name,'CC0 선택 지도 변경');
+ const request=(v:any)=>new Request('http://localhost/api/downloads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)}),select={action:'select',packageIds:[id],registryRevision:0};
+ assert.equal((await POST(request(select))).status,503);await atomic(join(root,'worker.json'),{selectionVersion:1,updatedAt:new Date().toISOString()});
+ for(const ids of [[id,id],['../../outside'],Array.from({length:33},()=>randomUUID())])assert.equal((await POST(request({...select,packageIds:ids}))).status,400);
+ assert.equal((await POST(request({...select,packageIds:[randomUUID()]}))).status,409);assert.equal((await POST(request({...select,registryRevision:9}))).status,409);
+ const response=await POST(request({...select,path:'/etc/passwd'}));assert.equal(response.status,202);const queued=await response.json(),q=JSON.parse(await readFile(join(root,'jobs',queued.id+'.request.json'),'utf8'));assert.equal(q.type,'select');assert.deepEqual(q.packageIds,[id]);assert.equal(q.path,undefined);assert.equal((await POST(request({...select,packageIds:[]}))).status,202);
+ const linked=randomUUID();await symlink(dir,join(root,'packages',linked));maps=await preparedSatellites();assert.equal(maps.find(p=>p.id===linked)!.selectable,false);
+});
+
+test('explicit satellite all-off suppresses manual fallback while preserving elevation and rejects malformed registry flags',async t=>{
+ const root=await fixture(t),id=randomUUID(),sat=join(root,'legacy'),dem=join(root,'packages',id,'elevation'),oldPath=process.env.TPK_PATH,oldUsage=process.env.TPK_USAGE_CONFIRMED;const manual=await makeTpk(sat);await makeElevation(dem);process.env.TPK_PATH=manual.path;process.env.TPK_USAGE_CONFIRMED='true';t.after(()=>{if(oldPath===undefined)delete process.env.TPK_PATH;else process.env.TPK_PATH=oldPath;if(oldUsage===undefined)delete process.env.TPK_USAGE_CONFIRMED;else process.env.TPK_USAGE_CONFIRMED=oldUsage;});
+ for(const patch of [{satelliteVisible:'false'},{satelliteVisible:false,layers:{satellite:id}},{satelliteSelectionJob:'../bad'}]){await atomic(join(root,'active.json'),{version:1,revision:2,layers:{},...patch});await assert.rejects(registry());}
+ await atomic(join(root,'active.json'),{version:1,revision:1234,layers:{}});const legacy=await getCatalog();assert.equal(legacy.info().usageConfirmed,true);t.after(()=>legacy.close());
+ await atomic(join(root,'active.json'),{version:1,revision:1235,layers:{elevation:id},satellitePackages:[],satelliteVisible:false,satelliteSelectionJob:randomUUID()});await assert.rejects(getCatalog(),/선택되지/);assert.equal((await(await getElevation()).sample(...center as [number,number])).elevationMeters,123.5);
+ const {GET:mapInfo}=await import('../app/api/map-info/route');const info=await(await mapInfo()).json();assert.equal(info.layers.satellite.available,false);assert.match(info.layers.satellite.reason,/선택되지/);
+});
+
+test('managed selection ranks native zoom then local requested extent with geographic fallback and private source metadata',async t=>{
+ const root=await fixture(t),{packageFile,color,pixels,korea,taean}=await import('./fixtures/catalog-fixture'),a=randomUUID(),b=randomUUID(),green=await color(30,130,60),blue=await color(30,70,200),c=coordinate(16),high=coordinate(17);
+ for(const [id,bytes,levels,requestedBounds]of [[a,green,[16,17],korea],[b,blue,[16],taean]] as const){const dir=join(root,'packages',id,'satellite');await mkdir(dir,{recursive:true});await packageFile(dir,'map.tpk',[...levels],[...levels.map(z=>({z,...coordinate(z),bytes})),{z:16,x:c.x+8,y:c.y,bytes}],korea);await atomic(join(dir,'maps.json'),{version:1,sources:[{id:'downloaded',name:id,file:'map.tpk',role:'base',priority:0,minZoom:16,maxZoom:levels.at(-1),usageConfirmed:true}]});await atomic(join(root,'packages',id,'manifest.json'),{version:1,id,name:id,requestedBounds,items:{satellite:{usageConfirmed:true,zoomLevels:levels}},files:[]});}
+ // Both TPKs declare wide metadata: trusted requested extents distinguish the regional package.
+ await atomic(join(root,'active.json'),{version:1,revision:1,layers:{satellite:a},satellitePackages:[b,a],satelliteVisible:true});const catalog=await getCatalog();assert.deepEqual(await pixels((await catalog.tile(16,c.x,c.y))!.bytes),[30,70,200]);assert.deepEqual(await pixels((await catalog.tile(17,high.x,high.y))!.bytes),[30,130,60]);assert.deepEqual(await pixels((await catalog.tile(16,c.x+8,c.y))!.bytes),[30,130,60]);assert.equal(JSON.stringify(catalog.info()).includes(root),false);
+});

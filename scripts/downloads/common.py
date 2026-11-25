@@ -42,6 +42,12 @@ def validate_request(v):
     if not isinstance(v,dict) or v.get('version')!=1:raise WorkError('Unsupported request version')
     identity(v.get('id'))
     if type(v.get('registryRevision')) is not int or v['registryRevision']<0:raise WorkError('Invalid registry revision')
+    if v.get('type')=='select':
+        ids=v.get('packageIds')
+        if not isinstance(ids,list) or len(ids)>32:raise WorkError('위성 지도는 최대32개를 선택하세요.')
+        for id in ids:identity(id)
+        if len(set(ids))!=len(ids):raise WorkError('중복 위성 지도 선택')
+        return v
     if v.get('type') in ('activate','reset','import'):
         if v['type']=='activate':identity(v.get('packageId'))
         return v

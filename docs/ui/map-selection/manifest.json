@@ -1,0 +1,95 @@
+{
+  "source": "Self-generated CC0 package/status fixtures; actual Next.js HTTP and production offline Docker worker selection; no official imagery claim",
+  "image": "map-service-download-worker:selection",
+  "captures": [
+    {
+      "file": "desktop-light-selection.png",
+      "device": "desktop",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "desktop-dark-selection.png",
+      "device": "desktop",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "mobile-light-selection.png",
+      "device": "mobile",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "mobile-dark-selection.png",
+      "device": "mobile",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  ],
+  "checks": [
+    {
+      "action": "all-select",
+      "selected": 3,
+      "zoom14": {
+        "native": 14,
+        "rgb": [
+          30,
+          70,
+          200
+        ]
+      },
+      "zoom16": {
+        "native": 16,
+        "rgb": [
+          220,
+          30,
+          30
+        ]
+      },
+      "zoom19": {
+        "native": 19,
+        "rgb": [
+          30,
+          70,
+          200
+        ]
+      },
+      "outsideLocal": {
+        "native": 13,
+        "rgb": [
+          30,
+          130,
+          60
+        ]
+      },
+      "cameraAndBboxPreserved": true
+    },
+    {
+      "action": "all-off-reload",
+      "satelliteVisible": false,
+      "manualFallback": false,
+      "previewTileCount": 0
+    },
+    {
+      "action": "local-only",
+      "unselectedOverlapIgnored": true,
+      "sourceHashesPreserved": true,
+      "rawZipFacilitiesEditsPreserved": true,
+      "viewAreaKeepsDownloadBbox": true
+    }
+  ],
+  "externalRequests": 0
+}

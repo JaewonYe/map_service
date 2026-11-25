@@ -32,6 +32,7 @@ export async function mapLayers() {
     street:normal.status === 'fulfilled'?catalogLayer(normal.value,'/api/street/{z}/{x}/{y}','STREET_USAGE_CONFIRMED'):missing('도로·지명이 포함된 일반 지도 TPK를 data/street/에 등록하세요.'),
     elevation:terrain.status === 'fulfilled'?terrain.value.info():missing('DEM GeoTIFF를 준비하고 고도 데이터 변환을 실행하세요.')
   };
+  if((await registry()).satelliteVisible===false)layers.satellite={available:false,reason:'표시할 위성 지도가 선택되지 않았습니다.'};
   const osmMetadata:OsmInfo = osm.status === 'fulfilled'?osm.value:{mode:'unavailable',url:null,attribution:''};
   if (!layers.street.available && osmMetadata.url) layers.street = {available:true,url:osmMetadata.url,attribution:osmMetadata.attribution,
     online:osmMetadata.mode === 'online',minNativeZoom:osmMetadata.minNativeZoom??0,maxNativeZoom:osmMetadata.maxNativeZoom??19,

@@ -498,3 +498,11 @@ V1 압축 bundle 검사는 유일한 record offset의 길이를 파일 오름차
 - typecheck/production build/Compose config/diff-check와 공통 디자인92개/스킬3개 검사를 별도 실행했다. 첫 전체 복원 시험은 worker가 재생성한 빈 중첩 폴더를 새 파일 충돌로 판단해 실패했으며, 파일/링크가 없는 빈 디렉터리만 허용·비우도록 고쳐 동일40개/HTTP 경로를 재검증했다. 충돌 검사·누락/해시 검사·저널 복구를 제거하지 않았다.
 
 사용자 Windows PC의 실제 자료/파일 잠금·HOST_DIR 및 사이트 접속 문제는 이 Linux/합성 검증과 별도다. 실행 중인 외부 CLI/준비 도구는 종료해야 하며 다중 web writer는 지원하지 않는다. 백업20개/정리 기록100개·이동 항목1000개·리더 종료120초·중간 실패30초 재시도 경계를 문서화했다. 기존 #20의 공식 원본·실제 앱/고도값 전체 완료 조건은 유지한다. 최종 동일 SHA의 PR/main CI 증거는 #20 댓글에 기록한다.
+
+### 위성 표시 체크 선택·전체 선택/해제 (2026-11-25)
+
+확인된 사용자 범위는 위성 우선. 준비된 manifest의 요약 목록/개별 체크/전체 선택·해제/일괄 적용을 추가했다. 내부 select 요청은 최대32개 UUID·최근 selectionVersion1 heartbeat·실제 worker 해시/형식/권한 검사·CAS 후 등록한다. satelliteVisible:false는 수동 위성 fallback도 차단하며 reset/새 위성 등록과 구분한다. 정리/복원은 표시 상태를 보존한다. 관리 패키지는 native 줌/기존 role·priority/유효 요청 범위 크기/최근 선택 순으로 찾고 수동 catalog 순위는 유지한다. 프리뷰는 revision 갱신 시 카메라·사각형을 유지한다.
+
+로컬 최종: Node126(앱121+도구5, downloads20), worker44, production image의 Compose 인증 전달4, Playwright80(single4/multi15/osm10/layers16/buildings35), typecheck/production build, 디자인92자산/3스킬, diff 검사 통과. 실패·스킵0. Node는 실제 수동 TPK가 있어도 all-off 미사용/DEM 보존, 패키지 요약 경로·비밀 비노출/잘못된 선택·구 worker 거부, 같은 줌에서 좁은 요청 범위/그보다 높은 native 줌의 넓은 자료/범위 밖 fallback을 검사한다. worker는 select/none/reset·다른 레이어/파일 보존·stale CAS/손상/중복·다른 레이어 선택 거부·크래시 복구·삭제/초기화/복원 표시 상태를 검사한다. 브라우저는 선택 초안/충돌/진행/완료/새로고침 및 프리뷰 타일 교체/카메라·좌표 유지/전체 해제 타일 제거를 검사한다.
+
+실제 production HTTP+오프라인 worker 검증·CC0 픽셀/native 헤더·파일 보존·외부 요청0·4장 Light/Dark desktop/mobile 캡처는 [화면 검토](DOWNLOAD_UI_REVIEW.md#위성-표시-선택전체-선택해제-검토)와 [manifest](ui/map-selection/manifest.json)에 기록했다. 초기 캡처 selector 오타를 고친 뒤 통과했으며 존재하지 않는 별도 design checker 호출은 제외하고 실제 단일 check_design_skills.py의92자산/3스킬 검사를 사용했다. 원본 재다운로드/실제 ArcGIS 계정·사용자 Windows 앱/대한민국 coverage 검증과 구분한다. #20의 남은 실제 원본·앱 조건은 유지한다. 최종 SHA/PR/main run·검사 수/artifact 증거는 #20 댓글에 기록한다.

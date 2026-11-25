@@ -14,7 +14,7 @@ class Worker:
         self.maintenance_original_dirs={'imagery':Path(imagery_dir) if imagery_dir else self.root/'originals/imagery','dem':Path(dem_dir) if dem_dir else self.root/'originals/dem'}
         self.original_dirs={'satellite':Path(imagery_dir).resolve() if imagery_dir else self.root/'originals/imagery','elevation':Path(dem_dir).resolve() if dem_dir else self.root/'originals/dem'}
         for folder in ('jobs','staging','packages','exports','incoming','history','maintenance'): (self.root/folder).mkdir(parents=True,exist_ok=True)
-    def heartbeat(self):atomic(self.root/'worker.json',{'version':1,'updatedAt':now(),'singleWriter':True,'maintenanceVersion':1,'legacyReset':set(self.maintenance_dirs)=={'tpk','osm','street','elevation'},'currentJob':self.request['id'] if self.request else None});self.last_heartbeat=time.monotonic()
+    def heartbeat(self):atomic(self.root/'worker.json',{'version':1,'updatedAt':now(),'singleWriter':True,'maintenanceVersion':1,'selectionVersion':1,'legacyReset':set(self.maintenance_dirs)=={'tpk','osm','street','elevation'},'currentJob':self.request['id'] if self.request else None});self.last_heartbeat=time.monotonic()
     def registry(self):
         p=self.root/'active.json'
         if not p.exists():return {'version':1,'revision':0,'layers':{}}
@@ -28,6 +28,9 @@ class Worker:
             if not isinstance(ids,list) or len(ids)>32:raise WorkError('Invalid satellite package list')
             for id in ids:identity(id)
             if len(set(ids))!=len(ids) or (ids[-1] if ids else None)!=v['layers'].get('satellite'):raise WorkError('Invalid satellite package selection')
+        if 'satelliteVisible' in v and type(v['satelliteVisible']) is not bool:raise WorkError('Invalid satellite visibility')
+        if v.get('satelliteVisible') is False and (v['layers'].get('satellite') or self.satellite_packages(v)):raise WorkError('Hidden satellite has active packages')
+        if 'satelliteSelectionJob' in v:identity(v['satelliteSelectionJob'])
         return v
     def satellite_packages(self,r):return r.get('satellitePackages',[r['layers']['satellite']] if r['layers'].get('satellite') else [])
     def save(self):self.state['updatedAt']=now();atomic(self.root/'jobs'/(self.request['id']+'.state.json'),self.state);self.heartbeat()
@@ -104,8 +107,21 @@ class Worker:
                 satellites=[old for old in satellites if old!=id]+[id]
                 if len(satellites)>32:raise WorkError('위성 패키지는 최대32개를 함께 표시할 수 있습니다. 기존 파일 기반 지도로 돌아간 뒤 필요한 패키지만 다시 등록하세요. 준비 파일은 보존했습니다.')
             layers.update({kind:id for kind in m['items']})
+        flags={k:r[k] for k in ('satelliteVisible','satelliteSelectionJob') if k in r} if id is not None else {}
+        if id and 'satellite' in m['items']:flags['satelliteVisible']=True
         atomic(self.root/'history'/f'{r["revision"]}.json',r)
-        self.check();atomic(self.root/'active.json',{'version':1,'revision':r['revision']+1,'layers':layers,'satellitePackages':satellites});self.committed=True;self.state['registered']=True
+        self.check();atomic(self.root/'active.json',{'version':1,'revision':r['revision']+1,'layers':layers,'satellitePackages':satellites,**flags});self.committed=True;self.state['registered']=True
+    def select_satellites(self):
+        r=self.registry()
+        if r['revision']!=self.request['registryRevision']:raise WorkError('등록 상태가 변경됐습니다. 다시 조회하고 선택을 적용하세요.')
+        ids=self.request['packageIds']
+        for id in ids:
+            self.check();m=packages.validate(self.root/'packages'/identity(id),self)
+            if m['id']!=id or 'satellite' not in m['items']:raise WorkError('선택한 패키지에 검증된 위성이 없습니다.')
+        layers=dict(r['layers']);layers.pop('satellite',None)
+        if ids:layers['satellite']=ids[-1]
+        self.check();atomic(self.root/'history'/f'{r["revision"]}.json',r)
+        self.check();atomic(self.root/'active.json',{'version':1,'revision':r['revision']+1,'layers':layers,'satellitePackages':ids,'satelliteVisible':bool(ids),'satelliteSelectionJob':self.request['id']});self.committed=True;self.state.update(selectionApplied=True,selectedPackageIds=ids)
     def recover(self):
         for p in (self.root/'jobs').glob('*.state.json'):
             s=read_json(p)
@@ -114,6 +130,7 @@ class Worker:
                 # Activation is a commit point: recover a published result even if the last state write was interrupted.
                 r=self.registry()
                 if s.get('packageId') and s['packageId'] in [*r['layers'].values(),*self.satellite_packages(r)]:s.update(state='partial' if any(i.get('state')!='completed' for i in s.get('items',{}).values()) else 'completed',stage='등록 결과 복구',registered=True)
+                if s.get('request',{}).get('type')=='select' and r.get('satelliteSelectionJob')==id:s.update(state='completed',stage='표시 선택 결과 복구',selectionApplied=True,selectedPackageIds=s['request']['packageIds']);s.pop('error',None)
                 atomic(p,s);shutil.rmtree(self.root/'staging'/id,ignore_errors=True)
         for p in (self.root/'staging').glob('*.part'):p.unlink(missing_ok=True)
         # Only this locked worker writes export parts; incoming uploads may still be live in web.
@@ -124,6 +141,7 @@ class Worker:
         try:
             self.check()
             if request['type']=='reset':self.stage('register','기존 파일 기반 지도 선택');self.activate();self.state.update(state='completed',stage='기존 지도 선택 완료');return
+            if request['type']=='select':self.stage('verify','선택한 위성 지도 검사');self.select_satellites();self.state.update(state='completed',stage='위성 표시 선택 적용 완료');return
             if request['type']=='activate':
                 self.stage('verify','준비된 패키지 검사');self.state['packageId']=request['packageId'];self.save();self.activate(request['packageId']);self.state.update(state='completed',stage='등록 완료');return
             items={}
