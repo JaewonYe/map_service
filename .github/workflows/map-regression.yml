@@ -157,6 +157,14 @@ jobs:
         run: |
           set -o pipefail
           docker run --rm --network none --read-only --tmpfs /tmp:rw,size=1g -v "$PWD:/source:ro" -e DOWNLOAD_CODE_ROOT=/source --entrypoint /usr/bin/python3 map-service-download-worker:ci /source/scripts/ci/download-worker.py 2>&1 | tee .cache/ci/downloads/worker.log
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Verify isolated maintenance retry with production image
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/verify-maintenance-retry.mjs 2>&1 | tee .cache/ci/downloads/retry.log
       - name: Preserve download diagnostics
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

@@ -512,3 +512,13 @@ V1 압축 bundle 검사는 유일한 record offset의 길이를 파일 오름차
 사용자 요청으로 다운로드 페이지의 기본 태안군/시험장 표현·고정 지역 선택·초기 영역을 없애고 명시 영역 선택부터 시작한다. 표시 상세도의 사용자 지정에서 위성 최소·최대0–19를 직접 입력하고 빈 값/소수/범위/역전/확인된 제공처 LOD 누락을 표시·차단한다. 사용자 지정 초안은 provider 갱신/테마/프리셋 왕복에도 자동 보정하지 않고 유지한다. 위성 해제 시 그 초안이 다른 원본 작업을 막지 않는다. 고도/기존 preset·모든 서버/worker 한도/인증/CAS·자료/과거 이름·CLI·공통 API/상위 gitlink·Cloud 허용 목록은 유지한다.
 
 로컬 Node126(앱121+도구5), typecheck/production build, Playwright82(single4/multi15/osm10/layers18/buildings35), 디자인92자산/3스킬·diff 검사 통과. 최초 nullable 타입 오류는 viewTarget 타입을 바로잡아 해결했고, 모바일 캡처 스크롤을 보완한 뒤 [양 테마 desktop/mobile 화면과 실제 production HTTP 검토](DOWNLOAD_UI_REVIEW.md#범용-다운로드사용자-지정-level-검토)를 통과했다. 새 실제 API 브라우저 시험은 초기 미선택 상태·일반 제목, 명시0/0–0.1/0.1 영역과 위성0–13이 plan/queue에 그대로 저장되는 것을 검사한다. 두 번째 시험은 오류·확인 LOD의 중간 누락·사용자 초안 보존/위성 해제 동작을 검사한다. 기존 실제 큐 시험은 고정 지역 UI 대신 명시 좌표와 실제 PBF 제공 지역 선택을 사용하도록 바꿨으며 API/assertion·reload/cancel 검사는 유지했다. 실제 데이터/Windows/원본 다운로드 검증과 구분하고 #20 미완료3조건은 유지한다. 최종 SHA의 PR/main CI(run·수치·artifact)는 #20 댓글에 기록한다.
+
+### 유지보수 파일시스템 진단·격리 재시도
+
+실패를 일반 문구로만 처리하던 유지보수에 안전한 errno/단계/root/항목 순번을 추가한다. UI 문구/레이아웃·이동·등록/저널/잠금 동작은 유지한다. 예외 원문·파일명·호스트 경로·인증값은 새 state.failure/log에 넣지 않는다. 설치된 이미지와 실제 마운트를 사용하는 Node/Python 오프라인 1회 재시도 도구는 기존 요청만 처리하고 종료 확인 후 원래 실행 상태를 복구한다. 원래 env/CA/TLS와 저장 경로는 변경하지 않는다. 실제 운영 환경의 경로/식별자/진행 상태는 공개 검증 기록에 포함하지 않는다.
+
+Worker46: 신규2개는 합성 EBUSY/EACCES/EROFS/EXDEV/ENOSPC/ENOTEMPTY 발생 시 원본/복구 잠금 유지·민감한 예외 문자열 비노출·동일 저널 재시작/복원을 검사한다. rename 뒤 저널 쓰기의 ENOSPC도 이미 이동한 백업을 잃지 않고 복구한다. 최초 로컬 실행은 /tmp를512MiB로 잡아 기존512MiB 여유 예약 조건 때문에 여러 시험이 실패했다. 제품 제한은 바꾸지 않고 CI와 같은1GiB tmpfs로 다시 실행해46개를 통과했다.
+
+Node129(앱124+도구5, downloads23): 신규3개는 Docker CLI fixture로 지도 경로만 전달/비밀 원문 비노출, 정확한 기존 마운트·사용자/오프라인 실행, 서비스 중지·복구 순서, 대기 요청 없음의 무변경, 진단 프로세스 실패 시 종료/복구를 검사한다. typecheck/production image의 Compose 인증4/디자인92자산·3스킬 검사를 함께 수행한다. UI 구현 변경이 없어 새 UI 캡처는 생성하지 않는다.
+
+`scripts/verify-maintenance-retry.mjs`는 CC0 바이트·설치된 production 이미지와 합성 수명주기 컨테이너만 사용한다. web/원래 worker 역할은 SIGTERM을 처리하는 sleep fixture이며, 격리 재시도는 실제 Worker/maintenance/flock/파일시스템을 실행한다. POSIX0555 백업 디렉터리의 실제 EACCES를 확인하고 기존 서비스/합성 인증·CA 설정을 복구한 뒤 권한 조건을 해소해 같은 저널 완료/원본 바이트 보존을 확인한다. 예전/새 로컬 이미지 호환 시험과 CI production 이미지 시험을 구분하며 Windows 실기·실제 데이터 복구 완료를 주장하지 않는다. 재현은 worker 이미지를 빌드한 뒤 `MAINTENANCE_RETRY_IMAGE=이미지이름 node scripts/verify-maintenance-retry.mjs`이며 POSIX 권한 fixture이므로 Linux에서 실행한다. 임시 fixture와 컨테이너만 정리한다. 최종 SHA의 PR/main 검사 수·run/artifact 증거는 관련 이슈에 개인 환경 정보 없이 기록한다.

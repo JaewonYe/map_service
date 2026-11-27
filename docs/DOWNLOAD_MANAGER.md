@@ -237,3 +237,21 @@ $downloadEnvArgs += @('--env-file', '.env.downloads')
 docker compose @downloadEnvArgs up -d --build web
 docker compose @downloadEnvArgs port web 3001
 ```
+
+### 정리 잠금이 남을 때의 격리 재시도
+
+`pending`은 작업 잠금 유무이며 진행/실패 여부와 구분한다. 새 worker는 처리 중 발생한 OSError를 `maintenance/<id>.state.json`의 `failure`와 `MAP_MAINTENANCE_FILESYSTEM_ERROR=` 로그에 기록한다. errno 코드·처리 단계·고정 root 종류·항목 순번만 포함하며 예외 원문/파일명/호스트 경로/인증값은 넣지 않는다. 기존 UI 오류 문구·저널·복구 잠금·등록/이동 방식은 유지한다. `EBUSY`는 사용 중인 경로, `EACCES`/`EPERM`은 권한, `EROFS`는 읽기 전용, `EXDEV`는 파일시스템 경계, `ENOSPC`는 여유 공간, `ENOTEMPTY`는 대상 폴더 충돌을 확인하는 단서다. 이 코드만으로 실제 OS의 원인을 단정하지 않는다.
+
+기존 이미지에서도 아래 도구를 사용할 수 있다. Node.js22 이상과 Docker, 현재 프로젝트의 기존 download-worker 컨테이너/로컬 이미지가 필요하다. Git이나 새 이미지 빌드·제공처 연결은 필요하지 않다.
+
+```powershell
+node scripts/retry-map-maintenance.mjs
+```
+
+다른 Compose 프로젝트 이름을 사용했다면 `--worker-container 컨테이너이름`을 지정한다. 도구는 service label이 download-worker인 단일 컨테이너만 허용한다. 먼저 기존 마운트를 읽기 전용으로 연결한 격리 컨테이너에서 요청/저널을 조회한다. 대기 요청이 없으면 서비스 상태를 바꾸지 않는다. 준비되지 않은/잘못된 저널은 진행하지 않는다.
+
+재시도 가능한 기존 저널이 있으면 현재 프로젝트의 예전 imagery 서비스를 중지하고 web/worker를 잠시 중지한다. **설치된 동일 이미지·사용자·마운트·지도 경로**로 네트워크 없는 격리 worker를 실행해 기존 요청을 한 번 이어 처리한다. 비밀 환경변수는 새 컨테이너에 전달하지 않으며 진단에는 예외 원문/호스트 경로/파일명/작업 ID를 출력하지 않는다. 기존 컨테이너를 재생성하거나 env/TLS/CA 설정을 변경하지 않는다. 새 정리 요청 생성·저널 편집·잠금 수동 해제·백업 삭제·강제 덮어쓰기는 하지 않는다.
+
+진단 컨테이너의 종료를 확인한 뒤 원래 실행 중이던 worker와 web을 다시 시작한다. 예전 imagery 서비스는 중지 상태를 유지한다. 원래 중지되어 있던 서비스는 자동 시작하지 않는다. 출력 마지막 JSON의 `pending:false`가 잠금 해제다. 계속 true면 `failure.code`와 진행 수치를 확인한다. 진단 프로세스 실패/중단도 종료 확인과 서비스 복구를 시도하며, 종료를 확인하지 못하면 중복 writer를 막기 위해 원래 서비스를 자동 시작하지 않는다. `pending:true` 또는 runner 오류는 종료 코드2, 도구 실행 오류는1이다. 진단 정보가 없어도 원문 로그/환경변수를 덤프하지 않는다.
+
+이 도구는 원인을 보여주고 **기존 정리를 재시도**한다. 잠금·ACL·읽기 전용·디스크 문제를 우회하지 않는다. 실제 복구 완료는 실행 결과로 확인해야 한다. 작업과 관련된 지도 프로그램/별도 준비 도구는 종료하고, 파일 권한이나 저장 경로를 바꾸기 전 저널과 백업을 보존한다.

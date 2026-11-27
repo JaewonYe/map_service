@@ -1,5 +1,5 @@
 """Synthetic localhost transport tests; NOT real provider permission/download evidence."""
-import copy, hashlib, http.server, io, json, os, pathlib, shutil, signal, socketserver, sqlite3, stat, struct, subprocess, sys, tempfile, threading, time, unittest, urllib.request, uuid, zipfile
+import contextlib, copy, errno, hashlib, http.server, io, json, os, pathlib, shutil, signal, socketserver, sqlite3, stat, struct, subprocess, sys, tempfile, threading, time, unittest, urllib.request, uuid, zipfile
 from unittest.mock import patch
 ROOT=pathlib.Path(os.getenv('DOWNLOAD_CODE_ROOT',pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0,str(ROOT/'scripts/downloads'));sys.path.insert(0,str(ROOT/'tests'))
@@ -608,5 +608,44 @@ class DownloadsWorker(unittest.TestCase):
         atomic(self.worker.root/'active.json',{'version':1,'revision':0,'layers':{}});none=self.selection_request([]);self.assertEqual(self.saved_job(none)['state'],'completed')
         clear=self.maintenance_request('clear');self.assertEqual(self.run_maintenance(clear)['state'],'completed');self.assertNotIn('satelliteVisible',self.worker.registry())
         restore=self.maintenance_request('restore',backupId=clear['id']);self.assertEqual(self.run_maintenance(restore)['state'],'completed');self.assertFalse(self.worker.registry()['satelliteVisible'])
+
+    def test_45_maintenance_os_failures_are_safe_and_restart_preserves_the_same_backup(self):
+        from maintenance import marker
+        sentinel='synthetic-private-exception-value'
+        for number in (errno.EBUSY,errno.EACCES,errno.EROFS,errno.EXDEV,errno.ENOSPC,errno.ENOTEMPTY):
+            with self.subTest(errno=number):
+                base=self.root/str(number);imagery=base/'imagery';dem=base/'dem';source=imagery/'map-group';source.mkdir(parents=True);(source/'pixels.bin').write_bytes(b'CC0 preserve source pixels')
+                self.worker=Worker(base/'downloads',ROOT,NoNetwork(),offline=True,imagery_dir=imagery,dem_dir=dem)
+                q=self.maintenance_request('clear');real_replace=os.replace;output=io.StringIO()
+                def block(src,dst):
+                    if Path(src)==source:raise OSError(number,sentinel,'/private/'+sentinel)
+                    return real_replace(src,dst)
+                with patch('maintenance.os.replace',side_effect=block),contextlib.redirect_stdout(output):state=self.run_maintenance(q)
+                journal=read_json(self.worker.root/'maintenance'/(q['id']+'.journal.json'));saved_marker=marker(self.worker.root).read_bytes()
+                self.assertEqual(state['state'],'failed');self.assertTrue(state['recoveryRequired']);self.assertEqual(journal['phase'],'moving')
+                self.assertEqual(state['failure'],{'code':errno.errorcode[number],'errno':number,'operation':'rename','root':'imagery','entryIndex':journal['moved'],'total':len(journal['entries'])})
+                self.assertEqual((source/'pixels.bin').read_bytes(),b'CC0 preserve source pixels');self.assertNotIn(sentinel,json.dumps(state));self.assertNotIn(sentinel,output.getvalue());self.assertNotIn(q['id'],output.getvalue());self.assertIn('MAP_MAINTENANCE_FILESYSTEM_ERROR=',output.getvalue())
+                self.worker=Worker(self.worker.root,ROOT,NoNetwork(),offline=True,imagery_dir=imagery,dem_dir=dem);self.assertEqual(marker(self.worker.root).read_bytes(),saved_marker);self.worker.run(once=True)
+                done=read_json(self.worker.root/'maintenance'/(q['id']+'.state.json'));self.assertEqual(done['state'],'completed',done);self.assertNotIn('failure',done);self.assertFalse(marker(self.worker.root).exists());self.assertEqual(self.worker.registry()['revision'],1)
+                self.assertEqual((imagery/'.map-trash'/q['id']/'map-group/pixels.bin').read_bytes(),b'CC0 preserve source pixels')
+                restore=self.maintenance_request('restore',backupId=q['id']);self.assertEqual(self.run_maintenance(restore)['state'],'completed');self.assertEqual((source/'pixels.bin').read_bytes(),b'CC0 preserve source pixels')
+
+    def test_46_journal_write_failure_after_a_rename_recovers_without_losing_the_backup(self):
+        from maintenance import marker
+        package=self.worker.root/'packages'/str(uuid.uuid4());package.mkdir();(package/'pixels.bin').write_bytes(b'CC0 durable backup')
+        q=self.maintenance_request('clear');jp=self.worker.root/'maintenance'/(q['id']+'.journal.json');backup=self.worker.root/'.map-trash'/q['id']/'packages';real_replace=os.replace;renamed=False;raised=False
+        def fail_after_rename(src,dst):
+            nonlocal renamed,raised
+            if Path(dst)==jp and renamed and not raised:
+                raised=True;raise OSError(errno.ENOSPC,'synthetic-private-disk-message','/private/synthetic-private-path')
+            result=real_replace(src,dst)
+            if Path(src)==self.worker.root/'packages':renamed=True
+            return result
+        output=io.StringIO()
+        with patch('maintenance.os.replace',side_effect=fail_after_rename),contextlib.redirect_stdout(output):state=self.run_maintenance(q)
+        self.assertTrue(raised);self.assertEqual(state['failure']['code'],'ENOSPC');self.assertEqual(state['failure']['operation'],'write-journal');self.assertTrue(state['recoveryRequired']);self.assertEqual((backup/package.name/'pixels.bin').read_bytes(),b'CC0 durable backup');self.assertNotIn('synthetic-private',json.dumps(state)+output.getvalue())
+        journal=read_json(jp);self.assertEqual(state['failure']['entryIndex'],journal['moved']);self.assertTrue(marker(self.worker.root).exists())
+        self.worker=Worker(self.worker.root,ROOT,NoNetwork(),offline=True);self.worker.run(once=True)
+        done=read_json(self.worker.root/'maintenance'/(q['id']+'.state.json'));self.assertEqual(done['state'],'completed',done);self.assertNotIn('failure',done);self.assertFalse(marker(self.worker.root).exists());self.assertEqual((backup/package.name/'pixels.bin').read_bytes(),b'CC0 durable backup');self.assertEqual(self.worker.registry()['revision'],1)
 
 if __name__=='__main__':unittest.main()

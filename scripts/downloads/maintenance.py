@@ -3,7 +3,7 @@
 A durable pending request blocks new web writes and map reads. A journal records
 same-filesystem renames before changing the registry; restart rolls it forward.
 """
-import copy, os, time
+import copy, errno, json, os, time
 from pathlib import Path
 from common import WorkError, atomic, read_json, identity, now
 
@@ -33,14 +33,26 @@ def marker(root):return Path(root)/'maintenance.pending.json'
 def folder(root):return Path(root)/'maintenance'
 def layers(r):return {'layers':r['layers'],'satellitePackages':r.get('satellitePackages',[r['layers']['satellite']] if r['layers'].get('satellite') else []),**{k:r[k] for k in ('satelliteVisible','satelliteSelectionJob') if k in r}}
 
+def filesystem_failure(error,context):
+    # Never copy exception text/filenames: those may contain host paths or secrets.
+    number=error.errno if type(error.errno) is int else None
+    result={'code':errno.errorcode.get(number,'OS_ERROR'),'errno':number}
+    allowed_operations={'ensure-map-root','inspect','remove-empty-backup','prepare-backup-directory','rename','write-journal'}
+    if context.get('operation') in allowed_operations:result['operation']=context['operation']
+    if context.get('root') in {'downloads','imagery','dem','tpk','osm','street','elevation'}:result['root']=context['root']
+    for key in ('entryIndex','total'):
+        if type(context.get(key)) is int and 0<=context[key]<=1000:result[key]=context[key]
+    return result
+
 class Maintenance:
-    def __init__(self,w):self.w=w;self.base=folder(w.root);self.base.mkdir(exist_ok=True)
+    def __init__(self,w):self.w=w;self.base=folder(w.root);self.base.mkdir(exist_ok=True);self.io_context={}
     def roots(self,legacy=False):
         result={'downloads':self.w.root,**self.w.maintenance_original_dirs}
         if legacy:
             if set(self.w.maintenance_dirs)!={'tpk','osm','street','elevation'}:raise WorkError('수동 지도 초기화 경로가 없습니다. web과 worker를 함께 업데이트하세요.')
             result.update(self.w.maintenance_dirs)
         for key,path in result.items():
+            self.io_context={'operation':'ensure-map-root','root':key}
             path=Path(path)
             if path.is_symlink() or path.resolve()==Path('/'):raise WorkError('Invalid maintenance root')
             path.mkdir(parents=True,exist_ok=True)
@@ -51,6 +63,7 @@ class Maintenance:
                 if key==other:continue
                 if key!='downloads' and other=='downloads' and other_path.is_relative_to(path):raise WorkError('지도 전용 경로가 다운로드 관리 경로를 포함합니다. 저장 경로를 분리하세요.')
                 if key!='downloads' and other!='downloads' and path.is_relative_to(other_path):raise WorkError('지도 전용 저장 경로가 서로 겹칩니다. 경로를 분리하세요.')
+        self.io_context={}
         return result
     def path(self,roots,entry,backup=False):
         key,name=entry['root'],entry['name'];root=roots.get(key)
@@ -156,6 +169,7 @@ class Maintenance:
             j['phase']='moving';atomic(jp,j)
         if j['phase']=='moving':
             for i,e in enumerate(j['entries']):
+                self.io_context={'operation':'inspect','root':e['root'],'entryIndex':i,'total':len(j['entries'])}
                 src=self.path(roots,e,op=='restore');dst=self.path(roots,e,op!='restore')
                 if i<j['moved']:
                     if not dst.exists():raise WorkError('완료된 백업 이동 파일이 누락됐습니다.')
@@ -166,10 +180,12 @@ class Maintenance:
                 elif src.exists():
                     if dst.exists():
                         if not vacant(dst):raise WorkError('백업 이동 충돌. 중간 자료를 보존했습니다. worker 재시작 후 상태를 확인하세요.')
-                        remove_empty(dst)
-                    dst.parent.mkdir(parents=True,exist_ok=True);os.replace(src,dst)
+                        self.io_context['operation']='remove-empty-backup';remove_empty(dst)
+                    self.io_context['operation']='prepare-backup-directory';dst.parent.mkdir(parents=True,exist_ok=True)
+                    self.io_context['operation']='rename';os.replace(src,dst)
                 elif not dst.exists():raise WorkError('백업 파일이 누락됐습니다. 수동 복구 전 기존 백업을 보존하세요.')
-                j['moved']=i+1;atomic(jp,j);w.heartbeat()
+                self.io_context['operation']='write-journal';j['moved']=i+1;atomic(jp,j);w.heartbeat()
+            self.io_context={}
             if op=='restore':
                 r=w.registry();expected=j['before']
                 restored={'version':1,'revision':expected['revision']+1,**j['after']}
@@ -180,7 +196,7 @@ class Maintenance:
         return j
     def run(self,q):
         q=validate(q);w=self.w;id=identity(q['id']);jp=self.base/(id+'.journal.json');state_path=self.base/(id+'.state.json')
-        w.request=q;w.started=time.monotonic();w.committed=False
+        w.request=q;w.started=time.monotonic();w.committed=False;self.io_context={}
         state={'id':id,'request':q,'state':'running','stage':'지도 백업 이동·등록 정리','createdAt':q['createdAt'],'updatedAt':now()};atomic(state_path,state);w.heartbeat()
         try:
             j=read_json(jp,1048576) if jp.exists() else self.prepare(q)
@@ -190,6 +206,9 @@ class Maintenance:
             state.update(state='completed',stage='백업 복원 완료' if q['operation']=='restore' else '삭제·초기화 완료 (백업 보관)',backupId=None if q['operation']=='restore' else id)
         except Exception as e:
             state.update(state='failed',stage='정리 중단',error=str(e) if isinstance(e,WorkError) else '지도 파일 이동 실패. 백업과 저널을 보존했습니다.')
+            if isinstance(e,OSError):
+                state['failure']=filesystem_failure(e,self.io_context)
+                print('MAP_MAINTENANCE_FILESYSTEM_ERROR='+json.dumps(state['failure']),flush=True)
             # A started move must be resumed under the same durable request; keep the read/write gate.
             if jp.exists():
                 try:
