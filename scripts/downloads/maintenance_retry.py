@@ -37,7 +37,7 @@ try:
             global last_error
             try:return function(*args,**kwargs)
             except OSError as error:
-                if not (operation=='mkdir' and error.errno==errno.EEXIST):
+                if not (operation=='mkdir' and error.errno in (errno.EEXIST,errno.ENOENT)):
                     number=error.errno if type(error.errno) is int else None
                     last_error={'code':errno.errorcode.get(number,'OS_ERROR'),'errno':number,'operation':operation}
                 raise
@@ -45,6 +45,13 @@ try:
     os.replace=trace(os.replace,'replace')
     os.mkdir=trace(os.mkdir,'mkdir')
     os.rmdir=trace(os.rmdir,'rmdir')
+    from maintenance import Maintenance
+    original_run=Maintenance.run
+    def observed_run(self,request):
+        global last_error
+        last_error=None
+        return original_run(self,request)
+    Maintenance.run=observed_run
     from worker import Worker
     legacy={key:Path(os.environ[name]) for key,name in [('tpk','MAP_MAINTENANCE_TPK_DIR'),('osm','MAP_MAINTENANCE_OSM_DIR'),('street','MAP_MAINTENANCE_STREET_DIR'),('elevation','MAP_MAINTENANCE_ELEVATION_DIR')] if os.getenv(name)}
     worker=Worker(root,offline=True,imagery_dir=os.getenv('MAP_IMAGERY_DIR'),dem_dir=os.getenv('MAP_DEM_DIR'),maintenance_dirs=legacy)
