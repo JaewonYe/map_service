@@ -1,0 +1,94 @@
+{
+  "source": "Real production Next.js HTTP UI with empty review data; no provider downloads, no worker and no mocks",
+  "captures": [
+    {
+      "file": "desktop-light-initial.png",
+      "device": "desktop",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "state": "initial-no-area"
+    },
+    {
+      "file": "desktop-light-custom.png",
+      "device": "desktop",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "state": "custom-0-13"
+    },
+    {
+      "file": "desktop-dark-custom.png",
+      "device": "desktop",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "state": "custom-0-13"
+    },
+    {
+      "file": "mobile-light-custom.png",
+      "device": "mobile",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "state": "custom-0-13"
+    },
+    {
+      "file": "mobile-dark-custom.png",
+      "device": "mobile",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "state": "custom-0-13"
+    }
+  ],
+  "checks": [
+    {
+      "device": "desktop",
+      "theme": "light",
+      "noFixedPlaceOrRectangle": true,
+      "customDraftEditable": true,
+      "invalidRangeBlocked": true,
+      "blankRemainsInvalid": true,
+      "noHorizontalOverflow": true
+    },
+    {
+      "device": "desktop",
+      "theme": "dark",
+      "noFixedPlaceOrRectangle": true,
+      "customDraftEditable": true,
+      "invalidRangeBlocked": true,
+      "blankRemainsInvalid": true,
+      "noHorizontalOverflow": true
+    },
+    {
+      "device": "mobile",
+      "theme": "light",
+      "noFixedPlaceOrRectangle": true,
+      "customDraftEditable": true,
+      "invalidRangeBlocked": true,
+      "blankRemainsInvalid": true,
+      "noHorizontalOverflow": true
+    },
+    {
+      "device": "mobile",
+      "theme": "dark",
+      "noFixedPlaceOrRectangle": true,
+      "customDraftEditable": true,
+      "invalidRangeBlocked": true,
+      "blankRemainsInvalid": true,
+      "noHorizontalOverflow": true
+    }
+  ],
+  "externalRequests": 0
+}

@@ -131,3 +131,6 @@ UI UX Pro Max와 Web Design Guidelines를 `.agents/skills/`에 설치하고 AGEN
 
 
 - #20 사용자 확인 “위성 지도 우선”에 따라 다운로드한 위성 목록의 체크/전체 선택·해제/일괄 표시 적용을 추가한다. 준비 manifest 요약만 공개하고 worker selectionVersion1·해시/형식/권한 재검사·revision/CAS로 type:select를 처리한다. satelliteVisible:false는 수동 위성 fallback 없이 전체 해제 상태를 저장하며 reset/새 위성 등록/정리 복원과 구분한다. 실제 native 줌→기존 role/priority→managed 유효 요청 범위 크기→최근 선택으로 합성하고 수동 카탈로그 우선순위는 보존한다. 미리보기는 revision 갱신 시 위치/줌/다운로드 사각형을 유지하며 명시 영역 보기만 카메라를 이동한다. OSM/고도/시설/ZIP/원본·공통 API/gitlink·Cloud 허용 목록은 변경하지 않는다. web/worker 동시 업그레이드 필요. 합성 CC0/실제 HTTP+오프라인 worker 검증과 공식 원본/사용자 PC 표시 검증은 구분하며 최종 PR/main 증거는 #20에 기록한다.
+
+
+- 2026-11-27 사용자 요청에 따라 웹 다운로드 페이지의 태안군/시험장 브랜드·기본 작업명·고정 지역 프리셋/초기 사각형을 제거하고 세계 국가 개요/영역 미선택으로 시작한다. 표시 상세도에 사용자 지정을 추가해 위성0–19 최소/최대 정수를 직접 입력한다. 범위·순서·확인된 제공처 LOD를 검사하고 입력/초안을 자동 보정하지 않으며 고도 설정과 구분한다. 실제 계획/queue API로 입력 level·영역을 그대로 보존하는 브라우저 회귀를 추가한다. 기존 source 한도/인증/worker/CAS·저장 자료·과거 사용자 이름·태안 CLI·공통 API/상위 gitlink/Cloud 허용 목록은 유지한다. Git 없는 Windows 배포는 소스 ZIP과 기존 env/data 보존 후 Docker 재빌드를 안내한다. 최종 UI/기능/CI 증거는 다운로드 검토 문서와 #20에 기록한다.

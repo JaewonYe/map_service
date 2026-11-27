@@ -85,3 +85,17 @@ production worker 이미지로 `tests/fixtures/downloads-proof.py <새 격리 �
 검토: named section/순서 있는 제목·네이티브 체크박스와 클릭 라벨/name·버튼/링크 구분·visible focus·44px 컨트롤·비활성/진행/오류 상태·aria-live 개수·오류 포커스를 유지한다. 체크 초안/적용 상태를 문자로 구분하고 충돌 시 입력과 원래 revision을 보존한다. 많은 패키지는 스크롤 목록/content-visibility로 처리하고 긴 이름은 줄바꿈한다. 모바일에서도 적용 버튼을 목록 앞에 두고 상단 미리보기 이동 링크를 제공한다. 빈 목록/권한 미확인/구 worker 조건을 설명한다. 회귀80개는 두 선택 시나리오와 기존 테마/지도/시설/경계/OSM 편집을 포함한다.
 
 재현: `docker build -f scripts/downloads/Dockerfile -t map-service-download-worker:selection .`, `npm run build`, `npx tsx scripts/capture-map-selection-review.ts`. 자체 `.cache/map-selection-review`만 사용하며 실제 data 폴더를 변경하지 않는다. Docker/Chromium이 필요하고 테스트 컨테이너는 종료한다.
+
+## 범용 다운로드·사용자 지정 level 검토 (2026-11-27)
+
+다운로드 페이지의 브랜드/브라우저 제목·기본 작업명과 고정 지역 프리셋·초기 사각형을 일반화했다. 세계 국가 개요는 초기 탐색용이며 다운로드 영역은 명시 선택 전까지 없다. 사용자 지정 상세도의 위성 최소·최대 level은 숫자 필드로 노출한다. platform-ui-design/MASTER/IMPLEMENTATION 및 로컬 reference 양 테마·크기, UI UX Pro Max의 `numeric input validation` 검색(Input Types/Input Labels/Inline Validation 권고), Web Design Guidelines 번들 기준을 적용했다. 공통 토큰/디자인 자산은 유지했다.
+
+| Desktop Light | Desktop Dark | Mobile Light | Mobile Dark |
+| --- | --- | --- | --- |
+| [사용자 지정](ui/generic-download/desktop-light-custom.png) | [사용자 지정](ui/generic-download/desktop-dark-custom.png) | [사용자 지정](ui/generic-download/mobile-light-custom.png) | [사용자 지정](ui/generic-download/mobile-dark-custom.png) |
+
+[초기 화면](ui/generic-download/desktop-light-initial.png) / [manifest](ui/generic-download/manifest.json). 실제 production Next.js HTTP와 빈 전용 review 데이터 폴더를 사용했다. mock 응답/worker/제공처 인증·다운로드는 사용하지 않았으며 worker 미연결을 그대로 표시한다. 양 테마에서 헤더/제목·고정 지명 부재/미선택 사각형/사용자 지정0–13/역전·빈 값 오류·기본 상태를 확인했다. 1440×900/390×844 가로 넘침 없음, 포커스한 입력이 sticky header/footer에 가리지 않음, 외부 요청0. 처음 캡처의 모바일 필드가 화면 아래에 잘려 보여 입력을 가운데로 스크롤하도록 캡처 스크립트를 보완한 뒤 4장을 다시 확인했다. 이는 제공처 실원본/coverage 검증이 아니다.
+
+검토 파일: `app/downloads/page.tsx:4` 제목 override와 일반 브랜드, `components/DownloadManager.tsx:25` 별도 입력 초안/계획 무효화, `components/DownloadManager.tsx:31` 정수·범위·순서·확인 LOD 검사, `components/DownloadManager.tsx:60` label/id/name·number/min/max/step/inputMode·autocomplete·aria-invalid/describedby/문자 오류 안내, `components/DownloadAreaMap.tsx:8` 세계 개요와 `:32` null 사각형 처리. 네이티브 키보드·버튼·visible focus·양 테마 컨트롤·44px 터치를 유지하며 새로운 확인창/외부 타일/테마 변형은 추가하지 않았다. 초기 타입검사에서 nullable viewTarget 타입을 좁혀 수정한 뒤 typecheck/build와 전체 브라우저82개를 통과했다. 신규2개는 실제 계획/queue에 영역·level 보존 및 capability 갱신/테마/프리셋 전환 시 초안 유지와 오류 차단을 검사한다. 기존 테마/시설/경계/OSM 편집 회귀도 포함한다.
+
+재현: `npm run build`, `node scripts/capture-generic-download-review.mjs`. 자체 `.cache/generic-download-review`만 사용하며 실제 data/env를 변경하지 않는다. Chromium이 필요하며 테스트 서버는 종료한다.
